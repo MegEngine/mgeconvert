@@ -1,0 +1,3 @@
+build/*
+lib/cnlib/cambriconLib.py
+lib/cnlib/_cambriconLib.so
