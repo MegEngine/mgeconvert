@@ -17,7 +17,7 @@ def main():
         "-i", "--input", required=True, type=str, help="Input megengine dump model file"
     )
     parser.add_argument(
-        "-c", "--prototxt", required=True, type=str, help="Output caffe .prototxt file",
+        "-c", "--prototxt", required=True, type=str, help="Output caffe .prototxt file"
     )
     parser.add_argument(
         "-b",

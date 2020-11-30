@@ -1,5 +1,3 @@
-import numpy as np
-
 from .cnlib import cambriconLib as cnlib
 
 

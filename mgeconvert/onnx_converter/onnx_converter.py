@@ -22,9 +22,9 @@ class OnnxConverter:
             toponet, TopologyNetwork
         ), "net must be instance of TopologyNetwork"
         self.net = toponet
-        assert (
-            opset_version >= 7 and opset_version <= 12
-        ), "opset {} are not supported yet".format(opset_version)
+        assert 7 <= opset_version <= 12, "opset {} are not supported yet".format(
+            opset_version
+        )
         self.graph_name = graph_name
         self.opset_version = opset_version
 
@@ -116,7 +116,7 @@ def convert_to_onnx(mge_fpath, output="out.onnx", *, graph_name="graph", opset=8
     """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     net = TopologyNetwork(mge_fpath)
-    converter = OnnxConverter(net, opset)
+    converter = OnnxConverter(net, opset, graph_name)
     model = converter.convert()
 
     assert isinstance(output, str), "onnx_fpath must be string"

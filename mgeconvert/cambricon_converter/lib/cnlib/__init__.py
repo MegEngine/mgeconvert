@@ -6,4 +6,4 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from . import cambriconLib
+from . import cambriconLib  # type: ignore[attr-defined] # pylint: disable=import-self
