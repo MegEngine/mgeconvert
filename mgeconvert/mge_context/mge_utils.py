@@ -6,15 +6,16 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import sys
+
 import megengine as mge
 import numpy as np
-from megengine import get_logger as mge_get_logger
+from megengine.logger import get_logger
 
 mge_version = mge.__version__
 
 
 if mge_version <= "0.6.0":
-    # pylint: disable=import-error, no-name-in-module
     import megengine._internal as mgb
     from megengine._internal import cgtools
 else:
@@ -22,10 +23,6 @@ else:
     import megengine.core._imperative_rt as rt
     import megengine.utils.comp_graph_tools as cgtools
     from megengine.core.tensor.raw_tensor import as_raw_tensor
-
-
-def get_logger(*args):
-    return mge_get_logger(*args)
 
 
 def get_mge_version():
@@ -54,7 +51,7 @@ def get_symvar_value(sym_var):
 
 
 def isnum(x):
-    return isinstance(x, (int, float))
+    return isinstance(x, int) or isinstance(x, float)
 
 
 def isconst(x):
@@ -65,7 +62,7 @@ def isvar(x):
     return (
         isinstance(x, mgb.SymbolVar)
         if mge_version <= "0.6.0"
-        else isinstance(x, rt.VarNode)  # pylint: disable=c-extension-no-member
+        else isinstance(x, rt.VarNode)
     )
 
 
@@ -78,9 +75,8 @@ def get_dep_vars(x, type):
 
 
 def get_dtype_name(x):
-    return (
-        x.dtype.metadata["mgb_dtype"]["name"] if isinstance(x.dtype, np.dtype) else None
-    )
+    if isinstance(x.dtype, np.dtype):
+        return x.dtype.metadata["mgb_dtype"]["name"]
 
 
 def get_opr_type(x):

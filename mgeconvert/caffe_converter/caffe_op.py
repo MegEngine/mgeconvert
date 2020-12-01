@@ -32,7 +32,7 @@ from ..mge_context import (
     get_logger,
 )
 from ..mge_context.mge_utils import get_symvar_value, isconst
-from .caffe_pb import caffe_pb2 as cp  # pylint: disable=import-error
+from .caffe_pb import caffe_pb2 as cp
 
 logger = get_logger(__name__)
 MGE2CAFFE = {}
@@ -132,7 +132,7 @@ def _broadcast_for_eltwiseopr(oprname, InputA, InputB, context):
         if shpA == shpB:
             shape.append(shpA)
             continue
-        if shpA == 1:
+        elif shpA == 1:
             shape.append(shpB)
             bottom = topA
             name = oprname + context.gen_name
@@ -246,7 +246,7 @@ def _dimshufulle(opr, context):
     l = list(filter(lambda x: x != "x", list(opr.pattern)))
     assert len(l) == opr.inp_vars[0].ndim
     nl = []
-    for i, _ in enumerate(l):
+    for i in range(len(l)):
         while l[i] != i:
             j = l[i]
             nl.append((i, j))
@@ -288,28 +288,6 @@ def _subtensor(opr: SubtensorOpr, context):
 
     axis_suffixes = axis_suffix_gen()
 
-    def get_slice_list(n, s: slice, need_reverse=False):
-        l = np.arange(n)[s]
-        v = np.zeros(n + 1, dtype=bool)
-        if need_reverse:
-            v[l] |= True
-            v[l + 1] |= True
-        else:
-            v[l] ^= True
-            v[l + 1] ^= True
-        v[0] = False
-        return list(np.arange(n)[v[:-1]])
-
-    def get_concat_list(n, axis, s: slice):
-        l = np.arange(n)[s]
-        assert len(l) > 0, "got empty tensor in opr: {}, axis: {}.".format(opr, axis)
-        return list(l[np.insert(l[1:] - l[:-1] != 1, 0, True)])
-
-    def top_name(k, concat_list, name):
-        if k in concat_list and len(concat_list) == 1:
-            return name
-        return name + context.gen_name
-
     for i in range(0, len(opr.begin_param)):
         begin = opr.begin_param[i]
         end = opr.end_param[i]
@@ -319,8 +297,27 @@ def _subtensor(opr: SubtensorOpr, context):
 
         n = opr.inp_vars[0].shape[axis]
 
-        slice_list = get_slice_list(n, sl, step < 0)
-        concat_list = get_concat_list(n, axis, sl)
+        def get_slice_list(s: slice, need_reverse=False):
+            l = np.arange(n)[s]
+            v = np.zeros(n + 1, dtype=bool)
+            if need_reverse:
+                v[l] |= True
+                v[l + 1] |= True
+            else:
+                v[l] ^= True
+                v[l + 1] ^= True
+            v[0] = False
+            return list(np.arange(n)[v[:-1]])
+
+        def get_concat_list(s: slice):
+            l = np.arange(n)[s]
+            assert len(l) > 0, "got empty tensor in opr: {}, axis: {}.".format(
+                opr, axis
+            )
+            return list(l[np.insert(l[1:] - l[:-1] != 1, 0, True)])
+
+        slice_list = get_slice_list(sl, step < 0)
+        concat_list = get_concat_list(sl)
 
         if slice_list == [] or concat_list == []:
             continue
@@ -328,9 +325,12 @@ def _subtensor(opr: SubtensorOpr, context):
         bottom = top
         name = opr.name + next(axis_suffixes)
 
-        spldict = collections.OrderedDict(
-            [(k, top_name(k, concat_list, name)) for k in [0] + slice_list]
-        )
+        def top_name(k):
+            if k in concat_list and len(concat_list) == 1:
+                return name
+            return name + context.gen_name
+
+        spldict = collections.OrderedDict([(k, top_name(k)) for k in [0] + slice_list])
         top = list(spldict.values())
         context.add_layer(
             cp.LayerParameter(
@@ -342,7 +342,7 @@ def _subtensor(opr: SubtensorOpr, context):
             )
         )
         if len(concat_list) > 1:
-            bottom = list(map(lambda x, spl=spldict: spl[x], concat_list))  # type: ignore[misc]
+            bottom = list(map(lambda x: spldict[x], concat_list))
             name = name + "_concat"
             top = [name]
             context.add_layer(
@@ -360,7 +360,7 @@ def _subtensor(opr: SubtensorOpr, context):
         context.add_layer(
             list(
                 map(
-                    lambda _, spl=spldict: silence_blob(spl[_]),  # type: ignore[misc]
+                    lambda _: silence_blob(spldict[_]),
                     [_ for _ in [0] + slice_list if _ not in concat_list],
                 )
             )
@@ -382,7 +382,7 @@ def _subtensor(opr: SubtensorOpr, context):
 
 
 @_register_op(MultipleDeviceTensorHolderOpr, SharedDeviceTensorOpr)
-def _(*_):
+def _(opr, context):
     pass
 
 
@@ -409,14 +409,16 @@ def _arith(opr, mode, context):
             order = 0
         topA, topB, shape = _broadcast_for_eltwiseopr(opr.name, inpA, const, context)
 
-        layer_param = cp.ScaleParameter(axis=len(shape) - topB.ndim, num_axes=topB.ndim)
+        layer_param = cp.ScaleParameter(
+            axis=len(shape) - topB.ndim, num_axes=topB.ndim,
+        )
         if atype in {"ADD", "SUB"}:
             layer_param.bias_term = True
             param_b = topB
             param_k = np.ones(shape=param_b.shape)
             if atype == "SUB":
                 if order == 0:
-                    param_b = -param_b  # pylint: disable=invalid-unary-operand-type
+                    param_b = -param_b
                 else:
                     param_k = -param_k
             blobs = [context.gen_blob_proto(param_k), context.gen_blob_proto(param_b)]
@@ -635,7 +637,7 @@ def _pooling2d(opr, context):
     )
 
     if (nh - 1) * sh + kh > ph * 2 + ih:
-        logger.warning("Add extra 'slice layer' after Pooling Opr %s", opr.name)
+        logger.warning("Add extra 'slice layer' after Pooling Opr {}".format(opr.name))
         param = cp.SliceParameter(axis=2, slice_point=[nh - 1])
         bottom = top[:1]
         name = opr.name + context.gen_name
@@ -647,7 +649,7 @@ def _pooling2d(opr, context):
         )
         context.add_layer(silence_blob(top[1]))
     if (nw - 1) * sw + kw > pw * 2 + iw:
-        logger.warning("Add extra 'slice layer' after Pooling Opr %s", opr.name)
+        logger.warning("Add extra 'slice layer' after Pooling Opr {}".format(opr.name))
         param = cp.SliceParameter(axis=3, slice_point=[nw - 1])
         bottom = top[:1]
         name = opr.name + context.gen_name
@@ -671,7 +673,9 @@ def _reshape(opr, context):
     out_shape = opr.output_shape
 
     if inp_shape == out_shape:
-        logger.info("Input shape and output shape of Opr %s are same, skip!", opr.name)
+        logger.info(
+            "Input shape and output shape of Opr {} are same, skip!".format(opr.name)
+        )
         inp_blob = context.get_blob_name(opr.inp_vars[0])
         context.set_blob_name(opr.out_vars[0], inp_blob)
     elif (
@@ -708,8 +712,9 @@ def _reshape(opr, context):
         )
     else:
         logger.warning(
-            "NNIE doesn't support this reshape Opr %s, NNIE reshape only support C/H/W, not N!",
-            opr.name,
+            "NNIE doesn't support this reshape Opr {}, NNIE reshape only support C/H/W, not N!".format(
+                opr.name
+            )
         )
         if out_shape is None:
             out_shape = opr.shape_param

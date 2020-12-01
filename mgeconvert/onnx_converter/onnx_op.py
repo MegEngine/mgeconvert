@@ -29,7 +29,6 @@ from ..mge_context import (
 )
 
 mge2onnx_dtype_mapping = {
-    # pylint: disable=no-member
     np.float32: onnx.TensorProto.FLOAT,
     np.float16: onnx.TensorProto.FLOAT16,
     np.int8: onnx.TensorProto.INT8,
@@ -55,13 +54,13 @@ opset_version = 8
 
 
 def set_opset_version(version):
-    global opset_version  # pylint: disable=W0603
+    global opset_version
     opset_version = version
 
 
 class OperatorBaseConverter:
 
-    __opr_type__ = "OperatorBaseConverter"
+    __opr_type__ = None
 
     def __init__(self, opr):
         """
@@ -72,12 +71,10 @@ class OperatorBaseConverter:
         self._net_sources = []
         self._parameters = []
 
-    def _get_inputs(self, exclude_idx=None):
+    def _get_inputs(self, exclude_idx=[]):
         """
         Returns the names of inputs of onnx operator.
         """
-        if exclude_idx is None:
-            exclude_idx = []
         for idx, inp in enumerate(self._opr.inp_vars):
             if idx not in exclude_idx:
                 if self._opr.inp_vars[idx].np_data is not None:
@@ -181,7 +178,7 @@ class SubtensorConverter(OperatorBaseConverter):
 
     __opr_type__ = "Slice"
 
-    def slice_version_1(self, starts, ends, axes, _, inputs, outputs):
+    def slice_version_1(self, starts, ends, axes, steps, inputs, outputs):
         attr = {"axes": axes, "ends": ends, "starts": starts}
         slice_op = onnx.helper.make_node("Slice", inputs, outputs, **attr)
         return slice_op, [], []
@@ -387,7 +384,9 @@ class Pooling2DConverter(OperatorBaseConverter):
         ), "Pooling op doesn't support mode {}, you can implement it in Pooling2DConverter".format(
             opr.mode
         )
-        self.exclude_pad = opr.mode == "AVERAGE_COUNT_EXCLUDE_PADDING"
+        self.exclude_pad = (
+            True if opr.mode == "AVERAGE_COUNT_EXCLUDE_PADDING" else False
+        )
         self.__opr_type__ = self.support_op_map[opr.mode]
 
     def _get_attrs(self):
@@ -501,12 +500,11 @@ class AxisAddRemoveConverter(OperatorBaseConverter):
             unsqueeze = onnx.helper.make_node(
                 "Unsqueeze", inputs, outputs, axes=add_axis
             )
-            ret = [unsqueeze]
+            return [unsqueeze], self._net_sources, self._parameters
         elif len(remove_axis) > 0:
             squeeze = onnx.helper.make_node(
                 "Squeeze", inputs, outputs, axes=remove_axis
             )
-            ret = [squeeze]
+            return [squeeze], self._net_sources, self._parameters
         else:
-            ret = []
-        return ret, self._net_sources, self._parameters
+            return [], self._net_sources, self._parameters

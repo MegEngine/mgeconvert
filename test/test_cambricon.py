@@ -7,28 +7,12 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import megengine
-import numpy as np
 import pytest
 from mgeconvert.cambricon_converter.converter import CambriconConverter
 from mgeconvert.mge_context import TopologyNetwork
 
-from .quantization_utils import (
-    QuantizationConvBnOpr,
-    QuantizationLinearOpr,
-    dump_mge_quantization_model,
-)
-from .utils import (
-    ActiveOpr,
-    BnOpr,
-    ConcatOpr,
-    ElemwiseOpr,
-    PoolOpr,
-    ReshapeOpr,
-    SoftmaxOpr,
-    SubtensorOpr,
-    TransposeOpr,
-    dump_mge_model,
-)
+from .quantization_utils import *
+from .utils import *
 
 max_error = 1e-4
 tmp_file = "test_model"
@@ -59,18 +43,18 @@ _test = _test_convert_only
 
 @pytest.mark.parametrize("mode", ["relu", "tanh", "sigmoid"])
 def test_active(mode):
-    local_max_error = 1e-2  # tanh and sigmoid cannot pass 1e-4
+    max_error = 1e-2  # tanh and sigmoid cannot pass 1e-4
     net = ActiveOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
-    _test(net.data, mge_result, local_max_error)
+    _test(net.data, mge_result, max_error)
 
 
 @pytest.mark.parametrize("mode", ["abs", "exp", "log"])
 def test_elemwise_1(mode):
-    local_max_error = 1e-3  # exp cannot pass 1e-4
+    max_error = 1e-3  # exp cannot pass 1e-4
     net = ElemwiseOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
-    _test(net.data, mge_result, local_max_error)
+    _test(net.data, mge_result, max_error)
 
 
 @pytest.mark.parametrize("mode", ["add", "sub", "mul", "cycle_div"])
@@ -81,10 +65,10 @@ def test_elemwise_2(mode):
 
 
 def test_softmax():
-    local_max_error = 1e-2
+    max_error = 1e-2
     net = SoftmaxOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
-    _test(net.data, mge_result, local_max_error)
+    _test(net.data, mge_result, max_error)
 
 
 def test_transopse():
@@ -131,7 +115,7 @@ def test_batchnorm(mode):
 
 @pytest.mark.skip(reason="not trained")
 def test_convbn2d():
-    net = QuantizationConvBnOpr()
+    net = QuantizationConvBnOpr(0)
     mge_result = dump_mge_quantization_model(net, net.data, tmp_file)
     _test(net.data, mge_result, max_error)
 

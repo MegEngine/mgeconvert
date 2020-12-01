@@ -6,12 +6,12 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from google.protobuf import text_format  # type: ignore[attr-defined]
+from google.protobuf import text_format
 
 from ..mge_context import TopologyNetwork
 from ..mge_context.mge_utils import get_symvar_value
 from .caffe_op import MGE2CAFFE
-from .caffe_pb import caffe_pb2 as cp  # pylint: disable=import-error
+from .caffe_pb import caffe_pb2 as cp
 
 
 class CaffeConverter:
@@ -70,8 +70,8 @@ class CaffeConverter:
     def gen_blob_proto(self, data):
         if self.use_empty_blobs:
             return cp.BlobProto()
-        if isinstance(data, (int, float)):
-            return cp.BlobProto(data=[data])
+        if isinstance(data, int) or isinstance(data, float):
+            return cp.BlobProto(data=[data,])
         else:
             return cp.BlobProto(
                 data=data.reshape(-1), shape=cp.BlobShape(dim=data.shape)
@@ -87,7 +87,7 @@ class CaffeConverter:
     def convert(self):
         unsupported_oprs = []
         for opr in self.net.all_oprs:
-            if not isinstance(opr, tuple(MGE2CAFFE.keys())):
+            if type(opr) not in MGE2CAFFE:
                 unsupported_oprs.append(opr)
                 continue
         unsupported_oprs = set(map(type, unsupported_oprs))

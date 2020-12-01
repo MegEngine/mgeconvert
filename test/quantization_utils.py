@@ -6,9 +6,11 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import random
 from functools import partial
 
 import megengine as mge
+import megengine.functional as F
 import megengine.module as M
 import numpy as np
 from megengine.jit import trace
@@ -62,8 +64,9 @@ class QuantizationLinearOpr(M.Module):
 
 
 class QuantizationConvBnOpr(M.Module):
-    def __init__(self):
+    def __init__(self, mode):
         super().__init__()
+        self.mode = mode
         self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
         self.quant = M.QuantStub()
         self.dequant = M.DequantStub()
@@ -71,10 +74,11 @@ class QuantizationConvBnOpr(M.Module):
         self.group_conv_bn = M.ConvBn2d(3, 30, 3, 1, 1, 1, 3)
 
     def forward(self, x):
-        x = self.quant(x)
-        x = self.conv_bn(x)
-        x = self.dequant(x)
-        return x
+        if self.mode == 0:
+            x = self.quant(x)
+            x = self.conv_bn(x)
+            x = self.dequant(x)
+            return x
 
 
 def qat_cn(module, inplace=True):

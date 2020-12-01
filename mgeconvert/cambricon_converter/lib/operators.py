@@ -17,8 +17,8 @@ from .tensor import Tensor
 class OperatorBase:
 
     __name = None
-    __inp_tensor: Sequence = []
-    __out_tensor: Sequence = []
+    __inp_tensor = []
+    __out_tensor = []
     _compiled = None
     _param = None
     _op = None
@@ -499,7 +499,7 @@ class Conv(OperatorBase):
 
     @property
     def pad(self):
-        return self.__pad
+        return [x for x in self.__pad]
 
     def make_param(self):
         self._param = cnlib.cnConvOpParam(
@@ -653,7 +653,7 @@ class Pool(OperatorBase):
         self.__dilation = [dilation_h, dilation_w]
         self.__pool_mode = self._map_pool_mode[pool_mode]
         self.__strategy_mode = strategy_mode
-        self.__real = pool_mode == "MAX"
+        self.__real = True if pool_mode == "MAX" else False
 
     def make_param(self):
         self._param = cnlib.cnPoolOpParam(
@@ -972,7 +972,7 @@ class BasicDiv(OperatorBase):
 
 
 class AddPad(OperatorBase):
-    def __init__(self, name, inputs, outputs, pt, pb, pl, pr, *_):
+    def __init__(self, name, inputs, outputs, pt, pb, pl, pr, value):
         super().__init__(name, "AddPad", inputs, outputs)
         self._pt = pt
         self._pb = pb

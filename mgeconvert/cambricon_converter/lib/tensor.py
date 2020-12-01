@@ -92,6 +92,7 @@ class Tensor:
     _data_type = None
     _cn_data_type = None
 
+    _data_shape = []
     _data_count = 0
     _data_bytes = 0
 
@@ -198,10 +199,10 @@ class Tensor:
         assert isinstance(scale, (float, int))
         if scale < 2 ** -32 or scale > 2 ** 32:
             logging.warning(
-                "scale is not in the valid range:(%s, %s), which will result in "
-                "incorrect calculation of the converted model.",
-                2 ** -32,
-                2 ** 32,
+                "scale is not in the valid range:({}, {}), which will result in "
+                "incorrect calculation of the converted model.".format(
+                    2 ** -32, 2 ** 32
+                )
             )
         summ = 1.0
         cn_position = 0
@@ -243,26 +244,14 @@ class Tensor:
 
     @property
     def cpudata(self):
-        if self._data_cpu is None:
-            return None
-        if Tensor.NCHW2NHWC:
-            ret = self._data_cpu.astype(self._map_np_data_type[self._data_type])
-            ret = ret.reshape(self._get_internal_shape(self._data_shape))
-            ret = ret.transpose((0, 3, 1, 2))
-        else:
-            ret = self._data_cpu.reshape(self._data_shape)
-        return ret
-
-    @cpudata.setter
-    def cpudata(self, data):
-        if data is None:
-            self._data_cpu = None
-            return
-
-        if self._cn_tensor_type in (cnlib.CNML_CONST, cnlib.CNML_FILTER):
-            return
-
-        self._set_data_cpu(data)
+        if self._data_cpu is not None:
+            if Tensor.NCHW2NHWC:
+                return (
+                    self._data_cpu.astype(self._map_np_data_type[self._data_type])
+                    .reshape(self._get_internal_shape(self._data_shape))
+                    .transpose((0, 3, 1, 2))
+                )
+            return self._data_cpu.reshape(self._data_shape)
 
     def _set_data_cpu(self, data):
         if isinstance(data, (int, float)):
@@ -279,9 +268,24 @@ class Tensor:
         self._data_cpu = data
         self._head = HEAD.CPU
 
+    @cpudata.setter
+    def cpudata(self, data):
+        if data is None:
+            self._data_cpu = None
+            return
+
+        if self._cn_tensor_type is (cnlib.CNML_CONST, cnlib.CNML_FILTER):
+            return
+
+        self._set_data_cpu(data)
+
     @property
     def scale(self):
         return self._scale
+
+    def _set_scale(self, scale):
+        self._scale = scale
+        self._cn_position, self._cn_scale = self._get_quantized_info(self._scale)
 
     @scale.setter
     def scale(self, scale):
@@ -290,10 +294,6 @@ class Tensor:
             self._cn_position = None
             self._cn_scale = None
         self._set_scale(scale)
-
-    def _set_scale(self, scale):
-        self._scale = scale
-        self._cn_position, self._cn_scale = self._get_quantized_info(self._scale)
 
     @property
     def head(self):

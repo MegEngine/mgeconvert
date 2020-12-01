@@ -6,30 +6,19 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import random
+import sys
+
 import megengine
 import megengine.hub
 import numpy as np
 import onnxruntime as ort
 import pytest
 from mgeconvert.mge_context import TopologyNetwork
+from mgeconvert.onnx_converter import convert_to_onnx
 from mgeconvert.onnx_converter.onnx_converter import OnnxConverter
 
-from .utils import (
-    ActiveOpr,
-    BnOpr,
-    ConcatOpr,
-    ConvOpr,
-    ElemwiseOpr,
-    LinearOpr,
-    PoolOpr,
-    ReshapeOpr,
-    SoftmaxOpr,
-    SqueezeOpr,
-    SubtensorOpr,
-    TransposeOpr,
-    XORNet,
-    dump_mge_model,
-)
+from .utils import *
 
 max_error = 1e-6
 onnx_min_version = 7
@@ -53,7 +42,7 @@ def _test_convert_result(inputs, fpath, mge_result, max_err):
 
 
 def test_conv2d():
-    for choose in ("normal", "group"):
+    for choose in range(2):
         net = ConvOpr(choose)
         mge_result = dump_mge_model(net, net.data, tmp_file)
         _test_convert_result(net.data, tmp_file, mge_result, max_error)
@@ -67,9 +56,7 @@ def test_linear():
 
 @pytest.mark.parametrize("mode", ["max", "avg"])
 def test_pool(mode):
-    if mode == "avg":
-        return
-    net = PoolOpr(mode)
+    net = PoolOpr("max")
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 

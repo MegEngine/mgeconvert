@@ -53,11 +53,14 @@ class ConvOpr(M.Module):
         super().__init__()
         self.mode = mode
         self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
-        self.normal_conv = M.Conv2d(3, 30, 3, stride=(2, 2), padding=(2, 2))
+        self.conv = M.Conv2d(3, 30, 3, stride=(2, 2), padding=(2, 2))
         self.group_conv = M.Conv2d(3, 30, 3, stride=(2, 2), padding=(2, 2), groups=3)
 
     def forward(self, x):
-        return getattr(self, self.mode + "_conv")(x)
+        if self.mode == 0:
+            return self.conv(x)
+        if self.mode == 1:
+            return self.group_conv(x)
 
 
 class LinearOpr(M.Module):
@@ -82,7 +85,10 @@ class PoolOpr(M.Module):
         self.avgpool = M.pooling.AvgPool2d(kernel_size=3, stride=2, padding=2)
 
     def forward(self, x):
-        return getattr(self, self.mode + "pool")(x)
+        if self.mode == "max":
+            return self.maxpool(x)
+        if self.mode == "avg":
+            return self.avgpool(x)
 
 
 class BnOpr(M.Module):
@@ -95,7 +101,10 @@ class BnOpr(M.Module):
         self.bn2d = M.BatchNorm2d(3)
 
     def forward(self, x):
-        return getattr(self, self.mode)(x)
+        if self.mode == "bn1d":
+            return self.bn1d(x)
+        if self.mode == "bn2d":
+            return self.bn2d(x)
 
 
 class SubtensorOpr(M.Module):
@@ -150,7 +159,7 @@ class SqueezeOpr(M.Module):
 
     def forward(self, a):
         if mge.__version__ <= "0.6.0":
-            return F.remove_axis(a, 0)  # pylint: disable=no-member
+            return F.remove_axis(a, 0)
         else:
             return F.squeeze(a, 0)
 
@@ -189,52 +198,52 @@ class ElemwiseOpr(M.Module):
             x = a + mge.tensor(np.float32(10))
             y = a + mge.tensor(self.data1)
             z = x + y
+            return z
         # sub
-        elif self.mode == "sub":
+        if self.mode == "sub":
             x = a - mge.tensor(np.float32(10))
             y = a - mge.tensor(self.data1)
             z = x - y
+            return z
         # mul
-        elif self.mode == "mul":
+        if self.mode == "mul":
             x = a * mge.tensor(np.float32(10))
             y = mge.tensor(self.data1) * a
             z = x * y
+            return z
         # div
-        elif self.mode == "div":
+        if self.mode == "div":
             y = mge.tensor(self.data1) / a
             x = a / mge.tensor(np.float32(2))
             z = y / x
+            return z
         # cycle_div
-        elif self.mode == "cycle_div":
-            z = a / mge.tensor(self.data1)
+        if self.mode == "cycle_div":
+            return a / mge.tensor(self.data1)
         # abs
-        elif self.mode == "abs":
-            z = F.abs(a)
+        if self.mode == "abs":
+            return F.abs(a)
         # exp
-        elif self.mode == "exp":
-            z = F.exp(a)
+        if self.mode == "exp":
+            return F.exp(a)
         # log
-        elif self.mode == "log":
-            z = F.log(a)
-        else:
-            raise NotImplementedError('no such elemwise mode "%s"' % self.mode)
-        return z
+        if self.mode == "log":
+            return F.log(a)
 
 
 class ActiveOpr(M.Module):
-    str2fun = {
-        "relu": F.relu,
-        "tanh": F.tanh,
-        "sigmoid": F.sigmoid,
-    }
-
     def __init__(self, mode):
         super().__init__()
         self.mode = mode
         self.data = np.random.random((20, 3, 224, 224)).astype(np.float32)
 
     def forward(self, x):
-        return ActiveOpr.str2fun[self.mode](x)
+        if self.mode == "relu":
+            return F.relu(x)
+        if self.mode == "tanh":
+            return F.tanh(x)
+        if self.mode == "sigmoid":
+            return F.sigmoid(x)
 
 
 class XORNet(M.Module):

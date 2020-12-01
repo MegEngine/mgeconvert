@@ -6,29 +6,17 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-import caffe  # pylint: disable=import-error
+import random
+import sys
+
+import caffe
 import megengine
 import megengine.hub
 import numpy as np
 import pytest
 from mgeconvert.caffe_converter import convert_to_caffe
 
-from .utils import (
-    ActiveOpr,
-    BnOpr,
-    ConcatOpr,
-    ConvOpr,
-    ElemwiseOpr,
-    LinearOpr,
-    PoolOpr,
-    ReshapeOpr,
-    SoftmaxOpr,
-    SqueezeOpr,
-    SubtensorOpr,
-    TransposeOpr,
-    XORNet,
-    dump_mge_model,
-)
+from .utils import *
 
 max_error = 1e-6
 tmp_file = "test_model"
@@ -43,7 +31,7 @@ def _test_convert_result(inputs, fpath, mge_results, max_err):
         if "h2d[" in i:
             caffe_net.blobs[i].data[...] = inputs
             break
-    caffe_net.forward()
+    out = caffe_net.forward()
     caffe_dict = caffe_net.blobs
     caffe_results = list(caffe_dict.items())[-1][1].data
     assert caffe_results.shape == mge_results.shape
@@ -51,7 +39,7 @@ def _test_convert_result(inputs, fpath, mge_results, max_err):
 
 
 def test_conv2d():
-    for choose in ("normal", "group"):
+    for choose in range(2):
         net = ConvOpr(choose)
         mge_result = dump_mge_model(net, net.data, tmp_file)
         _test_convert_result(net.data, tmp_file, mge_result, max_error)
@@ -126,7 +114,7 @@ def test_elemwise(mode):
 @pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "abs", "exp", "log"])
 def test_elemwise_broadcast(mode):
     net = ElemwiseOpr(mode)
-    mge_result = dump_mge_model(net, np.array([2.0]).astype("float32"), tmp_file)
+    mge_result = dump_mge_model(net, 2.0, tmp_file)
     _test_convert_result(np.array([2.0]), tmp_file, mge_result, max_error)
 
 
