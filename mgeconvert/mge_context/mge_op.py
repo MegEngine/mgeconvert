@@ -84,10 +84,6 @@ class MatrixMulOpr(MgeOpr):
         self.transposeA = self.params["transposeA"]
         self.compute_mode = self.params["compute_mode"]
 
-    @property
-    def isFC(self):
-        return get_opr_type(self.inputs[1].owner_opr) == "MultipleDeviceTensorHolder"
-
 
 class BatchedMatrixMulOpr(MgeOpr):
     name = "BatchedMatrixMul"
@@ -166,9 +162,6 @@ class ElemwiseOpr(MgeOpr):
 class ElemwiseMultiTypeOpr(MgeOpr):
     name = "ElemwiseMultiType"
 
-    def __init__(self, opr):
-        super().__init__(opr)
-
 
 class Host2DeviceCopyOpr(MgeOpr):
     name = "Host2DeviceCopy"
@@ -181,9 +174,6 @@ class Host2DeviceCopyOpr(MgeOpr):
 
 class MultipleDeviceTensorHolderOpr(MgeOpr):
     name = "MultipleDeviceTensorHolder"
-
-    def __init__(self, opr):
-        super().__init__(opr)
 
 
 class SubtensorOpr(MgeOpr):
@@ -232,15 +222,9 @@ class SubtensorOpr(MgeOpr):
 class ImmutableTensorOpr(MgeOpr):
     name = "ImmutableTensor"
 
-    def __init__(self, opr):
-        super().__init__(opr)
-
 
 class GetVarShapeOpr(MgeOpr):
     name = "GetVarShape"
-
-    def __init__(self, opr):
-        super().__init__(opr)
 
 
 class BatchNormForwardOpr(MgeOpr):
@@ -292,9 +276,6 @@ class DimshuffleOpr(MgeOpr):
 class TypeCvtOpr(MgeOpr):
     name = "TypeCvt"
 
-    def __init__(self, opr):
-        super().__init__(opr)
-
 
 class ReduceOpr(MgeOpr):
     name = "Reduce"
@@ -316,9 +297,6 @@ class AxisAddRemoveOpr(MgeOpr):
 
 class BroadcastOpr(MgeOpr):
     name = "Broadcast"
-
-    def __init__(self, opr):
-        super().__init__(opr)
 
 
 class ConvolutionBackwardDataOpr(MgeOpr):

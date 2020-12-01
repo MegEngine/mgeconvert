@@ -55,12 +55,17 @@ def _register_op(*oprs):
 
 
 @_register_op(MultipleDeviceTensorHolderOpr)
-def _multiple_device_tensor_holder(opr, context):
+def _multiple_device_tensor_holder(*_):
     pass
 
 
 @_register_op(SharedDeviceTensorOpr)
-def _shared_device_tensor(opr, context):
+def _shared_device_tensor(*_):
+    pass
+
+
+@_register_op(GetVarShapeOpr)
+def _get_var_shape(*_):
     pass
 
 
@@ -107,9 +112,7 @@ def _dimshuffle(opr, context):
 def _reduce(opr, context):
     inps, oups = context.get_cn_inputs_and_outputs(opr)
     if opr.mode == "SUM_SQR":
-        """
-        Reduce(SUM_SQR) -> Elemwise(MUL) + Reduce(SUM)
-        """
+        # Reduce(SUM_SQR) -> Elemwise(MUL) + Reduce(SUM)
         cnt_square = Tensor(shape=inps[0].shape)
         cn_square = cnop.Square(opr.name + "_SQUARE", inps, cnt_square)
         cn_sum = cnop.Reduce(opr.name + "_SUM", cnt_square, oups, opr.axis, "SUM")
@@ -133,13 +136,8 @@ def _axis_add_remove(opr, context):
     context.var_map[opr.out_vars[0]] = inps[0]
 
 
-@_register_op(GetVarShapeOpr)
-def _get_var_shape(opr, context):
-    pass
-
-
 @_register_op(MarkNoBroadcastElemwiseOpr)
-def _axis_add_remove(opr, context):
+def _mark_no_broadcast_elemwise(opr, context):
     inps, _ = context.get_cn_inputs_and_outputs(opr)
     context.var_map[opr.out_vars[0]] = inps[0]
 
@@ -376,13 +374,16 @@ class CambriconConverter:
         unsupported_oprs = set()
         quantization_error_oprs = set()
         for opr in self.mge_net.all_oprs:
-            if type(opr) not in MGE2CN:
+            if not isinstance(opr, tuple(MGE2CN.keys())):
                 unsupported_oprs.add(type(opr))
-            if type(opr) in (
-                ConvBiasForwardOpr,
-                ConvolutionBackwardDataOpr,
-                ConvolutionForwardOpr,
-                MatrixMulOpr,
+            if isinstance(
+                opr,
+                (
+                    ConvBiasForwardOpr,
+                    ConvolutionBackwardDataOpr,
+                    ConvolutionForwardOpr,
+                    MatrixMulOpr,
+                ),
             ):
                 if (
                     get_dtype_name(opr.inp_vars[0]) != "QuantizedS8"
@@ -396,12 +397,12 @@ class CambriconConverter:
                     quantization_error_oprs.add(type(opr))
 
         if unsupported_oprs:
-            logger.error("Operators %s are not supported yet." % unsupported_oprs)
+            logger.error("Operators %s are not supported yet.", unsupported_oprs)
         if quantization_error_oprs:
             logger.error(
                 "Operators %s should be quantized, "
-                "check the function test_linear in test/test_cambricon for inspiration"
-                % quantization_error_oprs
+                "check the function test_linear in test/test_cambricon for inspiration",
+                quantization_error_oprs,
             )
         assert not unsupported_oprs and not quantization_error_oprs
 
@@ -524,8 +525,8 @@ def convert_to_cambricon(
     converter = CambriconConverter(net, batch_size, core_number, data_type, use_nhwc)
     logger.info("convert operators to cambricon...")
     converter.convert()
-    logger.info("%d operators converted..." % len(converter.cn_oprs))
+    logger.info("%d operators converted...", len(converter.cn_oprs))
     converter.fuse()
     logger.info("fusing...")
     converter.dump(filename)
-    logger.info("ok, dump model to %s" % filename)
+    logger.info("ok, dump model to %s", filename)

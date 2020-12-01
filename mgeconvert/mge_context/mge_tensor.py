@@ -20,7 +20,7 @@ class Tensor:
             self.ndim = len(self.shape)
         try:
             self.dtype = sym_var.dtype
-        except:
+        except:  # pylint: disable=bare-except
             self.dtype = None
 
         try:
@@ -28,17 +28,17 @@ class Tensor:
                 self.np_data = get_symvar_value(sym_var)
             else:
                 self.np_data = None
-        except:
+        except:  # pylint: disable=bare-except
             self.np_data = None
 
         try:
             self.qbit = self.dtype.metadata["mgb_dtype"]["name"]
-        except:
+        except:  # pylint: disable=bare-except
             self.qbit = None
 
         try:
             self.scale = self.dtype.metadata["mgb_dtype"]["scale"]
-        except:
+        except:  # pylint: disable=bare-except
             self.scale = None
 
     def set_owner_opr(self, owner_opr):
