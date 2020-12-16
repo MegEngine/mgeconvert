@@ -65,29 +65,42 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 
 * 寒武纪转换器
 
-  寒武纪转换器目前支持的硬件平台仅包括MLU270智能加速卡系列，使用前请事先安装MLU270智能加速卡和配套SDK，SDK版本需在1.2.5以上。更多信息请联系寒武纪。
-  安装camke、swig和python-dev
+  寒武纪转换器目前支持的硬件平台仅包括MLU270智能加速卡系列，使用前请事先安装MLU270智能加速卡和配套SDK并配置好安装路径 `NEUWARE_HOME=/path/to/cambricon`。SDK版本需在1.2.5以上，更多信息请联系寒武纪。
+
+  安装cmake、swig和python-dev
+
   ```bash
   sudo apt install cmake swig python3-dev
   ```
+
+  以下两个步骤将在安装本仓库时自动执行。
+
   从numpy官方库下载`numpy.i`，并放入路径`mgeconvert/cambricon_converter/swig`中。
+
   ```bash
-  wget -P mgeconvert/cambricon_converter/swig https://raw.githubusercontent.com/numpy/numpy/master/tools/swig/numpy.i
+  wget -P mgeconvert/cambricon_converter/swig \
+  https://raw.githubusercontent.com/numpy/numpy/master/tools/swig/numpy.i
   ```
-  编译得到python接口，执行以下命令前需要设置寒武纪环境变量。`NEUWARE_HOME=/path/to/cambricon`
-  ```
+
+  编译得到python接口。
+
+  ```bash
   cd mgeconvert/cambricon_converter
   mkdir build && cd build
   cmake ..
   make && make develop
   ```
+
   [测试用例](test/test_cambricon.py) 中可以完成相应的转换测试，[子目录](mgeconvert/cambricon_converter/README.md)获取更多寒武纪转换器相关信息。
 
 ### MgeConvert安装
-使用setup.py安装MgeConvert
+
+使用setup.py安装MgeConvert。
+
+默认不会安装寒武纪转换器，否则请先设置环境变量 `export USE_CAMBRICON_CONVERTER=ON`。
+
 ```bash
-python3 setup.py build
-python3 setup.py install
+pip3 install .
 ```
 
 ## 转换器使用说明
