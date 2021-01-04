@@ -305,14 +305,14 @@ class ConvolutionBackwardDataOpr(MgeOpr):
     def __init__(self, opr):
         super().__init__(opr)
         self.kernel_shape = get_shape(opr.inputs[1])
-        self.data_format = opr.params["format"]
-        self.dilation_w = opr.params["dilate_w"]
-        self.dilation_h = opr.params["dilate_h"]
-        self.pad_w = opr.params["pad_w"]
-        self.pad_h = opr.params["pad_h"]
-        self.stride_w = opr.params["stride_w"]
-        self.stride_h = opr.params["stride_h"]
-        self.sparse = opr.params["sparse"]
+        self.data_format = self.params["format"]
+        self.dilation_w = self.params["dilate_w"]
+        self.dilation_h = self.params["dilate_h"]
+        self.pad_w = self.params["pad_w"]
+        self.pad_h = self.params["pad_h"]
+        self.stride_w = self.params["stride_w"]
+        self.stride_h = self.params["stride_h"]
+        self.sparse = self.params["sparse"]
         if self.data_format == "NCHW":
             self.kh = self.kernel_shape[-2]
             self.kw = self.kernel_shape[-1]
