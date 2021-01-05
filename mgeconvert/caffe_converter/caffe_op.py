@@ -15,6 +15,7 @@ from ..mge_context import (
     AxisAddRemoveOpr,
     BatchNormForwardOpr,
     ConcatOpr,
+    ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
@@ -539,14 +540,17 @@ def _eltwise(opr: ElemwiseOpr, context):
         )
 
 
-@_register_op(ConvolutionForwardOpr)
+@_register_op(ConvolutionForwardOpr, ConvolutionBackwardDataOpr)
 def _convolution(opr, context):
     ph, pw = opr.ph, opr.pw
     sh, sw = opr.sh, opr.sw
     kh, kw = opr.kh, opr.kw
     param_W = opr.param_W
     group = opr.group
-    dilation_h = opr.dilation_h
+    dilation_h, dilation_w = opr.dilation_h, opr.dilation_w
+    assert (
+        dilation_h == dilation_w
+    ), "caffe accept one dilation, so dilation_h and dilation_w must equal"
     param_W = param_W.reshape((-1,) + param_W.shape[-3:])
     bias_term = opr.bias_term
     assert bias_term == False
@@ -565,9 +569,23 @@ def _convolution(opr, context):
         group=group,
         bias_term=bias_term,
     )
+    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    if isinstance(opr, ConvolutionBackwardDataOpr):
+        layer_type = "Deconvolution"
+        bottom = [context.get_blob_name(opr.inp_vars[1])]
+    else:
+        layer_type = "Convolution"
+        bottom = [context.get_blob_name(opr.inp_vars[0])]
 
     context.add_layer(
-        _gen_layer(opr, "Convolution", context, convolution_param=param, blobs=blobs)
+        cp.LayerParameter(
+            bottom=bottom,
+            top=top,
+            name=opr.name,
+            type=layer_type,
+            blobs=blobs,
+            convolution_param=param,
+        )
     )
 
 

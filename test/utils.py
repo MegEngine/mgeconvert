@@ -53,8 +53,19 @@ class ConvOpr(M.Module):
         super().__init__()
         self.mode = mode
         self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
-        self.normal_conv = M.Conv2d(3, 30, 3, stride=(2, 2), padding=(2, 2))
-        self.group_conv = M.Conv2d(3, 30, 3, stride=(2, 2), padding=(2, 2), groups=3)
+        self.normal_conv = M.Conv2d(
+            3, 30, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1)
+        )
+        self.group_conv = M.Conv2d(
+            3, 30, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1), groups=3
+        )
+
+        self.transpose_conv = M.Sequential(
+            M.ConvTranspose2d(
+                3, 5, (3, 4), dilation=(2, 2), stride=(3, 2), padding=(2, 3), groups=1
+            ),
+            M.ConvTranspose2d(5, 3, (3, 3)),
+        )
 
     def forward(self, x):
         return getattr(self, self.mode + "_conv")(x)

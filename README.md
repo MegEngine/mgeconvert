@@ -17,7 +17,7 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 |broadcast| ✓ | ✓ | ✓ |
 |concat| ✓ | ✓ | ✓ |
 |conv2d| ✓ | ✓ | ✓ |
-|convtranspose2d| × | × | ✓ |
+|convtranspose2d| ✓ | ✓ | ✓ |
 |div(true_div)| ✓ | ✓ | ✓ |
 |exp| ✓ | ✓ | ✓ |
 |log| ✓ | ✓ | ✓ |

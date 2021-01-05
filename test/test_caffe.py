@@ -50,11 +50,11 @@ def _test_convert_result(inputs, fpath, mge_results, max_err):
     assert np.allclose(caffe_results, mge_results, atol=max_err)
 
 
-def test_conv2d():
-    for choose in ("normal", "group"):
-        net = ConvOpr(choose)
-        mge_result = dump_mge_model(net, net.data, tmp_file)
-        _test_convert_result(net.data, tmp_file, mge_result, max_error)
+@pytest.mark.parametrize("mode", ["normal", "group", "transpose"])
+def test_conv2d(mode):
+    net = ConvOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
 def test_linear():

@@ -311,12 +311,12 @@ def _deconv(opr, context):
         opr.name,
         inps[1],
         oups,
-        opr.stride_h,
-        opr.stride_w,
+        opr.sh,
+        opr.sw,
         opr.dilation_h,
         opr.dilation_w,
-        opr.pad_h,
-        opr.pad_w,
+        opr.ph,
+        opr.pw,
     )
     cn_deconv.param_dict["W"] = inps[0]
     b_shp = (1, inps[0].shape[0], 1, 1)
