@@ -13,6 +13,7 @@ from ..mge_context import (
     AxisAddRemoveOpr,
     BatchNormForwardOpr,
     ConcatOpr,
+    ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
@@ -329,7 +330,7 @@ class DataProviderConverter(OperatorBaseConverter):
         return [], inp_tensor_list, []
 
 
-@_register_op(ConvolutionForwardOpr)
+@_register_op(ConvolutionForwardOpr, ConvolutionBackwardDataOpr)
 class Conv2DConverter(OperatorBaseConverter):
 
     __opr_type__ = "Conv"
@@ -338,7 +339,7 @@ class Conv2DConverter(OperatorBaseConverter):
         opr = self._opr
         return {
             "kernel_shape": [opr.kh, opr.kw],
-            "pads": [opr.ph, opr.ph, opr.pw, opr.pw],
+            "pads": [opr.ph, opr.pw, opr.ph, opr.pw],
             "strides": [opr.sh, opr.sw],
             "dilations": [opr.dilation_h, opr.dilation_w],
             "group": opr.group if opr.group is not None else 1,
@@ -353,21 +354,25 @@ class Conv2DConverter(OperatorBaseConverter):
         outputs = self._get_outputs()
         if attrs["group"] != 1:
             inputs[1] = opr.name + "_filter_reshape_onnx"
-            flt = opr.inp_vars[1]
+            flt = opr.param_W
             flt_shape = [
                 flt.shape[0] * flt.shape[1],
                 flt.shape[2],
                 flt.shape[3],
                 flt.shape[4],
             ]
-            flt_data = flt.np_data.reshape(flt_shape)
+            flt_data = flt.reshape(flt_shape)
             flt_tensor = onnx.helper.make_tensor_value_info(
-                inputs[1], mge2onnx_dtype_mapping[flt.dtype], flt_shape
+                inputs[1], mge2onnx_dtype_mapping[flt.dtype.type], flt_shape
             )
             flt_param = onnx.numpy_helper.from_array(flt_data, inputs[1])
             self._net_sources.append(flt_tensor)
             self._parameters.append(flt_param)
-        conv2d = onnx.helper.make_node("Conv", inputs, [outputs[0]], **attrs)
+        onnx_op = "Conv"
+        if isinstance(self._opr, ConvolutionBackwardDataOpr):
+            onnx_op = "ConvTranspose"
+            inputs = [inputs[1], inputs[0]]
+        conv2d = onnx.helper.make_node(onnx_op, inputs, [outputs[0]], **attrs)
         nodes.extend([conv2d])
         return (nodes, self._net_sources, self._parameters)
 
@@ -394,7 +399,7 @@ class Pooling2DConverter(OperatorBaseConverter):
         opr = self._opr
         attribute = {
             "kernel_shape": [opr.kh, opr.kw],
-            "pads": [opr.ph, opr.ph, opr.pw, opr.pw],
+            "pads": [opr.ph, opr.pw, opr.ph, opr.pw],
             "strides": [opr.sh, opr.sw],
         }
 

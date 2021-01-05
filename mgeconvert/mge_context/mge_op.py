@@ -120,8 +120,10 @@ class ConvolutionForwardOpr(MgeOpr):
     def __init__(self, opr):
         super().__init__(opr)
         self.kernel_shape = get_shape(opr.inputs[1])
+        self.param_W = get_symvar_value(opr.inputs[1])
         self.data_format = self.params["format"]
         self.dilation_w = self.params["dilate_w"]
+        self.dilation_h = self.params["dilate_h"]
         self.compute_mode = self.params["compute_mode"]
         self.sparse = self.params["sparse"]
 
@@ -134,12 +136,7 @@ class ConvolutionForwardOpr(MgeOpr):
             assert False, "do not support this {} format".format(self.data_format)
 
         self.num_output = get_shape(opr.outputs[0])[1]
-        self.dilation_h = self.dilation_w
-        self.param_W = get_symvar_value(opr.inputs[1])
-
         self.bias_term = False
-
-        # for caffe
         self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
 
 
@@ -304,17 +301,23 @@ class ConvolutionBackwardDataOpr(MgeOpr):
 
     def __init__(self, opr):
         super().__init__(opr)
-        self.kernel_shape = get_shape(opr.inputs[1])
+        # opr.inputs[0] is conv kernel
+        self.kernel_shape = get_shape(opr.inputs[0])
+        self.param_W = get_symvar_value(opr.inputs[0])
         self.data_format = self.params["format"]
         self.dilation_w = self.params["dilate_w"]
         self.dilation_h = self.params["dilate_h"]
-        self.pad_w = self.params["pad_w"]
-        self.pad_h = self.params["pad_h"]
-        self.stride_w = self.params["stride_w"]
-        self.stride_h = self.params["stride_h"]
+        self.compute_mode = self.params["compute_mode"]
         self.sparse = self.params["sparse"]
+
+        self.ph, self.pw = self.params["pad_h"], self.params["pad_w"]
+        self.sh, self.sw = self.params["stride_h"], self.params["stride_w"]
         if self.data_format == "NCHW":
             self.kh = self.kernel_shape[-2]
             self.kw = self.kernel_shape[-1]
         else:
-            raise NotImplementedError("do not support %s format" % self.data_format)
+            assert False, "do not support this {} format".format(self.data_format)
+
+        self.num_output = get_shape(opr.outputs[0])[1]
+        self.bias_term = False
+        self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
