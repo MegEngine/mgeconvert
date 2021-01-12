@@ -19,6 +19,7 @@ from ..mge_context import (
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
+    GetVarShapeOpr,
     Host2DeviceCopyOpr,
     IdentityOpr,
     MarkNoBroadcastElemwiseOpr,
@@ -30,7 +31,9 @@ from ..mge_context import (
     SharedDeviceTensorOpr,
     SubtensorOpr,
     Tensor,
+    VolatileSharedDeviceTensorOpr,
     get_logger,
+    get_symvar_value,
 )
 from ..mge_context.mge_utils import get_symvar_value, isconst
 from .caffe_pb import caffe_pb2 as cp  # pylint: disable=import-error
@@ -382,9 +385,18 @@ def _subtensor(opr: SubtensorOpr, context):
         logger.warning("Add 'reshape layers' in operator: Subtensor")
 
 
-@_register_op(MultipleDeviceTensorHolderOpr, SharedDeviceTensorOpr)
+@_register_op(
+    MultipleDeviceTensorHolderOpr, SharedDeviceTensorOpr, VolatileSharedDeviceTensorOpr
+)
 def _(*_):
     pass
+
+
+@_register_op(GetVarShapeOpr)
+def shapeof(opr, context):
+    out_shape = opr.out_vars[0]
+    out_shape.np_data = get_symvar_value(out_shape._var)
+    context.set_blob_name(out_shape)
 
 
 @_register_op(Host2DeviceCopyOpr)
@@ -392,6 +404,70 @@ def _data_provider(opr, context):
     param = cp.InputParameter(shape=[cp.BlobShape(dim=opr.shape)])
     context.add_layer(
         _gen_layer(opr, "Input", context, single_input=False, input_param=param)
+    )
+
+
+def bias_add(input, output, bias, name, context):
+    param = cp.BiasParameter(axis=1, num_axes=1)
+    blobs = [context.gen_blob_proto(bias)]
+    bottom = [context.get_blob_name(input)]
+    top = [context.set_blob_name(output)]
+    context.add_layer(
+        cp.LayerParameter(
+            name=name,
+            bottom=bottom,
+            top=top,
+            type="Bias",
+            bias_param=param,
+            blobs=blobs,
+        )
+    )
+
+
+def _arith_with_const_tensor(input, const, order, opr, context):
+    atype = opr.mode
+    topA, topB, shape = _broadcast_for_eltwiseopr(opr.name, input, const, context)
+    layer_param = cp.ScaleParameter(axis=len(shape) - topB.ndim, num_axes=topB.ndim)
+    if atype in {"ADD", "SUB"}:
+        layer_param.bias_term = True
+        param_b = topB
+        param_k = np.ones(shape=param_b.shape)
+        if atype == "SUB":
+            if order == 0:
+                param_b = -param_b  # pylint: disable=invalid-unary-operand-type
+            else:
+                param_k = -param_k
+        blobs = [context.gen_blob_proto(param_k), context.gen_blob_proto(param_b)]
+    else:
+        param_k = topB
+        if atype == "TRUE_DIV":
+            if order == 0:
+                param_k = 1.0 / param_k
+            else:
+                bottom = topA
+                name = opr.name + context.gen_name
+                topA = [name]
+                context.add_layer(
+                    cp.LayerParameter(
+                        name=name,
+                        type="Power",
+                        bottom=bottom,
+                        top=topA,
+                        power_param=cp.PowerParameter(scale=1, shift=0, power=-1),
+                    )
+                )
+        blobs = [context.gen_blob_proto(param_k)]
+    bottom = topA
+    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    context.add_layer(
+        cp.LayerParameter(
+            name=opr.name,
+            type="Scale",
+            bottom=bottom,
+            top=top,
+            scale_param=layer_param,
+            blobs=blobs,
+        )
     )
 
 
@@ -408,50 +484,17 @@ def _arith(opr, mode, context):
             inpA = opr.inp_vars[0]
             const = opr.inp_vars[1]
             order = 0
-        topA, topB, shape = _broadcast_for_eltwiseopr(opr.name, inpA, const, context)
-
-        layer_param = cp.ScaleParameter(axis=len(shape) - topB.ndim, num_axes=topB.ndim)
-        if atype in {"ADD", "SUB"}:
-            layer_param.bias_term = True
-            param_b = topB
-            param_k = np.ones(shape=param_b.shape)
-            if atype == "SUB":
-                if order == 0:
-                    param_b = -param_b  # pylint: disable=invalid-unary-operand-type
-                else:
-                    param_k = -param_k
-            blobs = [context.gen_blob_proto(param_k), context.gen_blob_proto(param_b)]
+        use_bias_layer = False
+        bias = 0
+        if atype == "ADD":
+            bias = const.np_data.squeeze()
+            if bias.ndim == 1 and inpA.ndim > 1 and bias.shape[0] == inpA.shape[1]:
+                use_bias_layer = True
+        if use_bias_layer:
+            bias_add(inpA, opr.out_vars[0], bias, opr.name, context)
         else:
-            param_k = topB
-            if atype == "TRUE_DIV":
-                if order == 0:
-                    param_k = 1.0 / param_k
-                else:
-                    bottom = topA
-                    name = opr.name + context.gen_name
-                    topA = [name]
-                    context.add_layer(
-                        cp.LayerParameter(
-                            name=name,
-                            type="Power",
-                            bottom=bottom,
-                            top=topA,
-                            power_param=cp.PowerParameter(scale=1, shift=0, power=-1),
-                        )
-                    )
-            blobs = [context.gen_blob_proto(param_k)]
-        bottom = topA
-        top = [context.set_blob_name(opr.out_vars[0], opr.name)]
-        context.add_layer(
-            cp.LayerParameter(
-                name=opr.name,
-                type="Scale",
-                bottom=bottom,
-                top=top,
-                scale_param=layer_param,
-                blobs=blobs,
-            )
-        )
+            _arith_with_const_tensor(inpA, const, order, opr, context)
+
     else:
         topA, topB, _ = _broadcast_for_eltwiseopr(
             opr.name, opr.inp_vars[0], opr.inp_vars[1], context
@@ -587,25 +630,6 @@ def _convolution(opr, context):
             convolution_param=param,
         )
     )
-
-
-def _biasadder(opr, context):
-    assert opr.param_manager["b"].owner_opr.is_value_initialized
-    param_b = opr.param_manager["b"].owner_opr.get_value()
-
-    if opr.brdcst_mode == 0:
-        param_b = param_b[0]
-        param = cp.BiasParameter(axis=0, num_axes=0)
-    elif opr.brdcst_mode == 1:
-        param = cp.BiasParameter(axis=1, num_axes=1)
-    else:
-        param = cp.BiasParameter(axis=1, num_axes=-1)
-
-    blobs = [
-        context.gen_blob_proto(param_b),
-    ]
-
-    return _gen_layer(opr, "Bias", context, bias_param=param, blobs=blobs)
 
 
 @_register_op(PoolingForwardOpr)
