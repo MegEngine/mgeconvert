@@ -173,6 +173,14 @@ class MultipleDeviceTensorHolderOpr(MgeOpr):
     name = "MultipleDeviceTensorHolder"
 
 
+class VolatileSharedDeviceTensorOpr(MgeOpr):
+    name = "VolatileSharedDeviceTensor"
+
+
+class IndexingOneHotOpr(MgeOpr):
+    name = "IndexingOneHotOpr"
+
+
 class SubtensorOpr(MgeOpr):
     name = "Subtensor"
 
@@ -294,6 +302,14 @@ class AxisAddRemoveOpr(MgeOpr):
 
 class BroadcastOpr(MgeOpr):
     name = "Broadcast"
+
+
+class WarpPerspectiveForwardOpr(MgeOpr):
+    name = "WarpPerspectiveForward"
+
+
+class LinspaceOpr(MgeOpr):
+    name = "Linspace"
 
 
 class ConvolutionBackwardDataOpr(MgeOpr):
