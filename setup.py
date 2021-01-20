@@ -77,6 +77,6 @@ setup(
     cmdclass=cmdclass,
     include_package_data=True,
     setup_requires=["Cython >= 0.20", "numpy"],
-    install_requires=["megengine >={}".format(MEGENGINE_LOWER), "numpy"],
+    install_requires=["numpy"],
     scripts=glob.glob("util/*"),
 )
