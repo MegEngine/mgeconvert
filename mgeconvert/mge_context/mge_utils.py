@@ -21,7 +21,11 @@ else:
     import megengine.core.tensor.megbrain_graph as G
     import megengine.core._imperative_rt as rt
     import megengine.utils.comp_graph_tools as cgtools
-    from megengine.core.tensor.raw_tensor import as_raw_tensor
+
+    if mge_version <= "1.1.0":
+        from megengine.core.tensor.raw_tensor import as_raw_tensor as Tensor
+    else:
+        from megengine.tensor import Tensor
 
 
 def get_logger(*args):
@@ -145,7 +149,7 @@ def eval_partial(inp, oup):
         cg = new_out_list[0].graph
         func = cg.compile(new_out_list)
         for node, value in zip(inp_node_list, inp):
-            node.set_value(as_raw_tensor(value)._dev_tensor())
+            node.set_value(Tensor(value)._dev_tensor())
         func.execute()
         result = [o.get_value().numpy() for o in out_node_list]
 

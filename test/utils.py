@@ -190,7 +190,7 @@ class ReshapeOpr(M.Module):
 class ElemwiseOpr(M.Module):
     def __init__(self, mode):
         super().__init__()
-        self.data = np.ones((20, 3, 224, 224)).astype(np.float32)
+        self.data = np.ones((2, 3, 224, 224)).astype(np.float32)
         self.data1 = np.random.random((1, 3, 1, 1)).astype(np.float32)
         self.mode = mode
 
