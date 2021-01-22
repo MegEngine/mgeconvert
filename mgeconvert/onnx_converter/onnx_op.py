@@ -12,11 +12,13 @@ import onnx
 from ..mge_context import (
     AxisAddRemoveOpr,
     BatchNormForwardOpr,
+    BroadcastOpr,
     ConcatOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
+    GetVarShapeOpr,
     Host2DeviceCopyOpr,
     IdentityOpr,
     MarkNoBroadcastElemwiseOpr,
@@ -27,6 +29,8 @@ from ..mge_context import (
     ReshapeOpr,
     SharedDeviceTensorOpr,
     SubtensorOpr,
+    TypeCvtOpr,
+    get_symvar_value,
 )
 
 mge2onnx_dtype_mapping = {
@@ -117,6 +121,7 @@ class OperatorBaseConverter:
                 self.__opr_type__,
                 self._get_inputs(),
                 self._get_outputs(),
+                name=self._opr.name,
                 **self._get_attrs(),
             )
         ]
@@ -126,6 +131,17 @@ class OperatorBaseConverter:
 @_register_op(MultipleDeviceTensorHolderOpr, SharedDeviceTensorOpr)
 class IgnoredOperatorConverter(OperatorBaseConverter):
     def convert(self):
+        return [], [], []
+
+
+@_register_op(GetVarShapeOpr)
+class GetVarShapeConverter(OperatorBaseConverter):
+    __opr_type__ = "Shape"
+
+    def convert(self):
+        shape = self._opr.out_vars[0]
+        shape.np_data = get_symvar_value(shape._var).astype(np.int64)
+        shape.dtype = np.int64
         return [], [], []
 
 
@@ -146,6 +162,10 @@ class ElemwiseConverter(OperatorBaseConverter):
         "SIGMOID": "Sigmoid",
         "ABS": "Abs",
         "LOG": "Log",
+        "FLOOR": "Floor",
+        "CEIL": "Ceil",
+        "POW": "Pow",
+        "MAX": "Max",
     }
 
     def __init__(self, opr):
@@ -468,7 +488,11 @@ class ConcatConverter(OperatorBaseConverter):
 
 @_register_op(ReduceOpr)
 class ReduceConverter(OperatorBaseConverter):
-    support_op_map = {"MAX": "ReduceMax", "SUM": "ReduceSum"}
+    support_op_map = {
+        "MAX": "ReduceMax",
+        "SUM": "ReduceSum",
+        "SUM_SQR": "ReduceSumSquare",
+    }
 
     def __init__(self, opr):
         super().__init__(opr)
@@ -490,7 +514,6 @@ class AxisAddRemoveConverter(OperatorBaseConverter):
         outputs = self._get_outputs()
         add_axis = []
         remove_axis = []
-
         for desc in self._opr.desc:
             if desc["method"] == 0:
                 add_axis.append(desc["axisnum"])
@@ -515,3 +538,32 @@ class AxisAddRemoveConverter(OperatorBaseConverter):
         else:
             ret = []
         return ret, self._net_sources, self._parameters
+
+
+@_register_op(BroadcastOpr)
+class BroadcastOprConverter(OperatorBaseConverter):
+    def convert(self):
+        assert opset_version > 7, "onnx support Expand (broadcast) since opset 8"
+        inputs = self._get_inputs()
+        typecvt_node = onnx.helper.make_node(
+            "Cast",
+            [inputs[1]],
+            [inputs[1] + "_int64"],
+            to=mge2onnx_dtype_mapping[np.int64],
+        )
+        inputs[1] = inputs[1] + "_int64"
+        outputs = self._get_outputs()
+        broadcast_node = onnx.helper.make_node("Expand", inputs, outputs)
+        return [typecvt_node, broadcast_node], self._net_sources, self._parameters
+
+
+@_register_op(TypeCvtOpr)
+class TypeCvtOprConverter(OperatorBaseConverter):
+    def convert(self):
+        inputs = self._get_inputs()
+        outputs = self._get_outputs()
+        target_dtype = self._opr.out_vars[0].dtype
+        node = onnx.helper.make_node(
+            "Cast", inputs, outputs, to=mge2onnx_dtype_mapping[target_dtype]
+        )
+        return [node], self._net_sources, self._net_sources

@@ -17,29 +17,32 @@ from mgeconvert.onnx_converter.onnx_converter import OnnxConverter
 from .utils import (
     ActiveOpr,
     BnOpr,
+    BroadcastOpr,
     ConcatOpr,
     ConvOpr,
     ElemwiseOpr,
     LinearOpr,
     PoolOpr,
+    ReduceOpr,
     ReshapeOpr,
     SoftmaxOpr,
     SqueezeOpr,
     SubtensorOpr,
     TransposeOpr,
+    TypeCvtOpr,
     XORNet,
     dump_mge_model,
 )
 
 max_error = 1e-6
-onnx_min_version = 7
-onnx_max_version = 12
 tmp_file = "test_model"
 
 
-def _test_convert_result(inputs, fpath, mge_result, max_err):
+def _test_convert_result(
+    inputs, fpath, mge_result, max_err, min_version=7, max_version=12
+):
     net = TopologyNetwork(fpath + ".mge")
-    for version in range(onnx_min_version, onnx_max_version + 1):
+    for version in range(min_version, max_version + 1):
         converter = OnnxConverter(net, opset_version=version, graph_name="graph")
         model = converter.convert()
         with open(tmp_file + ".onnx", "wb") as fout:
@@ -47,8 +50,9 @@ def _test_convert_result(inputs, fpath, mge_result, max_err):
         onnx_net = ort.InferenceSession(tmp_file + ".onnx")
         input_name = onnx_net.get_inputs()[0].name
         X_test = inputs
-        pred_onx = onnx_net.run(None, {input_name: X_test.astype(np.float32)})[0]
+        pred_onx = onnx_net.run(None, {input_name: X_test})[0]
         assert pred_onx.shape == mge_result.shape
+        assert pred_onx.dtype == mge_result.dtype
         assert np.allclose(pred_onx, mge_result, atol=max_err)
 
 
@@ -118,9 +122,19 @@ def test_reshape():
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "abs", "exp", "log"])
+@pytest.mark.parametrize(
+    "mode",
+    ["add", "sub", "mul", "div", "abs", "exp", "log", "pow", "ceil", "floor", "max"],
+)
 def test_elemwise(mode):
     net = ElemwiseOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+@pytest.mark.parametrize("mode", ["sum", "max"])
+def test_reduce(mode):
+    net = ReduceOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
@@ -130,6 +144,18 @@ def test_active(mode):
     net = ActiveOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+def test_broadcast():
+    net = BroadcastOpr()
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error, min_version=8)
+
+
+def test_typecvt():
+    net = TypeCvtOpr()
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error, min_version=10)
 
 
 @pytest.mark.parametrize(
