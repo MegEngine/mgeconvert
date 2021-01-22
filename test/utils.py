@@ -121,7 +121,8 @@ class SubtensorOpr(M.Module):
             x = x[:, :, 2:7, 3]
         else:
             x = x[1:3, 4:8, :, 4:9]
-            x = x[1, :, :, 3]
+            x = x[:, :, :, 3]
+            x = x[1, 1:]
         return x
 
 
@@ -192,6 +193,7 @@ class ElemwiseOpr(M.Module):
         super().__init__()
         self.data = np.ones((2, 3, 224, 224)).astype(np.float32)
         self.data1 = np.random.random((1, 3, 1, 1)).astype(np.float32)
+        self.data2 = np.random.random((2, 3, 224, 224)).astype(np.float32)
         self.mode = mode
 
     def forward(self, a):
@@ -211,6 +213,20 @@ class ElemwiseOpr(M.Module):
             y = mge.tensor(self.data1) * a
             z = x * y
         # div
+        elif self.mode == "max":
+            x = a + mge.tensor(self.data)
+            y = a + mge.tensor(self.data2)
+            z = F.maximum(x, y)
+
+        elif self.mode == "pow":
+            z = a ** 2
+
+        elif self.mode == "ceil":
+            z = F.ceil(a)
+
+        elif self.mode == "floor":
+            z = F.floor(a)
+
         elif self.mode == "div":
             y = mge.tensor(self.data1) / a
             x = a / mge.tensor(np.float32(2))
@@ -232,12 +248,21 @@ class ElemwiseOpr(M.Module):
         return z
 
 
+class ReduceOpr(M.Module):
+    def __init__(self, mode):
+        super().__init__()
+        self.mode = mode
+        self.data = np.random.random((1, 3, 1000)).astype(np.float32)
+
+    def forward(self, a):
+        if self.mode == "sum":
+            return F.sum(a, axis=2)
+        else:
+            return F.max(a, axis=2)
+
+
 class ActiveOpr(M.Module):
-    str2fun = {
-        "relu": F.relu,
-        "tanh": F.tanh,
-        "sigmoid": F.sigmoid,
-    }
+    str2fun = {"relu": F.relu, "tanh": F.tanh, "sigmoid": F.sigmoid}
 
     def __init__(self, mode):
         super().__init__()
@@ -246,6 +271,26 @@ class ActiveOpr(M.Module):
 
     def forward(self, x):
         return ActiveOpr.str2fun[self.mode](x)
+
+
+class BroadcastOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.array([1], dtype=np.float16)
+
+    def forward(self, x):
+        return F.broadcast_to(x, (3, 5))
+
+
+class TypeCvtOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.array([[2, 2, 2, 2], [3, 3, 3, 3]], dtype=np.int32)
+
+    def forward(self, x):
+        x = x + 1
+        x = x.astype(np.float32)
+        return x
 
 
 class XORNet(M.Module):
