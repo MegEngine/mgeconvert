@@ -16,11 +16,13 @@ from mgeconvert.caffe_converter import convert_to_caffe
 from .utils import (
     ActiveOpr,
     BnOpr,
+    BroadcastOpr,
     ConcatOpr,
     ConvOpr,
     ElemwiseOpr,
     LinearOpr,
     PoolOpr,
+    ReduceOpr,
     ReshapeOpr,
     SoftmaxOpr,
     SqueezeOpr,
@@ -40,7 +42,7 @@ def _test_convert_result(inputs, fpath, mge_results, max_err):
     )
     caffe_net = caffe.Net(tmp_file + ".txt", "test_model.caffemodel", caffe.TEST)
     for i in caffe_net.blobs.keys():
-        if "h2d[" in i:
+        if "h2d" in i:
             caffe_net.blobs[i].data[...] = inputs
             break
     caffe_net.forward()
@@ -116,14 +118,18 @@ def test_reshape():
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["add", "sub", "mul", "div"])
+@pytest.mark.parametrize(
+    "mode", ["add", "sub", "mul", "div", "abs", "exp", "log", "max", "pow"]
+)
 def test_elemwise(mode):
     net = ElemwiseOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "abs", "exp", "log"])
+@pytest.mark.parametrize(
+    "mode", ["add", "sub", "mul", "div", "abs", "exp", "log", "pow"]
+)
 def test_elemwise_broadcast(mode):
     net = ElemwiseOpr(mode)
     mge_result = dump_mge_model(net, np.array([2.0]).astype("float32"), tmp_file)
@@ -133,6 +139,19 @@ def test_elemwise_broadcast(mode):
 @pytest.mark.parametrize("mode", ["relu", "sigmoid", "tanh"])
 def test_active(mode):
     net = ActiveOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+@pytest.mark.parametrize("mode", ["max", "sum"])
+def test_reduce(mode):
+    net = ReduceOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+def test_broadcast():
+    net = BroadcastOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
