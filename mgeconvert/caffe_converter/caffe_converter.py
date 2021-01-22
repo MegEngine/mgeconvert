@@ -6,12 +6,130 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import numpy as np
 from google.protobuf import text_format  # type: ignore[attr-defined]
 
 from ..mge_context import TopologyNetwork
-from ..mge_context.mge_utils import get_symvar_value
+from ..mge_context import mge_op as Op
+from ..mge_context.mge_utils import get_symvar_value, isconst
 from .caffe_op import MGE2CAFFE
 from .caffe_pb import caffe_pb2 as cp  # pylint: disable=import-error
+
+
+class Node:
+    def __init__(self, type, is_output=False, const_value=None):
+        self.opnode = None
+        self.type = type
+        self.inp_oprs = []
+        self.inp_const = []
+        self.inp_vars = []
+        self.is_output = is_output
+        self.const_value = const_value
+
+    def check_const_value(self, opnode):
+        inp_vars = [v.np_data for v in opnode.inp_vars]
+        for const in self.const_value:
+            idx = const[0]
+            if idx == -1:
+                find = False
+                for index, v in enumerate(inp_vars):
+                    if np.array_equal(const[1], v):
+                        find = True
+                        del inp_vars[index]
+                        break
+                if not find:
+                    return False
+            elif not np.array_equal(const[1], inp_vars[idx]):
+                return False
+        return True
+
+
+def get_type(opr):
+    if isinstance(opr, Op.ElemwiseOpr):
+        return opr.mode
+    else:
+        return str(type(opr))
+
+
+def match(node, opr):
+    node_queue = [node]
+    opr_queue = [opr]
+    matched_opr = set()
+    matched_node = set()
+    while len(node_queue) != 0:
+        cur_node = node_queue.pop(0)
+        cur_opr = opr_queue.pop(0)
+        if cur_node.type != get_type(cur_opr) and cur_node.type != "*" or cur_opr.skip:
+            return False
+        if cur_node.opnode == None:
+            cur_node.opnode = cur_opr
+            if cur_node.const_value != None:
+                if not cur_node.check_const_value(cur_opr):
+                    return False
+        elif cur_node.opnode != cur_opr:
+            return False
+
+        matched_opr.add(cur_opr)
+        matched_node.add(cur_node)
+        for i, var in enumerate(cur_opr.inp_vars):
+            if isconst(var):
+                cur_node.inp_const.append([i, var.np_data])
+            else:
+                cur_node.inp_vars.append([i, var])
+        if len(cur_node.inp_oprs) == 0:
+            continue
+        if len(cur_node.inp_oprs) != len(cur_opr.inp_oprs):
+            return False
+
+        for i, j in zip(cur_node.inp_oprs, cur_opr.inp_oprs):
+            node_queue.append(i)
+            opr_queue.append(j)
+
+    for n in matched_node:
+        if n.is_output:
+            continue
+        for op in n.opnode.out_oprs:
+            if op not in matched_opr:
+                return False
+
+    return True
+
+
+def _leaky_relu(opr):
+
+    AddNode = Node("ADD", is_output=True)
+    MulNode = Node("MUL")
+    MaxNode = Node("MAX", const_value=[(-1, [0.0])])
+    MinNode = Node("MIN", const_value=[(-1, [0.0])])
+    AddNode.inp_oprs = [MaxNode, MulNode]
+    MulNode.inp_oprs = [MinNode]
+    if (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Op.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    ):
+        add_opr = opr.out_oprs[0]
+        if match(AddNode, add_opr):
+            if (
+                MaxNode.inp_vars[0] == MinNode.inp_vars[0]
+                and len(MulNode.inp_const) == 1
+                and MulNode.inp_const[0][1].shape == (1,)
+            ):
+                LeakRelu = Op.LeakyReluOpr(
+                    "LeakRelu_" + AddNode.opnode.name, MulNode.inp_const[0][1],
+                )
+                LeakRelu.inp_vars = [MaxNode.inp_vars[0][1]]
+                LeakRelu.out_vars = AddNode.opnode.out_vars
+                AddNode.opnode.skip = True
+                MulNode.opnode.skip = True
+                MaxNode.opnode.skip = True
+                MinNode.opnode.skip = True
+                return LeakRelu
+    return None
+
+
+replace_rules = {}
+replace_rules["MAX"] = _leaky_relu
 
 
 class CaffeConverter:
@@ -99,7 +217,18 @@ class CaffeConverter:
             is_const = [data.np_data is not None for data in opr.inp_vars]
             return not all(is_const) or len(opr.inp_vars) == 0
 
-        for opr in self.net.all_oprs:
+        all_oprs = list(self.net.all_oprs)
+        for idx, opr in enumerate(all_oprs):
+            if get_type(opr) in replace_rules:
+                new_op = replace_rules[get_type(opr)](opr)
+                if new_op is not None:
+                    all_oprs[idx] = new_op
+
+        for index in range(len(all_oprs) - 1, -1, -1):
+            if all_oprs[index].skip:
+                del all_oprs[index]
+
+        for opr in all_oprs:
             if not need_convert(opr):
                 for tensor in opr.out_vars:
                     if tensor.np_data is None:

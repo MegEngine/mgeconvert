@@ -136,7 +136,7 @@ def test_elemwise_broadcast(mode):
     _test_convert_result(np.array([2.0]), tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["relu", "sigmoid", "tanh"])
+@pytest.mark.parametrize("mode", ["relu", "sigmoid", "tanh", "leaky_relu"])
 def test_active(mode):
     net = ActiveOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
@@ -189,4 +189,12 @@ def test_xornet():
         return
     net = XORNet()
     mge_result = dump_mge_model(net, net.data, tmp_file, True)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+def test_leakyrelu_model():
+    if megengine.__version__ < "1.1.0":
+        return
+    net = XORNet()
+    mge_result = dump_mge_model(net, net.data, tmp_file, False)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)

@@ -23,6 +23,7 @@ from ..mge_context import (
     GetVarShapeOpr,
     Host2DeviceCopyOpr,
     IdentityOpr,
+    LeakyReluOpr,
     MarkNoBroadcastElemwiseOpr,
     MatrixMulOpr,
     MultipleDeviceTensorHolderOpr,
@@ -37,7 +38,7 @@ from ..mge_context import (
     get_logger,
     get_symvar_value,
 )
-from ..mge_context.mge_utils import get_symvar_value, isconst
+from ..mge_context.mge_utils import isconst
 from .caffe_pb import caffe_pb2 as cp  # pylint: disable=import-error
 
 logger = get_logger(__name__)
@@ -395,7 +396,7 @@ def _(*_):
 
 
 @_register_op(GetVarShapeOpr)
-def shapeof(opr, context):
+def shapeof(opr, _):
     out_shape = opr.out_vars[0]
     out_shape.np_data = get_symvar_value(out_shape._var)
 
@@ -938,6 +939,13 @@ def axis_add_remove(opr, context):
         )
     )
 
+
+@_register_op(LeakyReluOpr)
+def leaky_relu(opr, context):
+    param = cp.ReLUParameter(negative_slope=opr.negative_slope[0])
+    context.add_layer(_gen_layer(opr, "ReLU", context, relu_param=param))
+
+
 @_register_op(TypeCvtOpr)
 def typecvt(opr, context):
     context.set_blob_name(opr.out_vars[0], context.get_blob_name(opr.inp_vars[0]))
@@ -969,7 +977,7 @@ def broadcast(opr, context):
         bottom = top
     for i in range(b_ndim):
         shpA, shpB = a_shape[i], b_shape[i]
-        assert shpA == shpB or shpA == 1
+        assert shpA in (shpB, 1)
         name = opr.name + context.gen_name
         top = [name]
         context.add_layer(
