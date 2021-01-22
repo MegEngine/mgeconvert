@@ -77,7 +77,7 @@ def get_shape(x):
     return x._get_imm_shape() if mge_version <= "0.6.0" else x.shape
 
 
-def get_dep_vars(x, type):
+def get_dep_vars(x, type=None):
     return cgtools.get_dep_vars(x, type)
 
 
@@ -118,8 +118,8 @@ def graph_traversal(outputs):
     return map_oprs, map_vars, var2oprs, opr2receivers, indegree2opr, opr2indegree
 
 
-def get_oprs_seq(outputs):
-    all_oprs = cgtools.get_oprs_seq(outputs, prune_reshape=True)
+def get_oprs_seq(outputs, prune_reshape=True):
+    all_oprs = cgtools.get_oprs_seq(outputs, prune_reshape=prune_reshape)
     return all_oprs
 
 

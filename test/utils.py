@@ -262,7 +262,12 @@ class ReduceOpr(M.Module):
 
 
 class ActiveOpr(M.Module):
-    str2fun = {"relu": F.relu, "tanh": F.tanh, "sigmoid": F.sigmoid}
+    str2fun = {
+        "relu": F.relu,
+        "tanh": F.tanh,
+        "sigmoid": F.sigmoid,
+        "leaky_relu": F.leaky_relu,
+    }
 
     def __init__(self, mode):
         super().__init__()
@@ -313,4 +318,31 @@ class XORNet(M.Module):
         x = self.bn1(x)
         x = F.tanh(x)
         x = self.fc2(x)
+        return x
+
+
+class XORNet_LeakyRelu(M.Module):
+    def __init__(self):
+        self.mid_dim = 14
+        self.num_class = 2
+        super().__init__()
+        self.fc0 = M.Linear(self.num_class, self.mid_dim, bias=True)
+        self.bn0 = M.BatchNorm1d(self.mid_dim)
+        self.fc1 = M.Linear(self.mid_dim, self.mid_dim, bias=True)
+        self.bn1 = M.BatchNorm1d(self.mid_dim)
+        self.fc2 = M.Linear(self.mid_dim, self.num_class, bias=True)
+        self.data = np.random.random((12, 2)).astype(np.float32)
+
+    def forward(self, x):
+        x = self.fc0(x)
+        x = self.bn0(x)
+        x = F.leaky_relu(x)
+        x = F.leaky_relu(x)
+        x = F.tanh(x)
+        x = self.fc1(x)
+        x = F.leaky_relu(x)
+        x = self.bn1(x)
+        x = F.tanh(x)
+        x = self.fc2(x)
+        x = F.leaky_relu(x)
         return x

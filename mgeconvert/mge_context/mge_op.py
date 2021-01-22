@@ -8,7 +8,9 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import json
 import sys
+from typing import List  # pylint: disable=unused-import
 
+from .mge_tensor import Tensor  # pylint: disable=unused-import
 from .mge_utils import get_mge_version, get_opr_type, get_shape, get_symvar_value
 
 mge_version = get_mge_version()
@@ -18,11 +20,17 @@ def str_to_mge_class(classname):
     return getattr(sys.modules[__name__], classname)
 
 
-class MgeOpr:
+class OpBase:
+    skip = False
+    name = ""
+    inp_vars = []  # type: List[Tensor]
+    out_vars = []  # type: List[Tensor]
+
+
+class MgeOpr(OpBase):
     def __init__(self, opr):
         self._opr = opr
         self.name = opr.name
-
         self.name = self.name.replace(":", "_")
         self.name = self.name.replace(".", "_")
         self.name = self.name.replace(",", "_")
@@ -214,8 +222,12 @@ class SubtensorOpr(MgeOpr):
             else:
                 if self.has_begin[i]:
                     begin_param.append(slice_param.pop(0))
+                else:
+                    begin_param.append(0)
                 if self.has_end[i]:
                     end_param.append(slice_param.pop(0))
+                else:
+                    end_param.append(2147483647)
                 step_param.append(1 if self.has_step[i] == 0 else slice_param.pop(0))
 
         self.squeeze_axis = squeeze_axis
@@ -337,3 +349,11 @@ class ConvolutionBackwardDataOpr(MgeOpr):
         self.num_output = get_shape(opr.outputs[0])[1]
         self.bias_term = False
         self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
+
+
+class LeakyReluOpr(OpBase):
+    name = "LeakyRelu"
+
+    def __init__(self, name, negative_slope):
+        self.name = name
+        self.negative_slope = negative_slope
