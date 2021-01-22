@@ -14,6 +14,7 @@ import numpy as np
 from ..mge_context import (
     AxisAddRemoveOpr,
     BatchNormForwardOpr,
+    BroadcastOpr,
     ConcatOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
@@ -31,6 +32,7 @@ from ..mge_context import (
     SharedDeviceTensorOpr,
     SubtensorOpr,
     Tensor,
+    TypeCvtOpr,
     VolatileSharedDeviceTensorOpr,
     get_logger,
     get_symvar_value,
@@ -396,7 +398,6 @@ def _(*_):
 def shapeof(opr, context):
     out_shape = opr.out_vars[0]
     out_shape.np_data = get_symvar_value(out_shape._var)
-    context.set_blob_name(out_shape)
 
 
 @_register_op(Host2DeviceCopyOpr)
@@ -411,7 +412,7 @@ def bias_add(input, output, bias, name, context):
     param = cp.BiasParameter(axis=1, num_axes=1)
     blobs = [context.gen_blob_proto(bias)]
     bottom = [context.get_blob_name(input)]
-    top = [context.set_blob_name(output)]
+    top = [context.set_blob_name(output, name)]
     context.add_layer(
         cp.LayerParameter(
             name=name,
@@ -426,8 +427,18 @@ def bias_add(input, output, bias, name, context):
 
 def _arith_with_const_tensor(input, const, order, opr, context):
     atype = opr.mode
-    topA, topB, shape = _broadcast_for_eltwiseopr(opr.name, input, const, context)
-    layer_param = cp.ScaleParameter(axis=len(shape) - topB.ndim, num_axes=topB.ndim)
+    topB = const.np_data
+    if input.ndim >= 2 and (
+        topB.squeeze().shape == (input.shape[1],) or topB.squeeze().shape == (1,)
+    ):
+        topA = [context.get_blob_name(input)]
+        topB = topB.squeeze()
+        shape = topB.shape
+        layer_param = cp.ScaleParameter()
+    else:
+        topA, topB, shape = _broadcast_for_eltwiseopr(opr.name, input, const, context)
+        layer_param = cp.ScaleParameter(axis=len(shape) - topB.ndim, num_axes=topB.ndim)
+
     if atype in {"ADD", "SUB"}:
         layer_param.bias_term = True
         param_b = topB
@@ -575,6 +586,19 @@ def _eltwise(opr: ElemwiseOpr, context):
         context.add_layer(_gen_layer(opr, "AbsVal", context))
     elif atype in ["ADD", "SUB", "MUL", "TRUE_DIV"]:
         _arith(opr, opr.mode, context)
+    elif atype == "POW":
+        power = opr.inp_vars[1].np_data
+        assert power.shape == (1,)
+        power_param = cp.PowerParameter(scale=1, shift=0, power=power[0])
+        context.add_layer(_gen_layer(opr, "Power", context, power_param=power_param))
+    elif atype == "MAX":
+        param = cp.EltwiseParameter(operation="MAX")
+        assert (
+            opr.inp_vars[0].np_data is None and opr.inp_vars[1].np_data is None
+        ), "Caffe doesn't support elemwise MAX(tensor, const)"
+        context.add_layer(
+            _gen_layer(opr, "Eltwise", context, single_input=False, eltwise_param=param)
+        )
     else:
         assert (
             False
@@ -843,10 +867,14 @@ def _reduce(opr, context):
     assert opr.mode in [
         "SUM",
         "MAX",
+        "SUM_SQR",
     ], "Reduce op doesn't support mode {}, you can implement it in _reduce".format(
         opr.mode
     )
-    if opr.mode == "SUM":
+    if opr.mode == "SUM" or opr.mode == "SUM_SQR":
+        mode = "SUM"
+        if opr.mode == "SUM_SQR":
+            mode = "SUMSQ"
         bottom = [context.get_blob_name(opr.inp_vars[0])]
         top = [context.set_blob_name(opr.out_vars[0], opr.name)]
         context.add_layer(
@@ -855,9 +883,7 @@ def _reduce(opr, context):
                 type="Reduction",
                 bottom=bottom,
                 top=top,
-                reduction_param=cp.ReductionParameter(
-                    operation=opr.mode, axis=opr.axis
-                ),
+                reduction_param=cp.ReductionParameter(operation=mode, axis=opr.axis),
             )
         )
         param = cp.ReshapeParameter(shape=cp.BlobShape(dim=opr.out_vars[0].shape))
@@ -911,3 +937,49 @@ def axis_add_remove(opr, context):
             name=opr.name, type="Reshape", bottom=bottom, top=top, reshape_param=param
         )
     )
+
+@_register_op(TypeCvtOpr)
+def typecvt(opr, context):
+    context.set_blob_name(opr.out_vars[0], context.get_blob_name(opr.inp_vars[0]))
+
+
+@_register_op(BroadcastOpr)
+def broadcast(opr, context):
+    input = opr.inp_vars[0]
+    inp_ndim = input.ndim
+    a_shape = input.shape
+    b_shape = opr.inp_vars[1].np_data
+    b_ndim = len(b_shape)
+    assert inp_ndim <= b_ndim
+    bottom = [context.get_blob_name(input)]
+    if inp_ndim < b_ndim:
+        a_shape = (1,) * (b_ndim - inp_ndim) + a_shape
+        inp_ndim = b_ndim
+        param = cp.ReshapeParameter(shape=cp.BlobShape(dim=a_shape))
+        top = [bottom[0] + "_reshape"]
+        context.add_layer(
+            cp.LayerParameter(
+                bottom=bottom,
+                top=top,
+                name=opr.name + context.gen_name,
+                type="Reshape",
+                reshape_param=param,
+            )
+        )
+        bottom = top
+    for i in range(b_ndim):
+        shpA, shpB = a_shape[i], b_shape[i]
+        assert shpA == shpB or shpA == 1
+        name = opr.name + context.gen_name
+        top = [name]
+        context.add_layer(
+            cp.LayerParameter(
+                name=name,
+                type="Tile",
+                bottom=bottom,
+                top=top,
+                tile_param=cp.TileParameter(axis=i, tiles=shpB),
+            )
+        )
+        bottom = top
+    context.set_blob_name(opr.out_vars[0], bottom[0])
