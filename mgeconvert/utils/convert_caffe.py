@@ -27,8 +27,20 @@ def main():
         help="Output caffe .caffemodel file",
     )
 
+    parser.add_argument(
+        "--end_point",
+        default=None,
+        type=str,
+        help="end_point is used to specify which part of the mge model should be converted",
+    )
+
     args = parser.parse_args()
-    convert_to_caffe(args.input, prototxt=args.prototxt, caffemodel=args.caffemodel)
+    outspec = None
+    if args.end_point is not None:
+        outspec = args.end_point.split(";")
+    convert_to_caffe(
+        args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
+    )
 
 
 if __name__ == "__main__":

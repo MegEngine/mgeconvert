@@ -21,8 +21,24 @@ def main():
     )
     parser.add_argument("--opset", default=8, type=int, help="Onnx opset version")
     parser.add_argument("--graph", default="graph", type=str, help="Onnx graph name")
+    parser.add_argument(
+        "--end_point",
+        default=None,
+        type=str,
+        help="end_point is used to specify which part of the mge model should be converted",
+    )
     args = parser.parse_args()
-    convert_to_onnx(args.input, args.output, graph_name=args.graph, opset=args.opset)
+    outspec = None
+    if args.end_point is not None:
+        outspec = args.end_point.split(";")
+
+    convert_to_onnx(
+        args.input,
+        args.output,
+        graph_name=args.graph,
+        opset=args.opset,
+        outspec=outspec,
+    )
 
 
 if __name__ == "__main__":
