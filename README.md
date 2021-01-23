@@ -15,15 +15,19 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 |average pool2d| ✓ | ✓ | ✓ |
 |batchnorm| ✓ | ✓ | ✓ |
 |broadcast| ✓ | ✓ | ✓ |
+|ceil| × | ✓ | × |
 |concat| ✓ | ✓ | ✓ |
 |conv2d| ✓ | ✓ | ✓ |
 |convtranspose2d| ✓ | ✓ | ✓ |
 |div(true_div)| ✓ | ✓ | ✓ |
 |exp| ✓ | ✓ | ✓ |
+|elemwise max|  ✓ | ✓ | ✓ |
+|floor| × | ✓ | ✓ |
 |log| ✓ | ✓ | ✓ |
 |matrix mul| ✓ | ✓ | ✓ |
 |max pool2d| ✓ | ✓ | ✓ |
 |mul| ✓ | ✓ | ✓ |
+|pow| ✓ | ✓ | ✓ |
 |reduce max| ✓ | ✓ | ✓ |
 |reduce sum| ✓ | ✓ | ✓ |
 |relu| ✓ | ✓ | ✓ |
@@ -34,6 +38,7 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 |slice(subtensor)| ✓ | ✓ | ✓ |
 |squeeze(axis_add_remove)| ✓ | ✓ | ✓ |
 |tanh| ✓ | ✓ | ✓ |
+|typecvt|  ✓ | ✓ | ✓ |
 |transpose(dimshuffle)| ✓ | ✓ | ✓ |
 
 
@@ -111,17 +116,17 @@ pip3 install .
  
   执行 [convert_caffe.py](mgeconvert/utils/convert_caffe.py)将MegEngine模型转为Caffe模型，具体使用方法如下：
   ```bash
-  python3 -m mgeconvert.utils.convert_caffe -i $MGE_MODEL -c $PROTOTXT -b $CAFFEMODEL
+  python3 -m mgeconvert.utils.convert_caffe -i $MGE_MODEL -c $PROTOTXT -b $CAFFEMODEL [--end_point $ENDPOINT]
   ```
-  转换成功后将产生存储模型结构的文本文件`$PROTOTXT`,和存储模型参数的文件 `$CAFFEMODEL`
+  转换成功后将产生存储模型结构的文本文件`$PROTOTXT`,和存储模型参数的文件 `$CAFFEMODEL`。可以通过设置 --end_point 指定转换到模型某个节点（tensor)为止，多个tensor的名字用`;`分隔，未指定时转换整个模型。
 
 * 转onnx
 
   执行[convert_onnx.py](mgeconvert/utils/convert_onnx.py)将MegEngine模型转为ONNX模型，具体使用方法如下：
   ```bash
-  python3 -m mgeconvert.utils.convert_onnx -i $MGE_MODEL -o $ONNX_MODEL [--opset $OPSET] [--graph $GRAPH]
+  python3 -m mgeconvert.utils.convert_onnx -i $MGE_MODEL -o $ONNX_MODEL [--opset $OPSET] [--graph $GRAPH] [--end_point $ENDPOINT]
   ```
-  转换成功将产生onnx模型文件`$ONNX_MODEL`。可以通过--opset 指定onnx opset版本，当前支持7-12版本的opset，未指定时opset版本为8。可以通过 --graph 设置计算图名，未指定时使用 "graph" 作为计算图名。
+  转换成功将产生onnx模型文件`$ONNX_MODEL`。可以通过--opset 指定onnx opset版本，当前支持7-12版本的opset，未指定时opset版本为8。可以通过 --graph 设置计算图名，未指定时使用 "graph" 作为计算图名。可以通过设置 --end_point 指定转换到模型某个节点（tensor)为止，多个tensor的名字用`;`分隔，未指定时转换整个模型。
 
 * 转寒武纪
 
