@@ -12,6 +12,7 @@ from .mge_op import str_to_mge_class
 from .mge_tensor import Tensor
 from .mge_utils import (
     eval_partial,
+    get_dep_vars,
     get_mge_version,
     get_opr_type,
     get_oprs_seq,
@@ -20,9 +21,21 @@ from .mge_utils import (
 
 
 class TopologyNetwork:
-    def __init__(self, model_path):
+    def __init__(self, model_path, outspec=None, prune_reshape=True):
         _, outputs = load_comp_graph_from_file(model_path)
-        all_oprs = get_oprs_seq(outputs)
+        if outspec is not None:
+            output_spec = outspec.copy()
+            all_vars = get_dep_vars(outputs) + outputs
+            new_outputs = {}
+            for i in all_vars:
+                if i.name in output_spec:
+                    new_outputs[i.name] = i
+                    output_spec.remove(i.name)
+            assert len(output_spec) == 0, "Can not find {} in this model".format(
+                output_spec
+            )
+            outputs = [new_outputs[i] for i in outspec]
+        all_oprs = get_oprs_seq(outputs, prune_reshape=prune_reshape)
         self.input_vars = []
         self._orig_inputs = []
         self.output_vars = []

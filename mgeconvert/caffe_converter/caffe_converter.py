@@ -108,7 +108,9 @@ class CaffeConverter:
             MGE2CAFFE[type(opr)](opr, self)
 
 
-def convert_to_caffe(mge_fpath, prototxt="out.prototxt", caffemodel="out.caffemodel"):
+def convert_to_caffe(
+    mge_fpath, prototxt="out.prototxt", caffemodel="out.caffemodel", outspec=None
+):
     """
     Convert megengine model to Caffe,
     and save caffe model to `prototxt` and `caffemodel`.
@@ -122,7 +124,7 @@ def convert_to_caffe(mge_fpath, prototxt="out.prototxt", caffemodel="out.caffemo
     """
 
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
-    net = TopologyNetwork(mge_fpath)
+    net = TopologyNetwork(mge_fpath, outspec=outspec)
     converter = CaffeConverter(net)
     converter.convert()
     assert isinstance(prototxt, str) and isinstance(

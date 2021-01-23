@@ -12,7 +12,7 @@ import onnx.helper
 import onnx.numpy_helper
 from onnx import optimizer
 
-from ..mge_context import TopologyNetwork
+from ..mge_context import TopologyNetwork, get_symvar_value
 from .onnx_op import MGE2ONNX, mge2onnx_dtype_mapping, set_opset_version
 
 
@@ -51,6 +51,9 @@ class OnnxConverter:
 
         for opr in self.net.all_oprs_map.values():
             if not need_convert(opr):
+                for tensor in opr.out_vars:
+                    if tensor.np_data is None:
+                        tensor.np_data = get_symvar_value(tensor._var)
                 continue
             converter_cls = MGE2ONNX.get(type(opr), None)
             if converter_cls is None:
@@ -100,7 +103,9 @@ class OnnxConverter:
         return model
 
 
-def convert_to_onnx(mge_fpath, output="out.onnx", *, graph_name="graph", opset=8):
+def convert_to_onnx(
+    mge_fpath, output="out.onnx", *, graph_name="graph", opset=8, outspec=None
+):
     """
     Convert megengine model to ONNX,
     and save the ONNX model to file `output`.
@@ -115,7 +120,7 @@ def convert_to_onnx(mge_fpath, output="out.onnx", *, graph_name="graph", opset=8
     :type opset: int
     """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
-    net = TopologyNetwork(mge_fpath)
+    net = TopologyNetwork(mge_fpath, prune_reshape=True, outspec=outspec)
     converter = OnnxConverter(net, opset, graph_name)
     model = converter.convert()
 
