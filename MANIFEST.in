@@ -1,1 +1,3 @@
 include mgeconvert/cambricon_converter/lib/cnlib/_cambriconLib.so
+include mgeconvert/caffe_converter/caffe_pb/caffe.proto
+include mgeconvert/caffe_converter/caffe_pb/caffe_pb2.py
