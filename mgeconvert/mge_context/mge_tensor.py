@@ -14,6 +14,9 @@ class Tensor:
         self.id = sym_var.id
         self._var = sym_var
         self.name = sym_var.name
+        self.name = self.name.replace(":", "_")
+        self.name = self.name.replace(".", "_")
+        self.name = self.name.replace(",", "_")
         self.shape = get_shape(sym_var)
         self.owner_opr = owner_opr
         if self.shape is not None:

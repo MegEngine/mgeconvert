@@ -44,7 +44,11 @@ def dump_mge_model(net, data, fpath="test_model", optimize_for_inference=False):
             return output
 
         inference(mge.tensor(data))
-        inference.dump(fpath + ".mge", optimize_for_inference=optimize_for_inference)
+        inference.dump(
+            fpath + ".mge",
+            arg_names=["data"],
+            optimize_for_inference=optimize_for_inference,
+        )
         return mge_result.numpy()
 
 

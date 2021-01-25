@@ -99,9 +99,7 @@ class OperatorBaseConverter:
         """
         Returns the names of outputs of onnx operator.
         """
-        outputs = [var.name for var in self._opr.out_vars]
-
-        return list(filter(lambda x: ":workspace" not in x, outputs))
+        return [var.name for var in self._opr.out_vars]
 
     def _get_attrs(self):
         """
