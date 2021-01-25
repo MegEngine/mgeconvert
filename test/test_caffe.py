@@ -42,7 +42,7 @@ def _test_convert_result(inputs, fpath, mge_results, max_err):
     )
     caffe_net = caffe.Net(tmp_file + ".txt", "test_model.caffemodel", caffe.TEST)
     for i in caffe_net.blobs.keys():
-        if "h2d" in i:
+        if "data" in i:
             caffe_net.blobs[i].data[...] = inputs
             break
     caffe_net.forward()

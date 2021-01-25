@@ -48,7 +48,7 @@ class MgeOpr(OpBase):
         self.inp_vars.append(x)
 
     def add_out_var(self, x):
-        if ":workspace" in x.name:
+        if "workspace" in x.name:
             return
         self.out_vars.append(x)
 

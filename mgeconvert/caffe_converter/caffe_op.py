@@ -66,7 +66,7 @@ def _gen_layer(opr, etype, context, single_input=True, **kwargs):
         if single_input
         else list(map(context.get_blob_name, opr.inp_vars))
     )
-    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
     return cp.LayerParameter(
         bottom=bottom, top=top, name=opr.name, type=etype, **kwargs
     )
@@ -470,7 +470,7 @@ def _arith_with_const_tensor(input, const, order, opr, context):
                 )
         blobs = [context.gen_blob_proto(param_k)]
     bottom = topA
-    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
     context.add_layer(
         cp.LayerParameter(
             name=opr.name,
@@ -531,7 +531,7 @@ def _arith(opr, mode, context):
                 )
             param = cp.EltwiseParameter(operation="PROD")
         bottom = topA + topB
-        top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+        top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
         context.add_layer(
             cp.LayerParameter(
                 name=opr.name,
@@ -637,7 +637,7 @@ def _convolution(opr, context):
         group=group,
         bias_term=bias_term,
     )
-    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
     if isinstance(opr, ConvolutionBackwardDataOpr):
         layer_type = "Deconvolution"
         bottom = [context.get_blob_name(opr.inp_vars[1])]
@@ -694,7 +694,7 @@ def _pooling2d(opr, context):
     )
 
     bottom = [context.get_blob_name(opr.inp_vars[0])]
-    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
     context.add_layer(
         cp.LayerParameter(
             name=opr.name, type="Pooling", bottom=bottom, top=top, pooling_param=param
@@ -749,7 +749,7 @@ def _reshape(opr, context):
         d = len(inp_shape) - len(out_shape)
         tmp_shape = out_shape + (1,) * d
         bottom = [context.get_blob_name(opr.inp_vars[0])]
-        top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+        top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
         if inp_shape != tmp_shape:
             param = cp.ReshapeParameter(shape=cp.BlobShape(dim=tmp_shape))
             tmp = [bottom[0] + "tmp"]
@@ -805,7 +805,7 @@ def _fully_connected(opr, context):
     )
     blobs = [context.gen_blob_proto(param_W)]
     bottom = [context.get_blob_name(opr.inp_vars[0])]
-    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
 
     context.add_layer(
         cp.LayerParameter(
@@ -830,7 +830,7 @@ def _batchnorm(opr, context):
         context.get_blob_name(inp),
     ]
     tmp = [bottom[0] + context.gen_name]
-    top = [context.set_blob_name(opr.out_vars[opr.output_idx], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[opr.output_idx], opr.out_vars[0].name)]
     bn_param = cp.BatchNormParameter(use_global_stats=True)
     bn_blobs = [
         context.gen_blob_proto(mean_),
@@ -877,7 +877,7 @@ def _reduce(opr, context):
         if opr.mode == "SUM_SQR":
             mode = "SUMSQ"
         bottom = [context.get_blob_name(opr.inp_vars[0])]
-        top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+        top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
         context.add_layer(
             cp.LayerParameter(
                 name=opr.name,
@@ -915,7 +915,7 @@ def _reduce(opr, context):
             )
         )
         bottom = top
-        top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+        top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
         context.add_layer(
             cp.LayerParameter(
                 name=opr.name,
@@ -932,7 +932,7 @@ def axis_add_remove(opr, context):
     logger.warning("Use 'reshape layer' to replace operator: AxisAddRemove")
     param = cp.ReshapeParameter(shape=cp.BlobShape(dim=opr.out_vars[0].shape))
     bottom = [context.get_blob_name(opr.inp_vars[0])]
-    top = [context.set_blob_name(opr.out_vars[0], opr.name)]
+    top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
     context.add_layer(
         cp.LayerParameter(
             name=opr.name, type="Reshape", bottom=bottom, top=top, reshape_param=param
