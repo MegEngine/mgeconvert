@@ -503,7 +503,7 @@ def _arith(opr, mode, context):
             if bias.ndim == 1 and inpA.ndim > 1 and bias.shape[0] == inpA.shape[1]:
                 use_bias_layer = True
         if use_bias_layer:
-            bias_add(inpA, opr.out_vars[0], bias, opr.name, context)
+            bias_add(inpA, opr.out_vars[0], bias, opr.out_vars[0].name, context)
         else:
             _arith_with_const_tensor(inpA, const, order, opr, context)
 
@@ -743,7 +743,7 @@ def _reshape(opr, context):
         context.set_blob_name(opr.out_vars[0], inp_blob)
     elif (
         all([inp_shape, out_shape])
-        and len(inp_shape) > len(out_shape)
+        and len(inp_shape) >= len(out_shape)
         and inp_shape[0] == out_shape[0]
     ):
         d = len(inp_shape) - len(out_shape)
@@ -775,8 +775,10 @@ def _reshape(opr, context):
         )
     else:
         logger.warning(
-            "NNIE doesn't support this reshape Opr %s, NNIE reshape only support C/H/W, not N!",
+            "NNIE doesn't support this reshape Opr %s, inp_shape %s, out_shape %s, NNIE reshape only support C/H/W, not N!",
             opr.name,
+            inp_shape,
+            out_shape,
         )
         if out_shape is None:
             out_shape = opr.shape_param
