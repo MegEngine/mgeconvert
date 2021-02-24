@@ -1,2 +1,4 @@
 __pycache__
 mgeconvert/caffe_converter/caffe_pb
+mgeconvert/tflite_converter/tflite/
+*.tflite
