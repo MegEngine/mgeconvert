@@ -7,9 +7,9 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import flatbuffers
-import megengine as mge
 
 from ..mge_context import TopologyNetwork, get_symvar_value
+from ..mge_context.mge_op import Host2DeviceCopyOpr, ReduceOpr
 from .tflite import (
     Buffer,
     Conv2DOptions,
@@ -25,12 +25,7 @@ from .tflite import (
 from .tflite.BuiltinOperator import BuiltinOperator
 from .tflite.BuiltinOptions import BuiltinOptions
 from .tflite.CustomOptionsFormat import CustomOptionsFormat
-from .tflite_op import (
-    gen_tflite_options,
-    mge2tflite_dtype_mapping,
-    mge2tflite_opr_type,
-    operator2options,
-)
+from .tflite_op import MGE2TFLITE, mge2tflite_dtype_mapping
 
 
 class TFLiteConverter:
@@ -56,13 +51,27 @@ class TFLiteConverter:
         buffer = Buffer.BufferEnd(self._builder)
         self._buffer_list.append(buffer)
 
-        for opr in self.net.all_oprs_map.values():
-            opr_type = mge2tflite_opr_type(opr)
-            if opr_type not in self._opr_type_list:
-                self._opr_type_list.append(opr_type)
+        def need_convert(mge_opr):
+            is_const = [data.np_data is not None for data in mge_opr.inp_vars]
+            if type(mge_opr) == Host2DeviceCopyOpr:
+                return False
+            return not all(is_const) or len(mge_opr.inp_vars) == 0
+
+        for mge_opr in self.net.all_oprs_map.values():
+            if not need_convert(mge_opr):
+                continue
+
+            tfl_opr_type, tfl_options_type, tfl_options = MGE2TFLITE[type(mge_opr)](
+                mge_opr, self._builder
+            )
+            if tfl_opr_type not in self._opr_type_list:
+                self._opr_type_list.append(tfl_opr_type)
 
             # buffer and tensor
-            for var in opr.inp_vars + opr.out_vars:
+            # TODO: reduce axis is an input in tflite
+            if type(mge_opr) == ReduceOpr:
+                pass
+            for var in mge_opr.inp_vars + mge_opr.out_vars:
 
                 if var in self._var2tensor:
                     continue
@@ -84,7 +93,7 @@ class TFLiteConverter:
                 buffer = self.gen_buffer(byte_list)
                 self._buffer_list.append(buffer)
 
-                tensor = self.gen_tensor(
+                tfl_tensor = self.gen_tensor(
                     var.name,
                     result_shape,
                     mge2tflite_dtype_mapping[dtype],
@@ -92,12 +101,15 @@ class TFLiteConverter:
                     scale=scale,
                     zero_point=zero_point,
                 )
-                self._tensor_list.append(tensor)
+                self._tensor_list.append(tfl_tensor)
                 self._var2tensor[var] = len(self._tensor_list) - 1
 
-            operator = self.gen_operator(opr)
-            self._operator_list.append(operator)
-        last_opr = opr
+            tfl_opr = self.gen_operator(
+                mge_opr, tfl_opr_type, tfl_options_type, tfl_options
+            )
+            self._operator_list.append(tfl_opr)
+
+        last_opr = mge_opr
         print("last op: {}".format(last_opr))
         out_var = last_opr.out_vars[0]
         print("dtype: {}".format(out_var.dtype))
@@ -117,12 +129,12 @@ class TFLiteConverter:
             # except the output of reshape
             shape = [tensor.shape[0], tensor.shape[2], tensor.shape[3], tensor.shape[1]]
             value = tensor.np_data
-            if value:
+            if value is not None:
                 number_list = value.reshape(-1)
         elif tensor.ndim < 4:
             shape = list(tensor.shape)
             value = tensor.np_data
-            if value:
+            if value is not None:
                 number_list = value.reshape(-1)
         else:
             assert False, "ERROR: output ndim {0} is not supported now".format(
@@ -186,9 +198,9 @@ class TFLiteConverter:
         tensor = Tensor.TensorEnd(self._builder)
         return tensor
 
-    def gen_operator(self, opr):
+    def gen_operator(self, opr, opr_type, options_type, options):
         # opcode_index
-        opcode_index = self._opr_type_list.index(mge2tflite_opr_type(opr))
+        opcode_index = self._opr_type_list.index(opr_type)
         # inputs
         Operator.OperatorStartInputsVector(self._builder, len(opr.inp_vars))
         for var in reversed(opr.inp_vars):
@@ -199,10 +211,6 @@ class TFLiteConverter:
         for var in reversed(opr.out_vars):
             self._builder.PrependInt32(self._var2tensor[var])
         outputs = self._builder.EndVector(len(opr.out_vars))
-
-        # options
-        options_type = operator2options(mge2tflite_opr_type(opr))
-        options = gen_tflite_options(self._builder, opr, options_type)
 
         custom_options = None
         builtin_options = None

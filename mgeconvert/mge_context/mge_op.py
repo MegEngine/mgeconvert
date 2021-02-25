@@ -351,6 +351,10 @@ class ConvolutionBackwardDataOpr(MgeOpr):
         self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
 
 
+class ResizeOpr(OpBase):
+    name = "Resize"
+
+
 class LeakyReluOpr(OpBase):
     name = "LeakyRelu"
 

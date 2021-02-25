@@ -148,7 +148,12 @@ builder.Finish(model, tflite.GetFileIdentifier())
 with open("out.tflite", "wb") as f:
     f.write(builder.Output())
 
-# read model file
-# from mgeconvert.tflite_converter import tflite
-# buf = open("out.tflite", "rb").read()
-# model = tflite.Model.Model.GetRootAsModel(buf, 0)
+# # validate model file
+# from tensorflow.lite.python import interpreter
+# model = interpreter.Interpreter(model_path="./out.tflite")
+# model.allocate_tensors()
+# input = model.tensor(model.get_input_details()[0]["index"])
+# output = model.tensor(model.get_output_details()[0]["index"])
+# input().fill(3.)
+# model.invoke()
+# print(output())
