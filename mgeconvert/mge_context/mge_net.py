@@ -7,9 +7,12 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from collections import OrderedDict
+from enum import Enum
+
+import numpy as np
 
 from .mge_op import ReshapeOpr, str_to_mge_class
-from .mge_tensor import Tensor
+from .mge_tensor import FakeSymbolVar, Tensor
 from .mge_utils import (
     eval_partial,
     get_dep_vars,
@@ -18,6 +21,28 @@ from .mge_utils import (
     get_oprs_seq,
     load_comp_graph_from_file,
 )
+
+
+class TransformerRule(Enum):
+    # general rules
+    NOPE = 1
+
+    # for TFLite
+    REDUCE_AXIS_AS_INPUT = 100
+    RESIZE_SHAPE_AS_INPUT = 101
+
+    # for Caffe
+    FUSE_FOR_LEAKY_RELU = 200
+
+
+TRANSFORMMAP = {}
+
+
+def _register_tranformation_rule(transformer_option):
+    def callback(impl):
+        TRANSFORMMAP[transformer_option] = impl
+
+    return callback
 
 
 class TopologyNetwork:
@@ -73,6 +98,8 @@ class TopologyNetwork:
 
         for x in self._orig_outputs:
             self.output_vars.append(self.get_var(x))
+
+        self.max_id = max([out_var.id for out_var in self.output_vars]) + 1
 
     def run(self, feed_input, end_op):
         if end_op is None:
@@ -130,3 +157,31 @@ class TopologyNetwork:
     @property
     def all_vars(self):
         return self.all_vars_map.values()
+
+    def optimize_for_conversion(self, transformer_options):
+        for option in transformer_options:
+            TRANSFORMMAP[option](self)
+
+
+@_register_tranformation_rule(TransformerRule.REDUCE_AXIS_AS_INPUT)
+def reduce_axis_as_input(net):
+    from .mge_op import ReduceOpr
+
+    for op_id, op in net.all_oprs_map.items():
+        if type(op) == ReduceOpr:
+            axis_symvar = FakeSymbolVar(
+                sid=net.max_id,
+                name=op.name + "_axis",
+                shape=[1],
+                dtype=np.int32,
+                value=np.array(op.axis).reshape([1]),
+            )
+            net.max_id += 1
+
+            net.all_vars_map[axis_symvar.id] = Tensor(axis_symvar, op)
+            op.add_inp_var(net.all_vars_map[axis_symvar.id])
+
+
+@_register_tranformation_rule(TransformerRule.RESIZE_SHAPE_AS_INPUT)
+def resize_shape_as_input(net):
+    pass

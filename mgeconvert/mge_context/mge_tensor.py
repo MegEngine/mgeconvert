@@ -9,8 +9,18 @@
 from .mge_utils import get_dep_vars, get_shape, get_symvar_value
 
 
+class FakeSymbolVar:
+    def __init__(self, sid, name, shape, dtype, value=None):
+        self.id = sid
+        self.name = name
+        self.shape = shape
+        self.dtype = dtype
+        self.value = value
+
+
 class Tensor:
     def __init__(self, sym_var, owner_opr):
+        self.is_faked = type(sym_var) == FakeSymbolVar
         self.id = sym_var.id
         self._var = sym_var
         self.name = sym_var.name
@@ -26,13 +36,16 @@ class Tensor:
         except:  # pylint: disable=bare-except
             self.dtype = None
 
-        try:
-            if len(get_dep_vars(sym_var, "Host2DeviceCopy")) == 0:
-                self.np_data = get_symvar_value(sym_var)
-            else:
+        if type(sym_var) == FakeSymbolVar:
+            self.np_data = sym_var.value
+        else:
+            try:
+                if len(get_dep_vars(sym_var, "Host2DeviceCopy")) == 0:
+                    self.np_data = get_symvar_value(sym_var)
+                else:
+                    self.np_data = None
+            except:  # pylint: disable=bare-except
                 self.np_data = None
-        except:  # pylint: disable=bare-except
-            self.np_data = None
 
         try:
             self.qbit = self.dtype.metadata["mgb_dtype"]["name"]

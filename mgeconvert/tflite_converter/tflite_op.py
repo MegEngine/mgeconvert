@@ -195,7 +195,10 @@ def conv2d(mge_opr, builder):
 @_register_op(ResizeOpr)
 def _resize(mge_opr, builder):
     ResizeBilinearOptions.ResizeBilinearOptionsStart(builder)
-    ResizeBilinearOptions.ResizeBilinearOptionsAddAlignCorners(builder,
-                                                               False)
+    ResizeBilinearOptions.ResizeBilinearOptionsAddAlignCorners(builder, False)
     options = ResizeBilinearOptions.ResizeBilinearOptionsEnd(builder)
-    return BuiltinOperator.RESIZE_BILINEAR, BuiltinOptions.ResizeBilinearOptions, options
+    return (
+        BuiltinOperator.RESIZE_BILINEAR,
+        BuiltinOptions.ResizeBilinearOptions,
+        options,
+    )

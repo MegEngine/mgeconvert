@@ -7,8 +7,9 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import flatbuffers
+import numpy as np
 
-from ..mge_context import TopologyNetwork, get_symvar_value
+from ..mge_context import TopologyNetwork, TransformerRule
 from ..mge_context.mge_op import Host2DeviceCopyOpr, ReduceOpr
 from .tflite import (
     Buffer,
@@ -45,6 +46,12 @@ class TFLiteConverter:
         # buffer size will automatically increase if needed
         self._builder = flatbuffers.Builder(1024)
 
+        self._transformer_options = [
+            TransformerRule.REDUCE_AXIS_AS_INPUT,
+            TransformerRule.RESIZE_SHAPE_AS_INPUT,
+        ]
+        self.net.optimize_for_conversion(self._transformer_options)
+
     def convert(self):
         # Note the 0th entry of this array must be an empty buffer (sentinel)
         Buffer.BufferStart(self._builder)
@@ -57,7 +64,7 @@ class TFLiteConverter:
                 return False
             return not all(is_const) or len(mge_opr.inp_vars) == 0
 
-        for mge_opr in self.net.all_oprs_map.values():
+        for mge_opr in self.net.all_oprs:
             if not need_convert(mge_opr):
                 continue
 
@@ -68,9 +75,6 @@ class TFLiteConverter:
                 self._opr_type_list.append(tfl_opr_type)
 
             # buffer and tensor
-            # TODO: reduce axis is an input in tflite
-            if type(mge_opr) == ReduceOpr:
-                pass
             for var in mge_opr.inp_vars + mge_opr.out_vars:
 
                 if var in self._var2tensor:
@@ -138,12 +142,13 @@ class TFLiteConverter:
                 number_list = value.reshape(-1)
         else:
             assert False, "ERROR: output ndim {0} is not supported now".format(
-                len(tensor.shape)
+                tensor.ndim
             )
 
         if len(number_list) > 0:
             byte_list = []
             for i in number_list:
+                i = np.int32(i) if tensor.is_faked else i
                 byte_list.extend(i.tobytes())
             return shape, byte_list
         else:
