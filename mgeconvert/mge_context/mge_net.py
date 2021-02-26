@@ -6,11 +6,6 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from collections import OrderedDict
-from enum import Enum
-
-import numpy as np
-
 from .mge_op import ReshapeOpr, str_to_mge_class
 from .mge_tensor import FakeSymbolVar, Tensor
 from .mge_utils import (
@@ -21,28 +16,6 @@ from .mge_utils import (
     get_oprs_seq,
     load_comp_graph_from_file,
 )
-
-
-class TransformerRule(Enum):
-    # general rules
-    NOPE = 1
-
-    # for TFLite
-    REDUCE_AXIS_AS_INPUT = 100
-    RESIZE_SHAPE_AS_INPUT = 101
-
-    # for Caffe
-    FUSE_FOR_LEAKY_RELU = 200
-
-
-TRANSFORMMAP = {}
-
-
-def _register_tranformation_rule(transformer_option):
-    def callback(impl):
-        TRANSFORMMAP[transformer_option] = impl
-
-    return callback
 
 
 class TopologyNetwork:
@@ -65,8 +38,13 @@ class TopologyNetwork:
         self._orig_inputs = []
         self.output_vars = []
         self._orig_outputs = outputs
-        self.all_oprs_map = OrderedDict()
-        self.all_vars_map = OrderedDict()
+        # why using two lists instead of one ordereddict for oprs and vars:
+        # for network trasformation, it's hard to manipulate ordereddict
+        # index of opr_ids and all_oprs should be matched
+        self._opr_ids = []
+        self.all_oprs = []
+        self._var_ids = []
+        self.all_vars = []
 
         for mge_opr in all_oprs:
             if get_opr_type(mge_opr) == "Host2DeviceCopy":
@@ -134,54 +112,20 @@ class TopologyNetwork:
         return result_dict
 
     def add_opr(self, x):
-        assert x.id not in self.all_oprs_map
-        self.all_oprs_map[x.id] = str_to_mge_class(get_opr_type(x) + "Opr")(x)
+        assert x.id not in self._opr_ids
+        self._opr_ids.append(x.id)
+        self.all_oprs.append(str_to_mge_class(get_opr_type(x) + "Opr")(x))
 
     def get_opr(self, x):
-        if x.id in self.all_oprs_map:
-            return self.all_oprs_map[x.id]
+        if x.id in self._opr_ids:
+            return self.all_oprs[self._opr_ids.index(x.id)]
         else:
             return None
 
     def get_var(self, x):
         # auto convert to Tensor
-        if x.id not in self.all_vars_map:
+        if x.id not in self._var_ids:
             owner = x.owner_opr if get_mge_version() <= "0.6.0" else x.owner
-            self.all_vars_map[x.id] = Tensor(x, self.get_opr(owner))
-        return self.all_vars_map[x.id]
-
-    @property
-    def all_oprs(self):
-        return self.all_oprs_map.values()
-
-    @property
-    def all_vars(self):
-        return self.all_vars_map.values()
-
-    def optimize_for_conversion(self, transformer_options):
-        for option in transformer_options:
-            TRANSFORMMAP[option](self)
-
-
-@_register_tranformation_rule(TransformerRule.REDUCE_AXIS_AS_INPUT)
-def reduce_axis_as_input(net):
-    from .mge_op import ReduceOpr
-
-    for op_id, op in net.all_oprs_map.items():
-        if type(op) == ReduceOpr:
-            axis_symvar = FakeSymbolVar(
-                sid=net.max_id,
-                name=op.name + "_axis",
-                shape=[1],
-                dtype=np.int32,
-                value=np.array(op.axis).reshape([1]),
-            )
-            net.max_id += 1
-
-            net.all_vars_map[axis_symvar.id] = Tensor(axis_symvar, op)
-            op.add_inp_var(net.all_vars_map[axis_symvar.id])
-
-
-@_register_tranformation_rule(TransformerRule.RESIZE_SHAPE_AS_INPUT)
-def resize_shape_as_input(net):
-    pass
+            self._var_ids.append(x.id)
+            self.all_vars.append(Tensor(x, self.get_opr(owner)))
+        return self.all_vars[self._var_ids.index(x.id)]

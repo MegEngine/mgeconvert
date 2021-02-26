@@ -49,7 +49,7 @@ class OnnxConverter:
                     names.append(i.name)
             return results
 
-        for opr in self.net.all_oprs_map.values():
+        for opr in self.net.all_oprs:
             if not need_convert(opr):
                 for tensor in opr.out_vars:
                     if tensor.np_data is None:

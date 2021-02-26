@@ -51,6 +51,7 @@ from .tflite import (
     SubOptions,
     TransposeConvOptions,
 )
+from .tflite.ActivationFunctionType import ActivationFunctionType
 from .tflite.BuiltinOperator import BuiltinOperator
 from .tflite.BuiltinOptions import BuiltinOptions
 from .tflite.Padding import Padding
@@ -63,6 +64,14 @@ mge2tflite_dtype_mapping = {
     np.int32: TensorType.INT32,
     np.int8: TensorType.INT8,
     np.uint8: TensorType.UINT8,
+}
+
+
+mge2tflite_activation_type = {
+    "IDENTITY": ActivationFunctionType.NONE,
+    "RELU": ActivationFunctionType.RELU,
+    "RELU6": ActivationFunctionType.RELU6,
+    "TANH": ActivationFunctionType.TANH,
 }
 
 
@@ -83,20 +92,32 @@ def _elemwise(mge_opr, builder):
         NegOptions.NegOptionsStart(builder)
         options = NegOptions.NegOptionsEnd(builder)
         return BuiltinOperator.NEG, BuiltinOptions.NegOptions, options
-    if mge_opr.mode == "ADD":
+    if mge_opr.mode in ("ADD", "FUSE_ADD_RELU"):
         AddOptions.AddOptionsStart(builder)
+        AddOptions.AddOptionsAddFusedActivationFunction(
+            builder, mge2tflite_activation_type[mge_opr.activation]
+        )
         options = AddOptions.AddOptionsEnd(builder)
         return BuiltinOperator.ADD, BuiltinOptions.AddOptions, options
     if mge_opr.mode == "SUB":
         SubOptions.SubOptionsStart(builder)
+        SubOptions.SubOptionsAddFusedActivationFunction(
+            builder, mge2tflite_activation_type[mge_opr.activation]
+        )
         options = SubOptions.SubOptionsEnd(builder)
         return BuiltinOperator.SUB, BuiltinOptions.SubOptions, options
     if mge_opr.mode == "MUL":
         MulOptions.MulOptionsStart(builder)
+        MulOptions.MulOptionsAddFusedActivationFunction(
+            builder, mge2tflite_activation_type[mge_opr.activation]
+        )
         options = MulOptions.MulOptionsEnd(builder)
         return BuiltinOperator.MUL, BuiltinOptions.MulOptions, options
     if mge_opr.mode == "DIV":
         DivOptions.DivOptionsStart(builder)
+        DivOptions.DivOptionsAddFusedActivationFunction(
+            builder, mge2tflite_activation_type[mge_opr.activation]
+        )
         options = DivOptions.DivOptionsEnd(builder)
         return BuiltinOperator.DIV, BuiltinOptions.DivOptions, options
     if mge_opr.mode == "MAX":
@@ -140,6 +161,9 @@ def _reshape(mge_opr, builder):
 @_register_op(ConcatOpr)
 def _concat(mge_opr, builder):
     ConcatenationOptions.ConcatenationOptionsStart(builder)
+    ConcatenationOptions.ConcatenationOptionsAddFusedActivationFunction(
+        builder, mge2tflite_activation_type[mge_opr.activation]
+    )
     axis = mge_opr.axis
     if mge_opr.inp_vars[0].ndim == 4:
         # map NCHW to NHWC
@@ -170,6 +194,9 @@ def _pooling(mge_opr, builder):
         Pool2DOptions.Pool2DOptionsAddStrideW(builder, mge_opr.sw)
     Pool2DOptions.Pool2DOptionsAddFilterHeight(builder, mge_opr.kh)
     Pool2DOptions.Pool2DOptionsAddFilterWidth(builder, mge_opr.kw)
+    Pool2DOptions.Pool2DOptionsAddFusedActivationFunction(
+        builder, mge2tflite_activation_type[mge_opr.activation]
+    )
     options = Pool2DOptions.Pool2DOptionsEnd(builder)
 
     tfl_opr_type = BuiltinOperator.AVERAGE_POOL_2D
@@ -187,6 +214,9 @@ def conv2d(mge_opr, builder):
     Conv2DOptions.Conv2DOptionsAddStrideW(builder, mge_opr.sw)
     Conv2DOptions.Conv2DOptionsAddDilationHFactor(builder, mge_opr.dilation_h)
     Conv2DOptions.Conv2DOptionsAddDilationWFactor(builder, mge_opr.dilation_w)
+    Conv2DOptions.Conv2DOptionsAddFusedActivationFunction(
+        builder, mge2tflite_activation_type[mge_opr.activation]
+    )
     options = Conv2DOptions.Conv2DOptionsEnd(builder)
     return BuiltinOperator.CONV_2D, BuiltinOptions.Conv2DOptions, options
 

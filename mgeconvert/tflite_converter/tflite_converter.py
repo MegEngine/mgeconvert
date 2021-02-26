@@ -9,8 +9,8 @@
 import flatbuffers
 import numpy as np
 
-from ..mge_context import TopologyNetwork, TransformerRule
-from ..mge_context.mge_op import Host2DeviceCopyOpr, ReduceOpr
+from ..mge_context import TopologyNetwork, TransformerRule, optimize_for_conversion
+from ..mge_context.mge_op import Host2DeviceCopyOpr
 from .tflite import (
     Buffer,
     Conv2DOptions,
@@ -48,9 +48,12 @@ class TFLiteConverter:
 
         self._transformer_options = [
             TransformerRule.REDUCE_AXIS_AS_INPUT,
-            TransformerRule.RESIZE_SHAPE_AS_INPUT,
+            # TransformerRule.RESIZE_SHAPE_AS_INPUT,
+            TransformerRule.FUSE_FOR_RELU6,
+            TransformerRule.FUSE_ACTIVATION,
+            TransformerRule.CONV_ADD_ZERO_BIAS,
         ]
-        self.net.optimize_for_conversion(self._transformer_options)
+        optimize_for_conversion(self.net, self._transformer_options)
 
     def convert(self):
         # Note the 0th entry of this array must be an empty buffer (sentinel)
@@ -125,30 +128,29 @@ class TFLiteConverter:
         return self.get_model()
 
     def _get_shape_param(self, tensor):
-        number_list = []
-
         if tensor.ndim == 4:
             # OC, IC, H, W  to  OC, H, W, IC
             # NCHW to NHWC
             # except the output of reshape
             shape = [tensor.shape[0], tensor.shape[2], tensor.shape[3], tensor.shape[1]]
-            value = tensor.np_data
-            if value is not None:
-                number_list = value.reshape(-1)
         elif tensor.ndim < 4:
             shape = list(tensor.shape)
-            value = tensor.np_data
-            if value is not None:
-                number_list = value.reshape(-1)
         else:
             assert False, "ERROR: output ndim {0} is not supported now".format(
                 tensor.ndim
             )
 
+        if tensor.is_faked:
+            return shape, tensor.byte_list
+
+        number_list = []
+        value = tensor.np_data
+        if value is not None:
+            number_list = value.reshape(-1)
+
         if len(number_list) > 0:
             byte_list = []
             for i in number_list:
-                i = np.int32(i) if tensor.is_faked else i
                 byte_list.extend(i.tobytes())
             return shape, byte_list
         else:

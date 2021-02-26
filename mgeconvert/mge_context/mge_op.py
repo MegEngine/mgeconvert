@@ -43,6 +43,7 @@ class MgeOpr(OpBase):
         self.inp_oprs = []
         self.out_oprs = []
         self.params = opr.params if mge_version <= "0.6.0" else json.loads(opr.params)
+        self.activation = "IDENTITY"
 
     def add_inp_var(self, x):
         self.inp_vars.append(x)
@@ -361,3 +362,7 @@ class LeakyReluOpr(OpBase):
     def __init__(self, name, negative_slope):
         self.name = name
         self.negative_slope = negative_slope
+
+
+class Relu6Opr(OpBase):
+    name = "Relu6"

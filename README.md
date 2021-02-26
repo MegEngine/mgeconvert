@@ -8,38 +8,38 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 
 ## 当前支持的Op列表
 
-|   |Caffe|ONNX|Cambricon|
-|-- |-----|----|---------|
-|abs| ✓ | ✓ | ✓ |
-|add| ✓ | ✓ | ✓ |
-|average pool2d| ✓ | ✓ | ✓ |
-|batchnorm| ✓ | ✓ | ✓ |
-|broadcast| ✓ | ✓ | ✓ |
-|ceil| × | ✓ | × |
-|concat| ✓ | ✓ | ✓ |
-|conv2d| ✓ | ✓ | ✓ |
-|convtranspose2d| ✓ | ✓ | ✓ |
-|div(true_div)| ✓ | ✓ | ✓ |
-|exp| ✓ | ✓ | ✓ |
-|elemwise max|  ✓ | ✓ | ✓ |
-|floor| × | ✓ | ✓ |
-|log| ✓ | ✓ | ✓ |
-|matrix mul| ✓ | ✓ | ✓ |
-|max pool2d| ✓ | ✓ | ✓ |
-|mul| ✓ | ✓ | ✓ |
-|pow| ✓ | ✓ | ✓ |
-|reduce max| ✓ | ✓ | ✓ |
-|reduce sum| ✓ | ✓ | ✓ |
-|relu| ✓ | ✓ | ✓ |
-|reshape| ✓ | ✓ | ✓ |
-|sigmoid| ✓ | ✓ | ✓ |
-|softmax| ✓ | ✓ | ✓ |
-|sub| ✓ | ✓ | ✓ |
-|slice(subtensor)| ✓ | ✓ | ✓ |
-|squeeze(axis_add_remove)| ✓ | ✓ | ✓ |
-|tanh| ✓ | ✓ | ✓ |
-|typecvt|  ✓ | ✓ | ✓ |
-|transpose(dimshuffle)| ✓ | ✓ | ✓ |
+|   |Caffe|ONNX|Cambricon|TFLite|
+|-- |-----|----|---------|------|
+|abs| ✓ | ✓ | ✓ |  |
+|add| ✓ | ✓ | ✓ | ✓ |
+|average pool2d| ✓ | ✓ | ✓ |  |
+|batchnorm| ✓ | ✓ | ✓ |  |
+|broadcast| ✓ | ✓ | ✓ |  |
+|ceil| × | ✓ | × |  |
+|concat| ✓ | ✓ | ✓ | ✓ |
+|conv2d| ✓ | ✓ | ✓ |  |
+|convtranspose2d| ✓ | ✓ | ✓ |  |
+|div(true_div)| ✓ | ✓ | ✓ | ✓ |
+|exp| ✓ | ✓ | ✓ |  |
+|elemwise max|  ✓ | ✓ | ✓ | ✓ |
+|floor| × | ✓ | ✓ |  |
+|log| ✓ | ✓ | ✓ |  |
+|matrix mul| ✓ | ✓ | ✓ |  |
+|max pool2d| ✓ | ✓ | ✓ |  |
+|mul| ✓ | ✓ | ✓ | ✓ |
+|pow| ✓ | ✓ | ✓ |  |
+|reduce max| ✓ | ✓ | ✓ | ✓ |
+|reduce sum| ✓ | ✓ | ✓ | ✓ |
+|relu| ✓ | ✓ | ✓ |  |
+|reshape| ✓ | ✓ | ✓ | ✓ |
+|sigmoid| ✓ | ✓ | ✓ |  |
+|softmax| ✓ | ✓ | ✓ |  |
+|sub| ✓ | ✓ | ✓ | ✓ |
+|slice(subtensor)| ✓ | ✓ | ✓ |  |
+|squeeze(axis_add_remove)| ✓ | ✓ | ✓ |  |
+|tanh| ✓ | ✓ | ✓ |  |
+|typecvt|  ✓ | ✓ | ✓ |  |
+|transpose(dimshuffle)| ✓ | ✓ | ✓ |  |
 
 
 ## 安装说明
@@ -97,6 +97,8 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
   ```
 
   [测试用例](test/test_cambricon.py) 中可以完成相应的转换测试，[子目录](mgeconvert/cambricon_converter/README.md)获取更多寒武纪转换器相关信息。
+
+* TFLite 转换器
 
 ### MgeConvert安装
 
