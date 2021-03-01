@@ -28,6 +28,7 @@ from ..mge_context import (
     ReshapeOpr,
     ResizeOpr,
     SharedDeviceTensorOpr,
+    SoftmaxOpr,
     SubtensorOpr,
     TypeCvtOpr,
     get_symvar_value,
@@ -38,6 +39,7 @@ from .tflite import (
     Conv2DOptions,
     DepthwiseConv2DOptions,
     DivOptions,
+    ExpOptions,
     FullyConnectedOptions,
     MaximumMinimumOptions,
     MulOptions,
@@ -113,13 +115,17 @@ def _elemwise(mge_opr, builder):
         )
         options = MulOptions.MulOptionsEnd(builder)
         return BuiltinOperator.MUL, BuiltinOptions.MulOptions, options
-    if mge_opr.mode == "DIV":
+    if mge_opr.mode in ("DIV", "TRUE_DIV"):
         DivOptions.DivOptionsStart(builder)
         DivOptions.DivOptionsAddFusedActivationFunction(
             builder, mge2tflite_activation_type[mge_opr.activation]
         )
         options = DivOptions.DivOptionsEnd(builder)
         return BuiltinOperator.DIV, BuiltinOptions.DivOptions, options
+    if mge_opr.mode == "EXP":
+        ExpOptions.ExpOptionsStart(builder)
+        options = ExpOptions.ExpOptionsEnd(builder)
+        return BuiltinOperator.EXP, BuiltinOptions.ExpOptions, options
     if mge_opr.mode == "MAX":
         MaximumMinimumOptions.MaximumMinimumOptionsStart(builder)
         options = MaximumMinimumOptions.MaximumMinimumOptionsEnd(builder)
@@ -205,9 +211,32 @@ def _pooling(mge_opr, builder):
     return tfl_opr_type, BuiltinOptions.Pool2DOptions, options
 
 
-# FIXME: Conv2d needs bias tensor as input
 @_register_op(ConvolutionForwardOpr)
 def conv2d(mge_opr, builder):
+    if mge_opr.group > 1:
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsStart(builder)
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddPadding(builder, Padding.VALID)
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddStrideH(builder, mge_opr.sh)
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddStrideW(builder, mge_opr.sw)
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddDepthMultiplier(
+            builder, mge_opr.inp_vars[1].shape[0]
+        )
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddFusedActivationFunction(
+            builder, mge2tflite_activation_type[mge_opr.activation]
+        )
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddDilationHFactor(
+            builder, mge_opr.dilation_h
+        )
+        DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddDilationWFactor(
+            builder, mge_opr.dilation_w
+        )
+        options = DepthwiseConv2DOptions.DepthwiseConv2DOptionsEnd(builder)
+        return (
+            BuiltinOperator.DEPTHWISE_CONV_2D,
+            BuiltinOptions.DepthwiseConv2DOptions,
+            options,
+        )
+
     Conv2DOptions.Conv2DOptionsStart(builder)
     Conv2DOptions.Conv2DOptionsAddPadding(builder, Padding.VALID)
     Conv2DOptions.Conv2DOptionsAddStrideH(builder, mge_opr.sh)
@@ -232,3 +261,51 @@ def _resize(mge_opr, builder):
         BuiltinOptions.ResizeBilinearOptions,
         options,
     )
+
+
+@_register_op(MatrixMulOpr)
+def _matrix_mul(mge_opr, builder):
+    FullyConnectedOptions.FullyConnectedOptionsStart(builder)
+    FullyConnectedOptions.FullyConnectedOptionsAddFusedActivationFunction(
+        builder, mge2tflite_activation_type[mge_opr.activation]
+    )
+    options = FullyConnectedOptions.FullyConnectedOptionsEnd(builder)
+    return (
+        BuiltinOperator.FULLY_CONNECTED,
+        BuiltinOptions.FullyConnectedOptions,
+        options,
+    )
+
+
+@_register_op(SoftmaxOpr)
+def _softmax(mge_opr, builder):
+    SoftmaxOptions.SoftmaxOptionsStart(builder)
+    SoftmaxOptions.SoftmaxOptionsAddBeta(builder, mge_opr.beta)
+    options = SoftmaxOptions.SoftmaxOptionsEnd(builder)
+    return BuiltinOperator.SOFTMAX, BuiltinOptions.SoftmaxOptions, options
+
+
+def _padding_mode_transpose_conv(mge_opr):
+    if (
+        mge_opr.out_vars[0].shape[2] == mge_opr.inp_vars[1].shape[2] * mge_opr.sh
+        and mge_opr.out_vars[0].shape[3] == mge_opr.inp_vars[1].shape[3] * mge_opr.sw
+    ):
+        # padding mode == SAME
+        return Padding.SAME
+    elif mge_opr.ph == 0 and mge_opr.pw == 0:
+        # padding mode == VALID
+        return Padding.VALID
+    else:
+        assert False, "ERROR: unsupported padding mode"
+
+
+@_register_op(ConvolutionBackwardDataOpr)
+def _deconv(mge_opr, builder):
+    TransposeConvOptions.TransposeConvOptionsStart(builder)
+    TransposeConvOptions.TransposeConvOptionsAddPadding(
+        builder, _padding_mode_transpose_conv(mge_opr)
+    )
+    TransposeConvOptions.TransposeConvOptionsAddStrideH(builder, mge_opr.sh)
+    TransposeConvOptions.TransposeConvOptionsAddStrideW(builder, mge_opr.sw)
+    options = TransposeConvOptions.TransposeConvOptionsEnd(builder)
+    return BuiltinOperator.TRANSPOSE_CONV, BuiltinOptions.TransposeConvOptions, options

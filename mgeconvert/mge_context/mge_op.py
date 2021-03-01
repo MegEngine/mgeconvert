@@ -366,3 +366,8 @@ class LeakyReluOpr(OpBase):
 
 class Relu6Opr(OpBase):
     name = "Relu6"
+
+
+class SoftmaxOpr(OpBase):
+    name = "Softmax"
+    beta = 0

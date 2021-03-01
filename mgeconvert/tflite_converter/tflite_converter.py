@@ -52,6 +52,9 @@ class TFLiteConverter:
             TransformerRule.FUSE_FOR_RELU6,
             TransformerRule.FUSE_ACTIVATION,
             TransformerRule.CONV_ADD_ZERO_BIAS,
+            TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,
+            TransformerRule.FUSE_SOFTMAX,
+            TransformerRule.DECONV_SHAPE_AS_INPUT,
         ]
         optimize_for_conversion(self.net, self._transformer_options)
 
@@ -79,7 +82,6 @@ class TFLiteConverter:
 
             # buffer and tensor
             for var in mge_opr.inp_vars + mge_opr.out_vars:
-
                 if var in self._var2tensor:
                     continue
 

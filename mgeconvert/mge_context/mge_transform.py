@@ -26,6 +26,10 @@ class TransformerRule(Enum):
     FUSE_FOR_RELU6 = 102
     FUSE_ACTIVATION = 103
     CONV_ADD_ZERO_BIAS = 104
+    DEPTHWISE_CONV_RESHAPE_WEIGHT = 105
+    FUSE_SOFTMAX = 106
+    DECONV_SHAPE_AS_INPUT = 107
+    FUSE_ASTYPE = 108
 
     # for Caffe
     FUSE_FOR_LEAKY_RELU = 200
@@ -183,3 +187,148 @@ def _conv_add_zero_bias(net):
 
         bias_tensor = net.get_var(bias_symvar)
         op.add_inp_var(bias_tensor)
+
+
+@_register_tranformation_rule(TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT)
+def _depthwise_conv_reshape_weight(net):
+    from .mge_op import ConvolutionForwardOpr
+
+    for op in net.all_oprs:
+        if type(op) != ConvolutionForwardOpr:
+            continue
+        if op.group == 1:
+            continue
+
+        var = op.inp_vars[1]
+        group = var.shape[0]
+        oc, ic = var.shape[1:3]
+        h, w = var.shape[3:5]
+        shape = [1, group * ic, h, w]
+        var.ndim = len(shape)
+        var.shape = shape
+        var.np_data.reshape(shape)
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_SOFTMAX)
+def _fuse_softmax(net):
+    from .mge_op import ElemwiseOpr, ReduceOpr, SoftmaxOpr
+
+    matches = OrderedDict()
+
+    for op in net.all_oprs:
+        if type(op) != ElemwiseOpr or op.mode != "TRUE_DIV":
+            continue
+        prev_op = op.inp_oprs[1]
+        if type(prev_op) != ReduceOpr or prev_op.mode != "SUM" or prev_op.axis != 1:
+            continue
+        prev_op = op.inp_oprs[0]
+        if type(prev_op) != ElemwiseOpr or prev_op.mode != "EXP":
+            continue
+        prev_op = prev_op.prev_opr
+        if type(prev_op) != ElemwiseOpr or prev_op.mode != "SUB":
+            continue
+        prev_op = prev_op.inp_oprs[1]
+        if type(prev_op) != ReduceOpr or prev_op.mode != "MAX" or prev_op.axis != 1:
+            continue
+
+        softmax_opr = SoftmaxOpr()
+        softmax_opr.beta = 1
+        softmax_opr.inp_vars = prev_op.inp_vars[:1]
+        softmax_opr.out_vars = op.out_vars
+        softmax_opr.prev_opr = prev_op.inp_oprs[0]
+        matches[prev_op.id] = (net.max_id, softmax_opr)
+        net.max_id += 1
+
+    for original_id, generated_pair in matches.items():
+        index = net._opr_ids.index(original_id)
+        del net._opr_ids[index : index + 5]
+        del net.all_oprs[index : index + 5]
+
+        net._opr_ids.insert(index, generated_pair[0])
+        net.all_oprs.insert(index, generated_pair[1])
+
+
+@_register_tranformation_rule(TransformerRule.DECONV_SHAPE_AS_INPUT)
+def _deconv_shape_as_input(net):
+    from .mge_op import ConvolutionBackwardDataOpr
+
+    for op in net.all_oprs:
+        if type(op) != ConvolutionBackwardDataOpr:
+            continue
+
+        byte_list = []
+        result_shape = op.out_vars[0].shape
+        number_list = [
+            result_shape[0],
+            result_shape[2],
+            result_shape[3],
+            result_shape[1],
+        ]
+        for i in number_list:
+            byte_list.extend(np.int32(i).tobytes())
+        shape_symvar = FakeSymbolVar(
+            sid=net.max_id,
+            name=op.name + "_shape",
+            shape=[4],
+            dtype=np.int32,
+            owner=op,
+            byte_list=byte_list,
+        )
+        net.max_id += 1
+        shape_tensor = net.get_var(shape_symvar)
+        op.inp_vars = [shape_tensor, op.inp_vars[1], op.inp_vars[0]]
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_ASTYPE)
+def _fuse_astype(net):
+    from .mge_op import TypeCvtOpr
+
+    def check_dtype(opr, dtype1, dtype2):
+        if opr.inp_vars[0].dtype == dtype1 and opr.out_vars[0].dtype == dtype2:
+            return True
+        return False
+
+    opr_with_quant = set()
+
+    for op in net.all_oprs:
+        if type(op) == TypeCvtOpr:
+            prev_op = op.prev_opr
+            if (
+                check_dtype(op, np.float32, np.int32)
+                or check_dtype(op, np.float32, np.uint8)
+                or check_dtype(op, np.int32, np.uint8)
+                or check_dtype(op, np.uint8, np.uint8)
+            ):
+                prev_op.out_vars[0] = opr.output_vars[0]
+                opr.out_vars[0].owner = prev_op
+                opr_with_quant.add(prev_op)
+            else:
+                assert check_dtype(op, np.uint8, np.int32) or check_dtype(
+                    op, np.uint8, np.float32
+                ), "ERROR: unsupported Astype mode: {0} to {1}".format(
+                    op.inp_vars[0].dtype, opr.out_vars[0].dtype
+                )
+            continue
+
+        for i in range(len(op.inp_vars)):
+            prev_op = op.inp_oprs[i]
+            if type(prev_op) == TypeCvtOpr and prev_op.inp_vars[0].dtype == np.uint8:
+                # this Astype opr is dequant
+                op.inp_vars[i] = prev_op.inp_vars[0]
+                result_shape = op.out_vars[0].shape
+                out_symvar = FakeSymbolVar(
+                    sid=net.max_id,
+                    name=op.out_vars[0].name,
+                    shape=[
+                        result_shape[0],
+                        result_shape[2],
+                        result_shape[3],
+                        result_shape[1],
+                    ],
+                    dtype=prev_op.inp_vars[0].dtype,
+                    owner=op,
+                    byte_list=None,
+                )
+                net.max_id += 1
+                out_tensor = net.get_var(out_symvar)
+                op.out_vars[0] = out_tensor
