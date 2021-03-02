@@ -21,15 +21,15 @@ class TransformerRule(Enum):
 
     # for TFLite
     REDUCE_AXIS_AS_INPUT = 100
-    RESIZE_SHAPE_AS_INPUT = 101
     # FUSE_FOR_RELU6 pass should happen before FUSE_ACTIVATION
-    FUSE_FOR_RELU6 = 102
-    FUSE_ACTIVATION = 103
-    CONV_ADD_ZERO_BIAS = 104
-    DEPTHWISE_CONV_RESHAPE_WEIGHT = 105
-    FUSE_SOFTMAX = 106
-    DECONV_SHAPE_AS_INPUT = 107
-    FUSE_ASTYPE = 108
+    FUSE_FOR_RELU6 = 101
+    FUSE_ACTIVATION = 102
+    CONV_ADD_ZERO_BIAS = 103
+    DEPTHWISE_CONV_RESHAPE_WEIGHT = 104
+    FUSE_SOFTMAX = 105
+    DECONV_SHAPE_AS_INPUT = 106
+    FUSE_ASTYPE = 107
+    MAKE_PADDING = 108
 
     # for Caffe
     FUSE_FOR_LEAKY_RELU = 200
@@ -72,11 +72,6 @@ def _reduce_axis_as_input(net):
 
         axis_tensor = net.get_var(axis_symvar)
         op.add_inp_var(axis_tensor)
-
-
-@_register_tranformation_rule(TransformerRule.RESIZE_SHAPE_AS_INPUT)
-def _resize_shape_as_input(net):
-    pass
 
 
 @_register_tranformation_rule(TransformerRule.FUSE_FOR_RELU6)
@@ -277,6 +272,65 @@ def _deconv_shape_as_input(net):
         net.max_id += 1
         shape_tensor = net.get_var(shape_symvar)
         op.inp_vars = [shape_tensor, op.inp_vars[1], op.inp_vars[0]]
+
+
+@_register_tranformation_rule(TransformerRule.MAKE_PADDING)
+def _make_padding(net):
+    from .mge_op import PadOpr, ConvolutionBackwardDataOpr
+
+    def have_padding(opr):
+        if (
+            hasattr(opr, "ph")
+            and (opr.ph > 0 or opr.pw > 0)
+            and not type(opr) == ConvolutionBackwardDataOpr
+        ):
+            return True
+        return False
+
+    insert_intended = OrderedDict()
+
+    for op in net.all_oprs:
+        prev_op = op.inp_oprs[0]
+
+        if have_padding(op):
+            assert opr.inp_vars[0].ndim == 4, "ERROR: unsupported padding mode"
+            byte_list = []
+            number_list = [0, 0, op.ph, op.ph, op.pw, op.pw, 0, 0]
+            for i in number_list:
+                byte_list.extend(np.int32(i).tobytes())
+            pad_in_symvar = FakeSymbolVar(
+                sid=net.max_id,
+                name=op.name + "_pad_in",
+                shape=[4, 2],
+                dtype=np.int32,
+                owner=None,
+                byte_list=byte_list,
+            )
+            net.max_id += 1
+            pad_in_tensor = net.get_var(pad_in_symvar)
+
+            shape = list(op.inp_vars[0].shape)
+            pad_out_symvar = FakeSymbolVar(
+                sid=net.max_id,
+                name=op.name + "_pad_out",
+                shape=[
+                    shape[0],
+                    shape[2] + opr.padding[0] * 2,
+                    shape[3] + opr.padding[1] * 2,
+                    shape[1],
+                ],
+                dtype=op.inp_vars[0].dtype,
+                owner=None,
+                byte_list=None,
+            )
+            net.max_id += 1
+            pad_out_tensor = net.get_var(pad_out_symvar)
+
+            pad_opr = PadOpr()
+            pad_opr.inp_vars = [op.inp_vars[0], pad_in_tensor]
+            pad_opr.out_vars = [pad_out_tensor]
+            pad_out_tensor.owner = pad_opr
+            op.inp_vars = [pad_opr] + op.inp_vars[1:]
 
 
 @_register_tranformation_rule(TransformerRule.FUSE_ASTYPE)

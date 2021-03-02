@@ -23,10 +23,11 @@ from ..mge_context import (
     MarkNoBroadcastElemwiseOpr,
     MatrixMulOpr,
     MultipleDeviceTensorHolderOpr,
+    PadOpr,
     PoolingForwardOpr,
     ReduceOpr,
     ReshapeOpr,
-    ResizeOpr,
+    ResizeForwardOpr,
     SharedDeviceTensorOpr,
     SoftmaxOpr,
     SubtensorOpr,
@@ -212,7 +213,7 @@ def _pooling(mge_opr, builder):
 
 
 @_register_op(ConvolutionForwardOpr)
-def conv2d(mge_opr, builder):
+def _conv2d(mge_opr, builder):
     if mge_opr.group > 1:
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsStart(builder)
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddPadding(builder, Padding.VALID)
@@ -250,8 +251,7 @@ def conv2d(mge_opr, builder):
     return BuiltinOperator.CONV_2D, BuiltinOptions.Conv2DOptions, options
 
 
-# TODO: resize op will be available in MegEngine 1.3
-@_register_op(ResizeOpr)
+@_register_op(ResizeForwardOpr)
 def _resize(mge_opr, builder):
     ResizeBilinearOptions.ResizeBilinearOptionsStart(builder)
     ResizeBilinearOptions.ResizeBilinearOptionsAddAlignCorners(builder, False)
@@ -309,3 +309,10 @@ def _deconv(mge_opr, builder):
     TransposeConvOptions.TransposeConvOptionsAddStrideW(builder, mge_opr.sw)
     options = TransposeConvOptions.TransposeConvOptionsEnd(builder)
     return BuiltinOperator.TRANSPOSE_CONV, BuiltinOptions.TransposeConvOptions, options
+
+
+@_register_op(PadOpr)
+def _pad(mge_opr, builder):
+    PadOptions.PadOptionsStart(builder)
+    options = PadOptions.PadOptionsEnd(builder)
+    return BuiltinOperator.PAD, BuiltinOptions.PadOptions, options

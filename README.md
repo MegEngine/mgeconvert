@@ -100,6 +100,35 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 
 * TFLite 转换器
 
+测试过的 op:
+
+* [ ] elemwise
+* [ ] reduce
+* [ ] reshape
+* [ ] concat
+* [ ] pool
+* [ ] conv
+* [ ] relu6
+* [ ] activation
+* [ ] depthwise-conv
+* [ ] fc
+* [ ] softmax
+* [ ] deconv
+* [ ] resize
+
+还没测试的 op:
+
+* [ ] pad
+* [ ] typecvt
+* [ ] mtk deconv
+* [ ] elemwisemultitype
+
+待处理问题：
+
+- flatbuffer 分支是否需要修改
+
+- [done] pyflexbuffers 仓库有没有可能集成进来
+
 ### MgeConvert安装
 
 使用setup.py安装MgeConvert。

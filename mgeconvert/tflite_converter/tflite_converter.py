@@ -48,7 +48,6 @@ class TFLiteConverter:
 
         self._transformer_options = [
             TransformerRule.REDUCE_AXIS_AS_INPUT,
-            # TransformerRule.RESIZE_SHAPE_AS_INPUT,
             TransformerRule.FUSE_FOR_RELU6,
             TransformerRule.FUSE_ACTIVATION,
             TransformerRule.CONV_ADD_ZERO_BIAS,

@@ -17,9 +17,9 @@ sudo python3 setup.py install
 cp -r /tmp/flatbuffers/tflite $basepath
 
 # using pyflexbuffers
-# FIXME: fix this repo later
-cd $basepath
-rm -rf /tmp/pyflexbuffers
-git clone git@git-core.megvii-inc.com:brain-sdk/pyflexbuffers.git /tmp/pyflexbuffers
-cd /tmp/pyflexbuffers
-sudo python3 setup.py install
+cd $basepath/pyflexbuffers
+PYBIND11_HEADER=$(python3 -c "import pybind11; print(pybind11.get_include())")
+PYTHON_INCLUDE=$(python3 -c "import sysconfig; sysconfig.get_paths()['include']")
+PYTHON_STDLIB=$(python3 -c "import sysconfig; sysconfig.get_paths()['stdlib']")
+
+g++ fbconverter.cc --std=c++14 -fPIC --shared -I$PYBIND11_HEADER -I$PYTHON_INCLUDE -L$PYTHON_STDLIB  -lflatbuffers -o fbconverter.so
