@@ -300,7 +300,7 @@ def _conv_bias(opr, context):
     cn_convolution.param_dict["W"] = inps[1]
     cn_convolution.param_dict["B"] = inps[2]
     # Active
-    cn_active = cnop.Active(opr.name + "Act", cnt_convolution, oups, opr.nonline_mode)
+    cn_active = cnop.Active(opr.name + "Act", cnt_convolution, oups, opr.activation)
     context.add_oprs(cn_convolution, cn_active)
 
 

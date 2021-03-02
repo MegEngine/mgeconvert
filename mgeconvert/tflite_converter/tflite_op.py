@@ -7,12 +7,14 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import numpy as np
+from numpy import dtype
 
 from ..mge_context import (
     AxisAddRemoveOpr,
     BatchNormForwardOpr,
     BroadcastOpr,
     ConcatOpr,
+    ConvBiasForwardOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
@@ -67,6 +69,9 @@ mge2tflite_dtype_mapping = {
     np.int32: TensorType.INT32,
     np.int8: TensorType.INT8,
     np.uint8: TensorType.UINT8,
+    dtype("int32"): TensorType.INT32,
+    dtype("uint8"): TensorType.UINT8,
+    dtype("int8"): TensorType.INT8,
 }
 
 
@@ -81,9 +86,10 @@ mge2tflite_activation_type = {
 MGE2TFLITE = {}
 
 
-def _register_op(op):
+def _register_op(*ops):
     def callback(impl):
-        MGE2TFLITE[op] = impl
+        for op in ops:
+            MGE2TFLITE[op] = impl
 
     return callback
 
@@ -212,7 +218,7 @@ def _pooling(mge_opr, builder):
     return tfl_opr_type, BuiltinOptions.Pool2DOptions, options
 
 
-@_register_op(ConvolutionForwardOpr)
+@_register_op(ConvolutionForwardOpr, ConvBiasForwardOpr)
 def _conv2d(mge_opr, builder):
     if mge_opr.group > 1:
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsStart(builder)

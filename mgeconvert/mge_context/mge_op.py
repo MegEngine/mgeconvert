@@ -154,7 +154,7 @@ class ConvBiasForwardOpr(ConvolutionForwardOpr):
 
     def __init__(self, opr):
         super().__init__(opr)
-        self.nonline_mode = self.params["nonlineMode"]
+        self.activation = self.params["nonlineMode"]
 
 
 class ElemwiseOpr(MgeOpr):
@@ -162,7 +162,10 @@ class ElemwiseOpr(MgeOpr):
 
     def __init__(self, opr):
         super().__init__(opr)
-        self.mode = self.params["mode"]
+        try:
+            self.mode = self.params["mode"]
+        except:
+            self.mode = "NONE"
 
 
 class ElemwiseMultiTypeOpr(MgeOpr):

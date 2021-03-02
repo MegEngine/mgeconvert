@@ -54,6 +54,8 @@ class TFLiteConverter:
             TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,
             TransformerRule.FUSE_SOFTMAX,
             TransformerRule.DECONV_SHAPE_AS_INPUT,
+            TransformerRule.FUSE_ASTYPE,
+            TransformerRule.FUSE_ELEMWISE_MULTITYPE,
         ]
         optimize_for_conversion(self.net, self._transformer_options)
 

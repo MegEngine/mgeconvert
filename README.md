@@ -115,13 +115,13 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 * [ ] softmax
 * [ ] deconv
 * [ ] resize
+* [ ] typecvt
+* [ ] elemwisemultitype <- 依赖 MR3238
 
 还没测试的 op:
 
 * [ ] pad
-* [ ] typecvt
 * [ ] mtk deconv
-* [ ] elemwisemultitype
 
 待处理问题：
 

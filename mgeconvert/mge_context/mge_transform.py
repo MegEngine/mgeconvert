@@ -30,6 +30,7 @@ class TransformerRule(Enum):
     DECONV_SHAPE_AS_INPUT = 106
     FUSE_ASTYPE = 107
     MAKE_PADDING = 108
+    FUSE_ELEMWISE_MULTITYPE = 109
 
     # for Caffe
     FUSE_FOR_LEAKY_RELU = 200
@@ -342,47 +343,69 @@ def _fuse_astype(net):
             return True
         return False
 
-    opr_with_quant = set()
+    delete_intended = []
 
-    for op in net.all_oprs:
+    for op_id, op in zip(net._opr_ids, net.all_oprs):
         if type(op) == TypeCvtOpr:
+            # typecvt.prev_opr must have single output
             prev_op = op.prev_opr
             if (
                 check_dtype(op, np.float32, np.int32)
                 or check_dtype(op, np.float32, np.uint8)
+                or check_dtype(op, np.float32, np.int8)
                 or check_dtype(op, np.int32, np.uint8)
-                or check_dtype(op, np.uint8, np.uint8)
-            ):
-                prev_op.out_vars[0] = opr.output_vars[0]
-                opr.out_vars[0].owner = prev_op
-                opr_with_quant.add(prev_op)
-            else:
-                assert check_dtype(op, np.uint8, np.int32) or check_dtype(
-                    op, np.uint8, np.float32
-                ), "ERROR: unsupported Astype mode: {0} to {1}".format(
-                    op.inp_vars[0].dtype, opr.out_vars[0].dtype
-                )
+            ):  # quant phase
+                is_net_input = prev_op.out_vars[0] in net.input_vars
+                if is_net_input:
+                    net.input_vars.remove(prev_op.out_vars[0])
+                prev_op.out_vars[0] = op.out_vars[0]
+                op.out_vars[0].owner = prev_op
+                if is_net_input:
+                    net.input_vars.append(prev_op.out_vars[0])
+                delete_intended.append(net._opr_ids.index(op_id))
+            else:  # dequant phase, typecvt must be the last opr in the model
+                if (
+                    check_dtype(op, np.uint8, np.int32)
+                    or check_dtype(op, np.uint8, np.float32)
+                    or check_dtype(op, np.int8, np.float32)
+                ):
+                    is_net_output = op.out_vars[0] in net.output_vars
+                    if is_net_output:
+                        net.output_vars.remove(op.out_vars[0])
+                        net.output_vars.append(prev_op.out_vars[0])
+                    delete_intended.append(net._opr_ids.index(op_id))
+
+    for delete_idx in delete_intended[::-1]:
+        del net._opr_ids[delete_idx]
+        del net.all_oprs[delete_idx]
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_ELEMWISE_MULTITYPE)
+def _fuse_elemwise_multitype(net):
+    # TODO: need to have params of ElemwiseMultiType
+    from .mge_op import ElemwiseMultiTypeOpr, ElemwiseOpr
+
+    matches = OrderedDict()
+
+    for op_id, op in zip(net._opr_ids, net.all_oprs):
+        if type(op) != ElemwiseMultiTypeOpr:
             continue
 
-        for i in range(len(op.inp_vars)):
-            prev_op = op.inp_oprs[i]
-            if type(prev_op) == TypeCvtOpr and prev_op.inp_vars[0].dtype == np.uint8:
-                # this Astype opr is dequant
-                op.inp_vars[i] = prev_op.inp_vars[0]
-                result_shape = op.out_vars[0].shape
-                out_symvar = FakeSymbolVar(
-                    sid=net.max_id,
-                    name=op.out_vars[0].name,
-                    shape=[
-                        result_shape[0],
-                        result_shape[2],
-                        result_shape[3],
-                        result_shape[1],
-                    ],
-                    dtype=prev_op.inp_vars[0].dtype,
-                    owner=op,
-                    byte_list=None,
-                )
-                net.max_id += 1
-                out_tensor = net.get_var(out_symvar)
-                op.out_vars[0] = out_tensor
+        # currently only support ADD + RELU
+        add_opr = ElemwiseOpr(op._opr)
+        add_opr.mode = "ADD"
+        add_opr.activation = "RELU"
+        add_opr.id = net.max_id
+        add_opr.inp_vars = op.inp_vars
+        add_opr.out_vars = op.out_vars
+        net.max_id += 1
+
+        matches[op_id] = (op.id, add_opr)
+
+    for original_id, generated_pair in matches.items():
+        index = net._opr_ids.index(original_id)
+        del net._opr_ids[index : index + 1]
+        del net.all_oprs[index : index + 1]
+
+        net._opr_ids.insert(index, generated_pair[0])
+        net.all_oprs.insert(index, generated_pair[1])
