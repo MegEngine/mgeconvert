@@ -164,7 +164,7 @@ class ElemwiseOpr(MgeOpr):
         super().__init__(opr)
         try:
             self.mode = self.params["mode"]
-        except:
+        except RuntimeError:
             self.mode = "NONE"
 
 

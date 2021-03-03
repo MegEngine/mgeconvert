@@ -11,8 +11,19 @@ from enum import Enum
 
 import numpy as np
 
-from .mge_net import TopologyNetwork
-from .mge_tensor import FakeSymbolVar
+from .mge_op import (
+    ConvBiasForwardOpr,
+    ConvolutionBackwardDataOpr,
+    ConvolutionForwardOpr,
+    ElemwiseOpr,
+    PadOpr,
+    PoolingForwardOpr,
+    ReduceOpr,
+    Relu6Opr,
+    SoftmaxOpr,
+    TypeCvtOpr,
+)
+from .mge_tensor import FakeSymbolVar, Tensor
 
 
 class TransformerRule(Enum):
@@ -30,7 +41,6 @@ class TransformerRule(Enum):
     DECONV_SHAPE_AS_INPUT = 106
     FUSE_ASTYPE = 107
     MAKE_PADDING = 108
-    FUSE_ELEMWISE_MULTITYPE = 109
 
     # for Caffe
     FUSE_FOR_LEAKY_RELU = 200
@@ -53,10 +63,8 @@ def _register_tranformation_rule(transformer_option):
 
 @_register_tranformation_rule(TransformerRule.REDUCE_AXIS_AS_INPUT)
 def _reduce_axis_as_input(net):
-    from .mge_op import ReduceOpr
-
-    for op_id, op in zip(net._opr_ids, net.all_oprs):
-        if type(op) != ReduceOpr:
+    for op in net.all_oprs:
+        if not isinstance(op, ReduceOpr):
             continue
 
         byte_list = np.int32(op.axis).tobytes()
@@ -77,12 +85,10 @@ def _reduce_axis_as_input(net):
 
 @_register_tranformation_rule(TransformerRule.FUSE_FOR_RELU6)
 def _fuse_for_relu6(net):
-    from .mge_op import ElemwiseOpr, Relu6Opr
-
     matches = OrderedDict()
 
-    for op_id, op in zip(net._opr_ids, net.all_oprs):
-        if type(op) != ElemwiseOpr:
+    for op in net.all_oprs:
+        if not isinstance(op, ElemwiseOpr):
             continue
         if len(op.inp_oprs) <= 0 or len(op.inp_oprs) >= 2:
             continue
@@ -90,7 +96,7 @@ def _fuse_for_relu6(net):
 
         if op.mode == "MIN" and np.array_equal(op.inp_vars[1].np_data, np.array([6])):
             if (
-                type(prev_op) == ElemwiseOpr
+                isinstance(prev_op, ElemwiseOpr)
                 and prev_op.mode == "MAX"
                 and np.array_equal(prev_op.inp_vars[1].np_data, np.array([0]))
             ):
@@ -102,7 +108,7 @@ def _fuse_for_relu6(net):
                 net.max_id += 1
         if op.mode == "MAX" and np.array_equal(op.inp_vars[1].np_data, np.array([0])):
             if (
-                type(prev_op) == ElemwiseOpr
+                isinstance(prev_op, ElemwiseOpr)
                 and prev_op.mode == "MIN"
                 and np.array_equal(prev_op.inp_vars[1].np_data, np.array([6]))
             ):
@@ -113,7 +119,7 @@ def _fuse_for_relu6(net):
                 matches[prev_op.id] = (net.max_id, relu6_opr)
                 net.max_id += 1
 
-    for original_id, generated_pair in matches.items():
+    for original_id, generated_pair in list(matches.items())[::-1]:
         index = net._opr_ids.index(original_id)
         del net._opr_ids[index : index + 2]
         del net.all_oprs[index : index + 2]
@@ -124,19 +130,17 @@ def _fuse_for_relu6(net):
 
 @_register_tranformation_rule(TransformerRule.FUSE_ACTIVATION)
 def _fuse_activation(net):
-    from .mge_op import ElemwiseOpr, Relu6Opr
-
     delete_intended = []
 
     for op_id, op in zip(net._opr_ids, net.all_oprs):
-        if (type(op) == Relu6Opr) or (
-            type(op) == ElemwiseOpr and op.mode in ("RELU", "TANH")
+        if isinstance(op, Relu6Opr) or (
+            isinstance(op, ElemwiseOpr) and op.mode in ("RELU", "TANH")
         ):
             prev_op = op.prev_opr
 
             # activation(relu/relu6/tanh) must be fused with previous opr
             activation = getattr(op, "mode", "IDENTITY")
-            activation = "RELU6" if (type(op) == Relu6Opr) else activation
+            activation = "RELU6" if isinstance(op, Relu6Opr) else activation
             prev_op.activation = activation
             prev_op.out_vars = op.out_vars
 
@@ -149,10 +153,10 @@ def _fuse_activation(net):
 
 @_register_tranformation_rule(TransformerRule.CONV_ADD_ZERO_BIAS)
 def _conv_add_zero_bias(net):
-    from .mge_op import ConvolutionForwardOpr
-
     for op in net.all_oprs:
-        if type(op) not in (ConvolutionForwardOpr,):
+        if not isinstance(op, ConvolutionForwardOpr):
+            continue
+        if isinstance(op, ConvBiasForwardOpr):
             continue
 
         result_shape = [op.out_vars[0].shape[1]]
@@ -187,17 +191,15 @@ def _conv_add_zero_bias(net):
 
 @_register_tranformation_rule(TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT)
 def _depthwise_conv_reshape_weight(net):
-    from .mge_op import ConvolutionForwardOpr
-
     for op in net.all_oprs:
-        if type(op) != ConvolutionForwardOpr:
+        if not isinstance(op, ConvolutionForwardOpr):
             continue
         if op.group == 1:
             continue
 
         var = op.inp_vars[1]
         group = var.shape[0]
-        oc, ic = var.shape[1:3]
+        ic = var.shape[2]
         h, w = var.shape[3:5]
         shape = [1, group * ic, h, w]
         var.ndim = len(shape)
@@ -207,24 +209,30 @@ def _depthwise_conv_reshape_weight(net):
 
 @_register_tranformation_rule(TransformerRule.FUSE_SOFTMAX)
 def _fuse_softmax(net):
-    from .mge_op import ElemwiseOpr, ReduceOpr, SoftmaxOpr
-
     matches = OrderedDict()
 
     for op in net.all_oprs:
-        if type(op) != ElemwiseOpr or op.mode != "TRUE_DIV":
+        if not isinstance(op, ElemwiseOpr) or op.mode != "TRUE_DIV":
             continue
         prev_op = op.inp_oprs[1]
-        if type(prev_op) != ReduceOpr or prev_op.mode != "SUM" or prev_op.axis != 1:
+        if (
+            not isinstance(prev_op, ReduceOpr)
+            or prev_op.mode != "SUM"
+            or prev_op.axis != 1
+        ):
             continue
         prev_op = op.inp_oprs[0]
-        if type(prev_op) != ElemwiseOpr or prev_op.mode != "EXP":
+        if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "EXP":
             continue
         prev_op = prev_op.prev_opr
-        if type(prev_op) != ElemwiseOpr or prev_op.mode != "SUB":
+        if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "SUB":
             continue
         prev_op = prev_op.inp_oprs[1]
-        if type(prev_op) != ReduceOpr or prev_op.mode != "MAX" or prev_op.axis != 1:
+        if (
+            not isinstance(prev_op, ReduceOpr)
+            or prev_op.mode != "MAX"
+            or prev_op.axis != 1
+        ):
             continue
 
         softmax_opr = SoftmaxOpr()
@@ -235,7 +243,7 @@ def _fuse_softmax(net):
         matches[prev_op.id] = (net.max_id, softmax_opr)
         net.max_id += 1
 
-    for original_id, generated_pair in matches.items():
+    for original_id, generated_pair in list(matches.items())[::-1]:
         index = net._opr_ids.index(original_id)
         del net._opr_ids[index : index + 5]
         del net.all_oprs[index : index + 5]
@@ -246,10 +254,8 @@ def _fuse_softmax(net):
 
 @_register_tranformation_rule(TransformerRule.DECONV_SHAPE_AS_INPUT)
 def _deconv_shape_as_input(net):
-    from .mge_op import ConvolutionBackwardDataOpr
-
     for op in net.all_oprs:
-        if type(op) != ConvolutionBackwardDataOpr:
+        if not isinstance(op, ConvolutionBackwardDataOpr):
             continue
 
         byte_list = []
@@ -277,13 +283,11 @@ def _deconv_shape_as_input(net):
 
 @_register_tranformation_rule(TransformerRule.MAKE_PADDING)
 def _make_padding(net):
-    from .mge_op import PadOpr, ConvolutionBackwardDataOpr
-
     def have_padding(opr):
         if (
             hasattr(opr, "ph")
             and (opr.ph > 0 or opr.pw > 0)
-            and not type(opr) == ConvolutionBackwardDataOpr
+            and not isinstance(opr, ConvolutionBackwardDataOpr)
         ):
             return True
         return False
@@ -291,10 +295,15 @@ def _make_padding(net):
     insert_intended = OrderedDict()
 
     for op in net.all_oprs:
-        prev_op = op.inp_oprs[0]
+        if type(op) not in (
+            ConvolutionForwardOpr,
+            ConvBiasForwardOpr,
+            PoolingForwardOpr,
+        ):
+            continue
 
         if have_padding(op):
-            assert opr.inp_vars[0].ndim == 4, "ERROR: unsupported padding mode"
+            assert op.inp_vars[0].ndim == 4, "ERROR: unsupported padding mode"
             byte_list = []
             number_list = [0, 0, op.ph, op.ph, op.pw, op.pw, 0, 0]
             for i in number_list:
@@ -308,36 +317,43 @@ def _make_padding(net):
                 byte_list=byte_list,
             )
             net.max_id += 1
-            pad_in_tensor = net.get_var(pad_in_symvar)
+            net._var_ids.append(pad_in_symvar.id)
+            pad_in_tensor = Tensor(pad_in_symvar, None)
+            net.all_vars.append(pad_in_tensor)
 
             shape = list(op.inp_vars[0].shape)
             pad_out_symvar = FakeSymbolVar(
                 sid=net.max_id,
                 name=op.name + "_pad_out",
-                shape=[
-                    shape[0],
-                    shape[2] + opr.padding[0] * 2,
-                    shape[3] + opr.padding[1] * 2,
-                    shape[1],
-                ],
+                shape=[shape[0], shape[2] + op.ph * 2, shape[3] + op.pw * 2, shape[1],],
                 dtype=op.inp_vars[0].dtype,
                 owner=None,
                 byte_list=None,
             )
             net.max_id += 1
-            pad_out_tensor = net.get_var(pad_out_symvar)
+            net._var_ids.append(pad_out_symvar.id)
+            pad_out_tensor = Tensor(pad_out_symvar, None)
+            net.all_vars.append(pad_out_tensor)
 
             pad_opr = PadOpr()
+            pad_opr.name = "pad_" + op.name
+            pad_opr.id = net.max_id
+            net.max_id += 1
             pad_opr.inp_vars = [op.inp_vars[0], pad_in_tensor]
             pad_opr.out_vars = [pad_out_tensor]
             pad_out_tensor.owner = pad_opr
-            op.inp_vars = [pad_opr] + op.inp_vars[1:]
+            op.inp_vars = [pad_out_tensor] + op.inp_vars[1:]
+
+            index = net._opr_ids.index(op.id)
+            insert_intended[index] = (pad_opr.id, pad_opr)
+
+    for index, generated_pair in list(insert_intended.items())[::-1]:
+        net._opr_ids.insert(index, generated_pair[0])
+        net.all_oprs.insert(index, generated_pair[1])
 
 
 @_register_tranformation_rule(TransformerRule.FUSE_ASTYPE)
 def _fuse_astype(net):
-    from .mge_op import TypeCvtOpr
-
     def check_dtype(opr, dtype1, dtype2):
         if opr.inp_vars[0].dtype == dtype1 and opr.out_vars[0].dtype == dtype2:
             return True
@@ -346,14 +362,14 @@ def _fuse_astype(net):
     delete_intended = []
 
     for op_id, op in zip(net._opr_ids, net.all_oprs):
-        if type(op) == TypeCvtOpr:
+        if isinstance(op, TypeCvtOpr):
             # typecvt.prev_opr must have single output
             prev_op = op.prev_opr
             if (
                 check_dtype(op, np.float32, np.int32)
                 or check_dtype(op, np.float32, np.uint8)
                 or check_dtype(op, np.float32, np.int8)
-                or check_dtype(op, np.int32, np.uint8)
+                or check_dtype(op, np.int32, np.int8)
             ):  # quant phase
                 is_net_input = prev_op.out_vars[0] in net.input_vars
                 if is_net_input:
@@ -365,7 +381,7 @@ def _fuse_astype(net):
                 delete_intended.append(net._opr_ids.index(op_id))
             else:  # dequant phase, typecvt must be the last opr in the model
                 if (
-                    check_dtype(op, np.uint8, np.int32)
+                    check_dtype(op, np.int8, np.int32)
                     or check_dtype(op, np.uint8, np.float32)
                     or check_dtype(op, np.int8, np.float32)
                 ):
@@ -378,34 +394,3 @@ def _fuse_astype(net):
     for delete_idx in delete_intended[::-1]:
         del net._opr_ids[delete_idx]
         del net.all_oprs[delete_idx]
-
-
-@_register_tranformation_rule(TransformerRule.FUSE_ELEMWISE_MULTITYPE)
-def _fuse_elemwise_multitype(net):
-    # TODO: need to have params of ElemwiseMultiType
-    from .mge_op import ElemwiseMultiTypeOpr, ElemwiseOpr
-
-    matches = OrderedDict()
-
-    for op_id, op in zip(net._opr_ids, net.all_oprs):
-        if type(op) != ElemwiseMultiTypeOpr:
-            continue
-
-        # currently only support ADD + RELU
-        add_opr = ElemwiseOpr(op._opr)
-        add_opr.mode = "ADD"
-        add_opr.activation = "RELU"
-        add_opr.id = net.max_id
-        add_opr.inp_vars = op.inp_vars
-        add_opr.out_vars = op.out_vars
-        net.max_id += 1
-
-        matches[op_id] = (op.id, add_opr)
-
-    for original_id, generated_pair in matches.items():
-        index = net._opr_ids.index(original_id)
-        del net._opr_ids[index : index + 1]
-        del net.all_oprs[index : index + 1]
-
-        net._opr_ids.insert(index, generated_pair[0])
-        net.all_oprs.insert(index, generated_pair[1])

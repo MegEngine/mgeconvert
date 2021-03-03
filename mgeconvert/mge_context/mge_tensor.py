@@ -10,7 +10,7 @@ from .mge_utils import get_dep_vars, get_shape, get_symvar_value
 
 
 class FakeSymbolVar:
-    def __init__(self, sid, name, shape, dtype, owner, byte_list=None):
+    def __init__(self, sid, name, shape, dtype, owner=None, byte_list=None):
         self.id = sid
         self.name = name
         self.shape = shape
@@ -21,7 +21,7 @@ class FakeSymbolVar:
 
 class Tensor:
     def __init__(self, sym_var, owner_opr):
-        self.is_faked = type(sym_var) == FakeSymbolVar
+        self.is_faked = isinstance(sym_var, FakeSymbolVar)
         self.id = sym_var.id
         self._var = sym_var
         self.name = sym_var.name

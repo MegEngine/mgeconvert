@@ -7,13 +7,16 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import flatbuffers
-import numpy as np
 
-from ..mge_context import TopologyNetwork, TransformerRule, optimize_for_conversion
+from ..mge_context import (
+    TopologyNetwork,
+    TransformerRule,
+    optimize_for_conversion,
+    set_platform,
+)
 from ..mge_context.mge_op import Host2DeviceCopyOpr
 from .tflite import (
     Buffer,
-    Conv2DOptions,
     GetFileIdentifier,
     Model,
     Operator,
@@ -21,12 +24,9 @@ from .tflite import (
     QuantizationParameters,
     SubGraph,
     Tensor,
-    TensorType,
 )
-from .tflite.BuiltinOperator import BuiltinOperator
-from .tflite.BuiltinOptions import BuiltinOptions
 from .tflite.CustomOptionsFormat import CustomOptionsFormat
-from .tflite_op import MGE2TFLITE, mge2tflite_dtype_mapping
+from .tflite_op import MGE2TFLITE, get_shape_param, mge2tflite_dtype_mapping
 
 
 class TFLiteConverter:
@@ -54,8 +54,8 @@ class TFLiteConverter:
             TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,
             TransformerRule.FUSE_SOFTMAX,
             TransformerRule.DECONV_SHAPE_AS_INPUT,
+            TransformerRule.MAKE_PADDING,
             TransformerRule.FUSE_ASTYPE,
-            TransformerRule.FUSE_ELEMWISE_MULTITYPE,
         ]
         optimize_for_conversion(self.net, self._transformer_options)
 
@@ -67,11 +67,13 @@ class TFLiteConverter:
 
         def need_convert(mge_opr):
             is_const = [data.np_data is not None for data in mge_opr.inp_vars]
-            if type(mge_opr) == Host2DeviceCopyOpr:
+            if isinstance(mge_opr, Host2DeviceCopyOpr):
                 return False
             return not all(is_const) or len(mge_opr.inp_vars) == 0
 
         for mge_opr in self.net.all_oprs:
+            last_opr = mge_opr
+            print(">>", mge_opr.name)
             if not need_convert(mge_opr):
                 continue
 
@@ -86,7 +88,9 @@ class TFLiteConverter:
                 if var in self._var2tensor:
                     continue
 
-                result_shape, byte_list = self._get_shape_param(var)
+                result_shape, byte_list = get_shape_param(var, mge_opr, self.net)
+                var.shape = result_shape
+                print(" ", var.name, " shape =", var.shape)
 
                 scale = None
                 zero_point = 0
@@ -119,7 +123,6 @@ class TFLiteConverter:
             )
             self._operator_list.append(tfl_opr)
 
-        last_opr = mge_opr
         print("last op: {}".format(last_opr))
         out_var = last_opr.out_vars[0]
         print("dtype: {}".format(out_var.dtype))
@@ -129,35 +132,6 @@ class TFLiteConverter:
             print("scale: {}, zero point: {}".format(scale, zero_point))
 
         return self.get_model()
-
-    def _get_shape_param(self, tensor):
-        if tensor.ndim == 4:
-            # OC, IC, H, W  to  OC, H, W, IC
-            # NCHW to NHWC
-            # except the output of reshape
-            shape = [tensor.shape[0], tensor.shape[2], tensor.shape[3], tensor.shape[1]]
-        elif tensor.ndim < 4:
-            shape = list(tensor.shape)
-        else:
-            assert False, "ERROR: output ndim {0} is not supported now".format(
-                tensor.ndim
-            )
-
-        if tensor.is_faked:
-            return shape, tensor.byte_list
-
-        number_list = []
-        value = tensor.np_data
-        if value is not None:
-            number_list = value.reshape(-1)
-
-        if len(number_list) > 0:
-            byte_list = []
-            for i in number_list:
-                byte_list.extend(i.tobytes())
-            return shape, byte_list
-        else:
-            return shape, None
 
     def gen_buffer(self, byte_list):
         if not byte_list:
@@ -225,7 +199,7 @@ class TFLiteConverter:
         custom_options = None
         builtin_options = None
         if options:
-            if type(options) == bytes:  # custom_options
+            if isinstance(options, bytes):  # custom_options
                 Operator.OperatorStartCustomOptionsVector(self._builder, len(options))
                 for i in reversed(options):
                     self._builder.PrependByte(i)
@@ -361,6 +335,11 @@ def convert_to_tflite(
     """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     net = TopologyNetwork(mge_fpath, prune_reshape=True)
+    net.batch_size = batch_size
+    if mtk:
+        # MTK devices only support batch_size 1
+        net.batch_size = 1
+        set_platform("mtk")
     converter = TFLiteConverter(net, graph_name)
     model = converter.convert()
 

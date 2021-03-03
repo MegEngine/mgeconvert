@@ -7,7 +7,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from .mge_op import ReshapeOpr, str_to_mge_class
-from .mge_tensor import FakeSymbolVar, Tensor
+from .mge_tensor import Tensor
 from .mge_utils import (
     eval_partial,
     get_dep_vars,
@@ -56,7 +56,7 @@ class TopologyNetwork:
             # set inp var
             for idx, x in enumerate(mge_opr.inputs):
                 # if prune_reshape, then remove second input in ReshapeOpr
-                if not (prune_reshape and type(opr) == ReshapeOpr and idx == 1):
+                if not (prune_reshape and isinstance(opr, ReshapeOpr) and idx == 1):
                     opr.add_inp_var(self.get_var(x))
             # set out var
             for x in mge_opr.outputs:
@@ -78,6 +78,8 @@ class TopologyNetwork:
             self.output_vars.append(self.get_var(x))
 
         self.max_id = max([out_var.id for out_var in self.output_vars]) + 1
+        # works iff all inputs have the same batch size
+        self.batch_size = self.input_vars[0].shape[0]
 
     def run(self, feed_input, end_op):
         if end_op is None:
@@ -129,3 +131,16 @@ class TopologyNetwork:
             self._var_ids.append(x.id)
             self.all_vars.append(Tensor(x, self.get_opr(owner)))
         return self.all_vars[self._var_ids.index(x.id)]
+
+
+class Config:
+    platform = "official"
+
+
+def set_platform(platform):
+    assert platform in ["official", "mtk"]
+    Config.platform = platform
+
+
+def get_platform():
+    return Config.platform

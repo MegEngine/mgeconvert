@@ -6,36 +6,28 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import collections
+
 import numpy as np
 from numpy import dtype
 
 from ..mge_context import (
-    AxisAddRemoveOpr,
-    BatchNormForwardOpr,
-    BroadcastOpr,
     ConcatOpr,
     ConvBiasForwardOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
-    DimshuffleOpr,
+    ElemwiseMultiTypeOpr,
     ElemwiseOpr,
-    GetVarShapeOpr,
-    Host2DeviceCopyOpr,
-    IdentityOpr,
-    MarkNoBroadcastElemwiseOpr,
     MatrixMulOpr,
-    MultipleDeviceTensorHolderOpr,
     PadOpr,
     PoolingForwardOpr,
     ReduceOpr,
     ReshapeOpr,
     ResizeForwardOpr,
-    SharedDeviceTensorOpr,
     SoftmaxOpr,
-    SubtensorOpr,
-    TypeCvtOpr,
-    get_symvar_value,
+    get_platform,
 )
+from .pyflexbuffers import dumps
 from .tflite import (
     AddOptions,
     ConcatenationOptions,
@@ -61,6 +53,68 @@ from .tflite.BuiltinOperator import BuiltinOperator
 from .tflite.BuiltinOptions import BuiltinOptions
 from .tflite.Padding import Padding
 from .tflite.TensorType import TensorType
+
+
+def _infer_batch(tensor, mge_opr, net):
+    if (
+        type(mge_opr) in (ConvolutionForwardOpr, ConvBiasForwardOpr)
+        and tensor in mge_opr.inp_vars
+        and mge_opr.inp_vars.index(tensor) >= 1
+    ):
+        return tensor.shape[0]
+
+    if isinstance(mge_opr, ReshapeOpr) and tensor in mge_opr.out_vars:
+        return mge_opr.inp_vars[0].shape[0]
+
+    if isinstance(mge_opr, MatrixMulOpr) and tensor in mge_opr.inp_vars:
+        return tensor.shape[0]
+
+    if isinstance(mge_opr, MatrixMulOpr) and tensor in mge_opr.out_vars:
+        return mge_opr.inp_vars[0].shape[0]
+
+    if isinstance(mge_opr, PadOpr) and tensor in mge_opr.inp_vars:
+        return tensor.shape[0]
+
+    if isinstance(mge_opr, ElemwiseOpr) and tensor.ndim < 4:
+        return tensor.shape[0]
+
+    return net.batch_size
+
+
+def get_shape_param(tensor, mge_opr, net):
+    batch = _infer_batch(tensor, mge_opr, net)
+    if tensor.ndim == 4:
+        # OC, IC, H, W  to  OC, H, W, IC
+        # NCHW to NHWC
+        # except the output of reshape
+        shape = [
+            batch,
+            tensor.shape[2],
+            tensor.shape[3],
+            tensor.shape[1],
+        ]
+    elif tensor.ndim < 4:
+        shape = list(tensor.shape)
+        shape[0] = batch
+    else:
+        assert False, "ERROR: output ndim {0} is not supported now".format(tensor.ndim)
+
+    if tensor.is_faked:
+        return shape, tensor.byte_list
+
+    number_list = []
+    value = tensor.np_data
+    if value is not None:
+        number_list = value.reshape(-1)
+
+    if len(number_list) > 0:
+        byte_list = []
+        for i in number_list:
+            byte_list.extend(i.tobytes())
+        return shape, byte_list
+    else:
+        return shape, None
+
 
 mge2tflite_dtype_mapping = {
     # pylint: disable=no-member
@@ -94,8 +148,17 @@ def _register_op(*ops):
     return callback
 
 
-@_register_op(ElemwiseOpr)
-def _elemwise(mge_opr, builder):
+@_register_op(ElemwiseOpr, ElemwiseMultiTypeOpr)
+def _elemwise(mge_opr, builder):  # pylint: disable=too-many-return-statements
+    if isinstance(mge_opr, ElemwiseMultiTypeOpr):
+        # TODO: currently only support ADD + RELU
+        AddOptions.AddOptionsStart(builder)
+        AddOptions.AddOptionsAddFusedActivationFunction(
+            builder, mge2tflite_activation_type["RELU"]
+        )
+        options = AddOptions.AddOptionsEnd(builder)
+        return BuiltinOperator.ADD, BuiltinOptions.AddOptions, options
+
     # return tuple of (tfl_op_type, option type, option)
     if mge_opr.mode == "NEG":
         NegOptions.NegOptionsStart(builder)
@@ -192,9 +255,7 @@ def _pooling(mge_opr, builder):
     Pool2DOptions.Pool2DOptionsStart(builder)
     Pool2DOptions.Pool2DOptionsAddPadding(builder, Padding.VALID)
     shape = mge_opr.inp_vars[0].shape
-    if (  # Config.platform == "mtk"
-        False and shape[2] == mge_opr.kh and shape[3] == mge_opr.kw
-    ):
+    if get_platform() == "mtk" and shape[2] == mge_opr.kh and shape[3] == mge_opr.kw:
         # MTK global pooling
         print(
             "\nWARNING: the stride of global pooling "
@@ -258,7 +319,7 @@ def _conv2d(mge_opr, builder):
 
 
 @_register_op(ResizeForwardOpr)
-def _resize(mge_opr, builder):
+def _resize(_, builder):
     ResizeBilinearOptions.ResizeBilinearOptionsStart(builder)
     ResizeBilinearOptions.ResizeBilinearOptionsAddAlignCorners(builder, False)
     options = ResizeBilinearOptions.ResizeBilinearOptionsEnd(builder)
@@ -272,6 +333,7 @@ def _resize(mge_opr, builder):
 @_register_op(MatrixMulOpr)
 def _matrix_mul(mge_opr, builder):
     FullyConnectedOptions.FullyConnectedOptionsStart(builder)
+    # mge quantized model should not have bias for tflite conversion
     FullyConnectedOptions.FullyConnectedOptionsAddFusedActivationFunction(
         builder, mge2tflite_activation_type[mge_opr.activation]
     )
@@ -303,10 +365,29 @@ def _padding_mode_transpose_conv(mge_opr):
         return Padding.VALID
     else:
         assert False, "ERROR: unsupported padding mode"
+        return None
 
 
 @_register_op(ConvolutionBackwardDataOpr)
 def _deconv(mge_opr, builder):
+    if get_platform() == "mtk":
+        CustomOperator = collections.namedtuple("CustomOperator", ["code"])
+        CustomOptions = collections.namedtuple("CustomOptions", ["code"])
+
+        options = dict()
+        options["PaddingType"] = _padding_mode_transpose_conv(mge_opr)
+        options["stride_height"] = mge_opr.sh
+        options["stride_width"] = mge_opr.sw
+        options["depth_multiplier"] = 1
+        options["dilation_height_factor"] = mge_opr.dilation_h
+        options["dilation_width_factor"] = mge_opr.dilation_w
+        options["activation"] = mge2tflite_activation_type[mge_opr.activation]
+        return (
+            CustomOperator("MTK_TRANSPOSE_CONV"),
+            CustomOptions("MTK_TRANSPOSE_CONV"),
+            dumps(options),
+        )
+
     TransposeConvOptions.TransposeConvOptionsStart(builder)
     TransposeConvOptions.TransposeConvOptionsAddPadding(
         builder, _padding_mode_transpose_conv(mge_opr)
@@ -318,7 +399,7 @@ def _deconv(mge_opr, builder):
 
 
 @_register_op(PadOpr)
-def _pad(mge_opr, builder):
+def _pad(_, builder):
     PadOptions.PadOptionsStart(builder)
     options = PadOptions.PadOptionsEnd(builder)
     return BuiltinOperator.PAD, BuiltinOptions.PadOptions, options

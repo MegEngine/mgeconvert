@@ -1,159 +1,131 @@
-import flatbuffers
+# -*- coding: utf-8 -*-
+# MegEngine is Licensed under the Apache License, Version 2.0 (the "License")
+#
+# Copyright (c) 2014-2021 Megvii Inc. All rights reserved.
+#
+# Unless required by applicable law or agreed to in writing,
+# software distributed under the License is distributed on an
+# "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import megengine
 import numpy as np
-from mgeconvert.tflite_converter import tflite
-from mgeconvert.tflite_converter.tflite import (
-    Buffer,
-    Conv2DOptions,
-    Model,
-    NegOptions,
-    Operator,
-    OperatorCode,
-    QuantizationParameters,
-    SubGraph,
-    Tensor,
-    TensorType,
+import pytest
+from mgeconvert.mge_context import TopologyNetwork
+from mgeconvert.tflite_converter.tflite_converter import TFLiteConverter
+from tensorflow.lite.python import interpreter
+from utils import (
+    ActiveOpr,
+    BnOpr,
+    BroadcastOpr,
+    ConcatOpr,
+    ConvOpr,
+    ElemwiseOpr,
+    LinearOpr,
+    PoolOpr,
+    ReduceOpr,
+    ReshapeOpr,
+    SoftmaxOpr,
+    SqueezeOpr,
+    SubtensorOpr,
+    TransposeOpr,
+    XORNet,
+    dump_mge_model,
 )
-from mgeconvert.tflite_converter.tflite.BuiltinOperator import BuiltinOperator
-from mgeconvert.tflite_converter.tflite.BuiltinOptions import BuiltinOptions
-from mgeconvert.tflite_converter.tflite.CustomOptionsFormat import CustomOptionsFormat
 
-buffer_list = []
-# buffer size will automatically increase if needed
-builder = flatbuffers.Builder(1024)
+max_error = 1e-6
+tmp_file = "test_model"
 
-# Note the 0th entry of this array must be an empty buffer (sentinel)
-Buffer.BufferStart(builder)
-buffer = Buffer.BufferEnd(builder)
-buffer_list.append(buffer)
 
-inp_shape = (2, 2, 2, 2)
+def _test_convert_result(inputs, fpath, mge_result, max_err):
+    print("-- mge result shape", mge_result)
+    if inputs.ndim == 4:
+        inputs = inputs.transpose((0, 2, 3, 1))
+    if mge_result.ndim == 4:
+        mge_result = mge_result.transpose((0, 2, 3, 1))
+    net = TopologyNetwork(fpath + ".mge")
 
-tensor_list = []
-for name in ["x", "z"]:
-    byte_list = None
+    converter = TFLiteConverter(net, graph_name="graph")
+    model = converter.convert()
+    with open(tmp_file + ".tflite", "wb") as fout:
+        fout.write(model)
 
-    # tensor buffer
-    Buffer.BufferStart(builder)
-    buffer = Buffer.BufferEnd(builder)
-    buffer_list.append(buffer)
+    tfl_model = interpreter.Interpreter(model_path=tmp_file + ".tflite")
+    tfl_model.allocate_tensors()
 
-    # tensor
-    tname = builder.CreateString(name)
+    input_details = tfl_model.get_input_details()
+    tfl_model.set_tensor(input_details[0]["index"], inputs)
+    tfl_model.invoke()
+    pred_tfl = tfl_model.tensor(tfl_model.get_output_details()[0]["index"])()
+    print("@@ predict tflite shape", pred_tfl)
+    assert pred_tfl.shape == mge_result.shape
+    assert pred_tfl.dtype == mge_result.dtype
+    assert np.allclose(pred_tfl, mge_result, atol=max_err)
 
-    Tensor.TensorStartShapeVector(builder, len(inp_shape))
-    for i in reversed(inp_shape):
-        builder.PrependInt32(i)
-    shape = builder.EndVector(len(inp_shape))
 
-    Tensor.TensorStart(builder)
-    Tensor.TensorAddName(builder, tname)
-    Tensor.TensorAddShape(builder, shape)
-    Tensor.TensorAddType(builder, TensorType.TensorType.INT32)
-    Tensor.TensorAddBuffer(builder, len(buffer_list) - 1)
-    tensor = Tensor.TensorEnd(builder)
-    tensor_list.append(tensor)
+# @pytest.mark.parametrize("mode", ["normal", "group", "transpose"])
+# def test_conv2d(mode):
+#     net = ConvOpr(mode)
+#     mge_result = dump_mge_model(net, net.data, tmp_file)
+#     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-opcode_index = 0
-operator_list = []
-# inputs
-Operator.OperatorStartInputsVector(builder, 1)
-builder.PrependInt32(0)
-inputs = builder.EndVector(1)
-# outputs
-Operator.OperatorStartOutputsVector(builder, 1)
-builder.PrependInt32(1)
-outputs = builder.EndVector(1)
 
-# options
-NegOptions.NegOptionsStart(builder)
-builtin_options = NegOptions.NegOptionsEnd(builder)
+def test_linear():
+    net = LinearOpr()
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-Operator.OperatorStart(builder)
-Operator.OperatorAddOpcodeIndex(builder, opcode_index)
-Operator.OperatorAddInputs(builder, inputs)
-Operator.OperatorAddOutputs(builder, outputs)
-Operator.OperatorAddBuiltinOptionsType(builder, BuiltinOptions.NegOptions)
-Operator.OperatorAddBuiltinOptions(builder, builtin_options)
-operator = Operator.OperatorEnd(builder)
-operator_list.append(operator)
 
-version = 3
-description = builder.CreateString("converted by MgeEngine")
+def test_softmax():
+    net = SoftmaxOpr()
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-operator_codes_list = []
-OperatorCode.OperatorCodeStart(builder)
-OperatorCode.OperatorCodeAddBuiltinCode(builder, BuiltinOperator.NEG)
-operator_code = OperatorCode.OperatorCodeEnd(builder)
-operator_codes_list.append(operator_code)
 
-Model.ModelStartOperatorCodesVector(builder, len(operator_codes_list))
-for i in reversed(operator_codes_list):
-    builder.PrependUOffsetTRelative(i)
-operator_codes = builder.EndVector(len(operator_codes_list))
+@pytest.mark.parametrize("mode", ["max", "avg"])
+def test_pooling(mode):
+    if megengine.__version__ > "0.6.0" and mode == "avg":
+        return
+    net = PoolOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-subgraphs_list = []
-# tensors
-SubGraph.SubGraphStartTensorsVector(builder, len(tensor_list))
-for tensor in reversed(tensor_list):
-    builder.PrependUOffsetTRelative(tensor)
-tensors = builder.EndVector(len(tensor_list))
 
-# inputs
-SubGraph.SubGraphStartInputsVector(builder, 1)
-builder.PrependInt32(0)
-graph_inputs = builder.EndVector(1)
+def test_concat():
+    net = ConcatOpr()
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-# outputs
-SubGraph.SubGraphStartOutputsVector(builder, 1)
-builder.PrependInt32(1)
-graph_outputs = builder.EndVector(1)
 
-# operators
-SubGraph.SubGraphStartOperatorsVector(builder, len(operator_list))
-for operator in reversed(operator_list):
-    builder.PrependUOffsetTRelative(operator)
-operators = builder.EndVector(len(operator_list))
+# def test_reshape():
+#     net = ReshapeOpr(fix_batch=True)
+#     mge_result = dump_mge_model(net, net.data, tmp_file)
+#     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-# name
-sub_graph_name = builder.CreateString("graph0")
+# test_reshape()
 
-SubGraph.SubGraphStart(builder)
-SubGraph.SubGraphAddTensors(builder, tensors)
-SubGraph.SubGraphAddInputs(builder, graph_inputs)
-SubGraph.SubGraphAddOutputs(builder, graph_outputs)
-SubGraph.SubGraphAddOperators(builder, operators)
-SubGraph.SubGraphAddName(builder, sub_graph_name)
-subgraph = SubGraph.SubGraphEnd(builder)
-subgraphs_list.append(subgraph)
 
-Model.ModelStartSubgraphsVector(builder, len(subgraphs_list))
-for i in reversed(subgraphs_list):
-    builder.PrependUOffsetTRelative(i)
-subgraphs = builder.EndVector(len(subgraphs_list))
+# @pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "exp", "max"])
+# def test_elemwise(mode):
+#     net = ElemwiseOpr(mode)
+#     mge_result = dump_mge_model(net, net.data, tmp_file)
+#     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
-Model.ModelStartBuffersVector(builder, len(buffer_list))
-for i in reversed(buffer_list):
-    builder.PrependUOffsetTRelative(i)
-buffers = builder.EndVector(len(buffer_list))
 
-Model.ModelStart(builder)
-Model.ModelAddVersion(builder, version)
-Model.ModelAddOperatorCodes(builder, operator_codes)
-Model.ModelAddSubgraphs(builder, subgraphs)
-Model.ModelAddDescription(builder, description)
-Model.ModelAddBuffers(builder, buffers)
-model = Model.ModelEnd(builder)
-builder.Finish(model, tflite.GetFileIdentifier())
+# @pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "exp"])
+# def test_elemwise_broadcast(mode):
+#     net = ElemwiseOpr(mode)
+#     mge_result = dump_mge_model(net, np.array([2.0]).astype("float32"), tmp_file)
+#     _test_convert_result(np.array([2.0]), tmp_file, mge_result, max_error)
 
-with open("out.tflite", "wb") as f:
-    f.write(builder.Output())
 
-# # validate model file
-# from tensorflow.lite.python import interpreter
-# model = interpreter.Interpreter(model_path="./out.tflite")
-# model.allocate_tensors()
-# input = model.tensor(model.get_input_details()[0]["index"])
-# output = model.tensor(model.get_output_details()[0]["index"])
-# input().fill(3.)
-# model.invoke()
-# print(output())
+# @pytest.mark.parametrize("mode", ["relu", "tanh"])
+# def test_active(mode):
+#     net = ActiveOpr(mode)
+#     mge_result = dump_mge_model(net, net.data, tmp_file)
+#     _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+# @pytest.mark.parametrize("mode", ["max", "sum"])
+# def test_reduce(mode):
+#     net = ReduceOpr(mode)
+#     mge_result = dump_mge_model(net, net.data, tmp_file)
+#     _test_convert_result(net.data, tmp_file, mge_result, max_error)
