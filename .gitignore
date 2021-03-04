@@ -3,3 +3,5 @@ mgeconvert/caffe_converter/caffe_pb
 mgeconvert/tflite_converter/tflite/
 *.tflite
 *.so
+*.mge
+.mypy_cache

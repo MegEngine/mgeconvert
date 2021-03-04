@@ -198,13 +198,12 @@ def _depthwise_conv_reshape_weight(net):
             continue
 
         var = op.inp_vars[1]
-        group = var.shape[0]
-        ic = var.shape[2]
+        ic, cm = var.shape[1], var.shape[2] * op.group
         h, w = var.shape[3:5]
-        shape = [1, group * ic, h, w]
-        var.ndim = len(shape)
-        var.shape = shape
-        var.np_data.reshape(shape)
+        print("@@@@", var.shape)
+        var.shape = (ic, cm, h, w)
+        var.ndim = len(var.shape)
+        var.np_data.reshape(ic, cm, h, w)
 
 
 @_register_tranformation_rule(TransformerRule.FUSE_SOFTMAX)
@@ -214,25 +213,28 @@ def _fuse_softmax(net):
     for op in net.all_oprs:
         if not isinstance(op, ElemwiseOpr) or op.mode != "TRUE_DIV":
             continue
-        prev_op = op.inp_oprs[1]
-        if (
-            not isinstance(prev_op, ReduceOpr)
-            or prev_op.mode != "SUM"
-            or prev_op.axis != 1
-        ):
-            continue
-        prev_op = op.inp_oprs[0]
-        if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "EXP":
-            continue
-        prev_op = prev_op.prev_opr
-        if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "SUB":
-            continue
-        prev_op = prev_op.inp_oprs[1]
-        if (
-            not isinstance(prev_op, ReduceOpr)
-            or prev_op.mode != "MAX"
-            or prev_op.axis != 1
-        ):
+        try:
+            prev_op = op.inp_oprs[1]
+            if (
+                not isinstance(prev_op, ReduceOpr)
+                or prev_op.mode != "SUM"
+                or prev_op.axis != 1
+            ):
+                continue
+            prev_op = op.inp_oprs[0]
+            if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "EXP":
+                continue
+            prev_op = prev_op.prev_opr
+            if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "SUB":
+                continue
+            prev_op = prev_op.inp_oprs[1]
+            if (
+                not isinstance(prev_op, ReduceOpr)
+                or prev_op.mode != "MAX"
+                or prev_op.axis != 1
+            ):
+                continue
+        except IndexError:  # doesn't match
             continue
 
         softmax_opr = SoftmaxOpr()

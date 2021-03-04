@@ -88,7 +88,7 @@ class TFLiteConverter:
                 if var in self._var2tensor:
                     continue
 
-                result_shape, byte_list = get_shape_param(var, mge_opr, self.net)
+                result_shape, byte_list = get_shape_param(var, mge_opr)
                 var.shape = result_shape
                 print(" ", var.name, " shape =", var.shape)
 

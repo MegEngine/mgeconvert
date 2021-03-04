@@ -314,6 +314,7 @@ class AxisAddRemoveOpr(MgeOpr):
         super().__init__(opr)
         self.desc = self.params["desc"]
         self.nr_desc = self.params["nr_desc"]
+        self.output_shape = get_shape(opr.outputs[0])
 
 
 class BroadcastOpr(MgeOpr):

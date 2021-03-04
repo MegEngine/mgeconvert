@@ -12,6 +12,7 @@ import numpy as np
 from numpy import dtype
 
 from ..mge_context import (
+    AxisAddRemoveOpr,
     ConcatOpr,
     ConvBiasForwardOpr,
     ConvolutionBackwardDataOpr,
@@ -55,47 +56,22 @@ from .tflite.Padding import Padding
 from .tflite.TensorType import TensorType
 
 
-def _infer_batch(tensor, mge_opr, net):
-    if (
-        type(mge_opr) in (ConvolutionForwardOpr, ConvBiasForwardOpr)
-        and tensor in mge_opr.inp_vars
-        and mge_opr.inp_vars.index(tensor) >= 1
-    ):
-        return tensor.shape[0]
+def get_shape_param(tensor, mge_opr):
+    if isinstance(mge_opr, ReshapeOpr):
+        return tensor.shape, None
 
-    if isinstance(mge_opr, ReshapeOpr) and tensor in mge_opr.out_vars:
-        return mge_opr.inp_vars[0].shape[0]
-
-    if isinstance(mge_opr, MatrixMulOpr) and tensor in mge_opr.inp_vars:
-        return tensor.shape[0]
-
-    if isinstance(mge_opr, MatrixMulOpr) and tensor in mge_opr.out_vars:
-        return mge_opr.inp_vars[0].shape[0]
-
-    if isinstance(mge_opr, PadOpr) and tensor in mge_opr.inp_vars:
-        return tensor.shape[0]
-
-    if isinstance(mge_opr, ElemwiseOpr) and tensor.ndim < 4:
-        return tensor.shape[0]
-
-    return net.batch_size
-
-
-def get_shape_param(tensor, mge_opr, net):
-    batch = _infer_batch(tensor, mge_opr, net)
     if tensor.ndim == 4:
         # OC, IC, H, W  to  OC, H, W, IC
         # NCHW to NHWC
         # except the output of reshape
         shape = [
-            batch,
+            tensor.shape[0],
             tensor.shape[2],
             tensor.shape[3],
             tensor.shape[1],
         ]
     elif tensor.ndim < 4:
         shape = list(tensor.shape)
-        shape[0] = batch
     else:
         assert False, "ERROR: output ndim {0} is not supported now".format(tensor.ndim)
 
@@ -105,6 +81,8 @@ def get_shape_param(tensor, mge_opr, net):
     number_list = []
     value = tensor.np_data
     if value is not None:
+        if value.ndim == 4:
+            value = value.transpose(0, 2, 3, 1)
         number_list = value.reshape(-1)
 
     if len(number_list) > 0:
@@ -222,7 +200,7 @@ def _reduce(mge_opr, builder):
     return reduce_mode_map[mge_opr.mode], BuiltinOptions.ReducerOptions, options
 
 
-@_register_op(ReshapeOpr)
+@_register_op(ReshapeOpr, AxisAddRemoveOpr)
 def _reshape(mge_opr, builder):
     ReshapeOptions.ReshapeOptionsStartNewShapeVector(builder, len(mge_opr.output_shape))
     for i in reversed(list(mge_opr.output_shape)):
@@ -243,8 +221,12 @@ def _concat(mge_opr, builder):
     axis = mge_opr.axis
     if mge_opr.inp_vars[0].ndim == 4:
         # map NCHW to NHWC
-        axis = axis if axis == 0 else (axis - 1)
-        axis = axis + 3 if axis == 0 else axis
+        if mge_opr.axis == 1:
+            axis = 3
+        elif mge_opr.axis == 2:
+            axis = 1
+        elif mge_opr.axis == 3:
+            axis = 2
     ConcatenationOptions.ConcatenationOptionsAddAxis(builder, axis)
     options = ConcatenationOptions.ConcatenationOptionsEnd(builder)
     return BuiltinOperator.CONCATENATION, BuiltinOptions.ConcatenationOptions, options

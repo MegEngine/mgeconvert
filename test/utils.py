@@ -271,15 +271,21 @@ class ActiveOpr(M.Module):
         "tanh": F.tanh,
         "sigmoid": F.sigmoid,
         "leaky_relu": F.leaky_relu,
+        "softmax": F.softmax,
+        "relu6": lambda x: F.maximum(F.minimum(x, 6), 0),
     }
 
-    def __init__(self, mode):
+    def __init__(self, mode, fused=False):
         super().__init__()
         self.mode = mode
-        self.data = np.random.random((20, 3, 224, 224)).astype(np.float32)
+        self.fused = fused
+        self.data = (np.random.random((1, 2, 3, 4)).astype(np.float32) - 0.5) * 8.0
 
     def forward(self, x):
-        return ActiveOpr.str2fun[self.mode](x)
+        if self.fused:
+            return ActiveOpr.str2fun[self.mode](x + x)
+        else:
+            return ActiveOpr.str2fun[self.mode](x)
 
 
 class BroadcastOpr(M.Module):
