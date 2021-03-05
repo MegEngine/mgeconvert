@@ -8,6 +8,7 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from collections import OrderedDict
 from enum import Enum
+from typing import Callable, Dict
 
 import numpy as np
 
@@ -20,6 +21,7 @@ from .mge_op import (
     PoolingForwardOpr,
     ReduceOpr,
     Relu6Opr,
+    ReshapeOpr,
     SoftmaxOpr,
     TypeCvtOpr,
 )
@@ -32,21 +34,22 @@ class TransformerRule(Enum):
 
     # for TFLite
     REDUCE_AXIS_AS_INPUT = 100
+    REMOVE_RESHAPE_INPUT = 101
     # FUSE_FOR_RELU6 pass should happen before FUSE_ACTIVATION
-    FUSE_FOR_RELU6 = 101
-    FUSE_ACTIVATION = 102
-    CONV_ADD_ZERO_BIAS = 103
-    DEPTHWISE_CONV_RESHAPE_WEIGHT = 104
-    FUSE_SOFTMAX = 105
-    DECONV_SHAPE_AS_INPUT = 106
-    FUSE_ASTYPE = 107
-    MAKE_PADDING = 108
+    FUSE_FOR_RELU6 = 102
+    FUSE_ACTIVATION = 103
+    CONV_ADD_ZERO_BIAS = 104
+    DEPTHWISE_CONV_RESHAPE_WEIGHT = 105
+    FUSE_SOFTMAX = 106
+    DECONV_SHAPE_AS_INPUT = 107
+    FUSE_ASTYPE = 108
+    MAKE_PADDING = 109
 
     # for Caffe
     FUSE_FOR_LEAKY_RELU = 200
 
 
-TRANSFORMMAP = {}
+TRANSFORMMAP: Dict[Enum, Callable] = {}
 
 
 def optimize_for_conversion(net, transformer_options):
@@ -59,6 +62,15 @@ def _register_tranformation_rule(transformer_option):
         TRANSFORMMAP[transformer_option] = impl
 
     return callback
+
+
+@_register_tranformation_rule(TransformerRule.REMOVE_RESHAPE_INPUT)
+def _remove_reshape_input(net):
+    for op in net.all_oprs:
+        if not isinstance(op, ReshapeOpr):
+            continue
+
+        del op.inp_vars[1]
 
 
 @_register_tranformation_rule(TransformerRule.REDUCE_AXIS_AS_INPUT)
@@ -297,7 +309,7 @@ def _make_padding(net):
     insert_intended = OrderedDict()
 
     for op in net.all_oprs:
-        if type(op) not in (
+        if type(op) not in (  # pylint: disable=unidiomatic-typecheck
             ConvolutionForwardOpr,
             ConvBiasForwardOpr,
             PoolingForwardOpr,

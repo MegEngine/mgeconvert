@@ -148,5 +148,5 @@ pip3 install .
 
   执行[convert_tflite.py](mgeconvert/utils/convert_tflite.py)将MegEngine模型转为 TFLite 模型，具体使用方法如下：
   ```bash
-  python3 -m mgeconvert.utils.convert_cambricon -i $MGE_MODEL -o $CAMBRICON_MODEL [-b $BATCH_SIZE] [-c $CORE_NUMBER] [-t $DATA_TYPE]
+  python3 -m mgeconvert.utils.convert_tflite -i $MGE_MODEL -o $TFLITEs_MODEL [--mtk]
   ```

@@ -6,7 +6,7 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from .mge_op import ReshapeOpr, str_to_mge_class
+from .mge_op import str_to_mge_class
 from .mge_tensor import Tensor
 from .mge_utils import (
     eval_partial,
@@ -54,10 +54,8 @@ class TopologyNetwork:
         for mge_opr in all_oprs:
             opr = self.get_opr(mge_opr)
             # set inp var
-            for idx, x in enumerate(mge_opr.inputs):
-                # if prune_reshape, then remove second input in ReshapeOpr
-                if not (prune_reshape and isinstance(opr, ReshapeOpr) and idx == 1):
-                    opr.add_inp_var(self.get_var(x))
+            for x in mge_opr.inputs:
+                opr.add_inp_var(self.get_var(x))
             # set out var
             for x in mge_opr.outputs:
                 opr.add_out_var(self.get_var(x))

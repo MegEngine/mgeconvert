@@ -15,7 +15,7 @@ from ..mge_context import (
     set_platform,
 )
 from ..mge_context.mge_op import Host2DeviceCopyOpr
-from .tflite import (
+from .tflite import (  # pylint: disable=import-error
     Buffer,
     GetFileIdentifier,
     Model,
@@ -25,7 +25,9 @@ from .tflite import (
     SubGraph,
     Tensor,
 )
-from .tflite.CustomOptionsFormat import CustomOptionsFormat
+from .tflite.CustomOptionsFormat import (  # pylint: disable=import-error
+    CustomOptionsFormat,
+)
 from .tflite_op import MGE2TFLITE, get_shape_param, mge2tflite_dtype_mapping
 
 
@@ -48,6 +50,7 @@ class TFLiteConverter:
 
         self._transformer_options = [
             TransformerRule.REDUCE_AXIS_AS_INPUT,
+            TransformerRule.REMOVE_RESHAPE_INPUT,
             TransformerRule.FUSE_FOR_RELU6,
             TransformerRule.FUSE_ACTIVATION,
             TransformerRule.CONV_ADD_ZERO_BIAS,
@@ -311,7 +314,7 @@ class TFLiteConverter:
         Model.ModelAddBuffers(self._builder, buffers)
 
         model = Model.ModelEnd(self._builder)
-        self._builder.Finish(model, GetFileIdentifier())
+        self._builder.Finish(model, file_identifier=GetFileIdentifier().encode())
         return self._builder.Output()
 
 

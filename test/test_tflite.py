@@ -11,12 +11,10 @@ import numpy as np
 import pytest
 from mgeconvert.mge_context import TopologyNetwork
 from mgeconvert.tflite_converter.tflite_converter import TFLiteConverter
-from tensorflow.lite.python import interpreter
+from tensorflow.lite.python import interpreter  # pylint: disable=import-error
 
 from .utils import (
     ActiveOpr,
-    BnOpr,
-    BroadcastOpr,
     ConcatOpr,
     ConvOpr,
     ElemwiseOpr,
@@ -25,10 +23,6 @@ from .utils import (
     ReduceOpr,
     ReshapeOpr,
     SoftmaxOpr,
-    SqueezeOpr,
-    SubtensorOpr,
-    TransposeOpr,
-    XORNet,
     dump_mge_model,
 )
 
@@ -39,7 +33,6 @@ tmp_file = "test_model"
 def _test_convert_result(inputs, fpath, mge_result, max_err, nhwc=True):
     if nhwc and inputs.ndim == 4:
         inputs = inputs.transpose((0, 2, 3, 1))
-    print("-- mge result shape\n", mge_result)
     net = TopologyNetwork(fpath + ".mge")
 
     converter = TFLiteConverter(net, graph_name="graph")
@@ -56,7 +49,6 @@ def _test_convert_result(inputs, fpath, mge_result, max_err, nhwc=True):
     pred_tfl = tfl_model.tensor(tfl_model.get_output_details()[0]["index"])()
     if pred_tfl.ndim == 4:
         pred_tfl = pred_tfl.transpose((0, 3, 1, 2))
-    print("@@ predict tflite shape\n", pred_tfl)
     assert pred_tfl.shape == mge_result.shape
     assert pred_tfl.dtype == mge_result.dtype
     assert np.allclose(pred_tfl, mge_result, atol=max_err)

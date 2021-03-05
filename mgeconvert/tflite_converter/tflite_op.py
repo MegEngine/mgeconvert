@@ -28,8 +28,8 @@ from ..mge_context import (
     SoftmaxOpr,
     get_platform,
 )
-from .pyflexbuffers import dumps
-from .tflite import (
+from .pyflexbuffers import dumps  # pylint: disable=import-error
+from .tflite import (  # pylint: disable=import-error
     AddOptions,
     ConcatenationOptions,
     Conv2DOptions,
@@ -49,11 +49,13 @@ from .tflite import (
     SubOptions,
     TransposeConvOptions,
 )
-from .tflite.ActivationFunctionType import ActivationFunctionType
-from .tflite.BuiltinOperator import BuiltinOperator
-from .tflite.BuiltinOptions import BuiltinOptions
-from .tflite.Padding import Padding
-from .tflite.TensorType import TensorType
+from .tflite.ActivationFunctionType import (  # pylint: disable=import-error
+    ActivationFunctionType,
+)
+from .tflite.BuiltinOperator import BuiltinOperator  # pylint: disable=import-error
+from .tflite.BuiltinOptions import BuiltinOptions  # pylint: disable=import-error
+from .tflite.Padding import Padding  # pylint: disable=import-error
+from .tflite.TensorType import TensorType  # pylint: disable=import-error
 
 
 def get_shape_param(tensor, mge_opr):

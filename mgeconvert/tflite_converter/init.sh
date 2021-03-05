@@ -1,22 +1,30 @@
 #!/bin/bash -e
 basepath=$(cd `dirname $0`; pwd)
 
-rm -rf /tmp/flatbuffers
-# using self-modified flatbuffer
-git clone https://github.com/lcxywfe/flatbuffers.git /tmp/flatbuffers
+# build flatbuffers
+sudo rm -rf /tmp/flatbuffers
+git clone https://github.com/google/flatbuffers.git /tmp/flatbuffers
 cd /tmp/flatbuffers
-git checkout add-finish-with-file-identifier
-# default install path: /usr/local, make sure /usr/local/lib is under LD_LIBRARY_PATH
-cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFLATBUFFERS_BUILD_SHAREDLIB=on -DCMAKE_INSTALL_PREFIX=/usr/local/
-sudo make install
+cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFLATBUFFERS_BUILD_SHAREDLIB=on -DCMAKE_INSTALL_PREFIX=/usr/local
+make -j; sudo make install
 
+export PATH=$PATH:/usr/local/bin
 # build tflite interface from schema.fbs
+cd /tmp
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/master/tensorflow/lite/schema/schema.fbs
-./flatc --python schema.fbs
-cd python
-sudo python3 setup.py install
-cp -r /tmp/flatbuffers/tflite $basepath
+flatc --python schema.fbs
+cp -r /tmp/tflite $basepath
+echo "======================"
+echo $(cat /tmp/tflite/__init__.py)
+echo "======================"
 
+# build pyflatbuffers
+cd /tmp/flatbuffers/python
+sudo python3 setup.py install
+
+sudo python3 -m pip install pybind11==2.6.2
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 # using pyflexbuffers
 cd $basepath/pyflexbuffers
 PYBIND11_HEADER=$(python3 -c "import pybind11; print(pybind11.get_include())")

@@ -1,6 +1,9 @@
 import json
 
-from .fbconverter import from_json, to_json  # pylint: disable=no-name-in-module
+from .fbconverter import (  # pylint: disable=import-error,no-name-in-module
+    from_json,
+    to_json,
+)
 
 
 def loads(s):

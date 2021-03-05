@@ -23,9 +23,9 @@ else:
     import megengine.utils.comp_graph_tools as cgtools
 
     if mge_version <= "1.1.0":
-        from megengine.core.tensor.raw_tensor import (
+        from megengine.core.tensor.raw_tensor import (  # pylint: disable=no-name-in-module,import-error
             as_raw_tensor as Tensor,
-        )  # pylint: disable=no-name-in-module,import-error
+        )
     else:
         from megengine.tensor import Tensor
 
