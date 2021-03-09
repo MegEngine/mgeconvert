@@ -17,6 +17,7 @@ from ..mge_context import (
     ConvBiasForwardOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
+    DimshuffleOpr,
     ElemwiseMultiTypeOpr,
     ElemwiseOpr,
     MatrixMulOpr,
@@ -48,6 +49,7 @@ from .tflite import (  # pylint: disable=import-error
     SoftmaxOptions,
     SubOptions,
     TransposeConvOptions,
+    TransposeOptions,
 )
 from .tflite.ActivationFunctionType import (  # pylint: disable=import-error
     ActivationFunctionType,
@@ -387,3 +389,10 @@ def _pad(_, builder):
     PadOptions.PadOptionsStart(builder)
     options = PadOptions.PadOptionsEnd(builder)
     return BuiltinOperator.PAD, BuiltinOptions.PadOptions, options
+
+
+@_register_op(DimshuffleOpr)
+def _dimshuffle(_, builder):
+    TransposeOptions.TransposeOptionsStart(builder)
+    options = TransposeOptions.TransposeOptionsEnd(builder)
+    return BuiltinOperator.TRANSPOSE, BuiltinOptions.TransposeOptions, options

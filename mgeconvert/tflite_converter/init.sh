@@ -14,9 +14,6 @@ cd /tmp
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/master/tensorflow/lite/schema/schema.fbs
 flatc --python schema.fbs
 cp -r /tmp/tflite $basepath
-echo "======================"
-echo $(cat /tmp/tflite/__init__.py)
-echo "======================"
 
 # build pyflatbuffers
 cd /tmp/flatbuffers/python

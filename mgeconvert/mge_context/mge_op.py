@@ -36,7 +36,10 @@ class MgeOpr(OpBase):
         self.name = self.name.replace(",", "_")
 
         self.id = opr.id
-        self.type = get_opr_type(opr)
+        try:
+            self.type = get_opr_type(opr)
+        except AssertionError:
+            self.type = None
         self.flag = None
         self.inp_vars = []
         self.out_vars = []

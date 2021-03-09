@@ -247,6 +247,9 @@ class ElemwiseOpr(M.Module):
         # log
         elif self.mode == "log":
             z = F.log(a)
+        elif self.mode == "fuse_mul_add3":
+            y = a * mge.tensor(self.data1)
+            z = y + mge.tensor(self.data2)
         else:
             raise NotImplementedError('no such elemwise mode "%s"' % self.mode)
         return z

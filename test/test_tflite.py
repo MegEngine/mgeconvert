@@ -23,6 +23,7 @@ from .utils import (
     ReduceOpr,
     ReshapeOpr,
     SoftmaxOpr,
+    TransposeOpr,
     dump_mge_model,
 )
 
@@ -30,7 +31,7 @@ max_error = 1e-6
 tmp_file = "test_model"
 
 
-def _test_convert_result(inputs, fpath, mge_result, max_err, nhwc=True):
+def _test_convert_result(inputs, fpath, mge_result, max_err, nhwc=True, nhwc2=True):
     if nhwc and inputs.ndim == 4:
         inputs = inputs.transpose((0, 2, 3, 1))
     net = TopologyNetwork(fpath + ".mge")
@@ -47,7 +48,7 @@ def _test_convert_result(inputs, fpath, mge_result, max_err, nhwc=True):
     tfl_model.set_tensor(input_details[0]["index"], inputs)
     tfl_model.invoke()
     pred_tfl = tfl_model.tensor(tfl_model.get_output_details()[0]["index"])()
-    if pred_tfl.ndim == 4:
+    if nhwc2 and pred_tfl.ndim == 4:
         pred_tfl = pred_tfl.transpose((0, 3, 1, 2))
     assert pred_tfl.shape == mge_result.shape
     assert pred_tfl.dtype == mge_result.dtype
@@ -93,7 +94,9 @@ def test_reshape():
     _test_convert_result(net.data, tmp_file, mge_result, max_error, nhwc=False)
 
 
-@pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "exp", "max"])
+@pytest.mark.parametrize(
+    "mode", ["add", "sub", "mul", "div", "exp", "max", "fuse_mul_add3"]
+)
 def test_elemwise(mode):
     net = ElemwiseOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
@@ -121,3 +124,9 @@ def test_active(mode):
     net = ActiveOpr(mode, fused=True)
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+def test_transopse():
+    net = TransposeOpr()
+    mge_result = dump_mge_model(net, net.data)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error, nhwc2=False)

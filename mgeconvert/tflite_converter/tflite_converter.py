@@ -7,6 +7,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import flatbuffers
+from tqdm import tqdm
 
 from ..mge_context import (
     TopologyNetwork,
@@ -14,10 +15,9 @@ from ..mge_context import (
     optimize_for_conversion,
     set_platform,
 )
-from ..mge_context.mge_op import Host2DeviceCopyOpr
+from ..mge_context.mge_op import Host2DeviceCopyOpr, MultipleDeviceTensorHolderOpr
 from .tflite import (  # pylint: disable=import-error
     Buffer,
-    GetFileIdentifier,
     Model,
     Operator,
     OperatorCode,
@@ -59,6 +59,8 @@ class TFLiteConverter:
             TransformerRule.DECONV_SHAPE_AS_INPUT,
             TransformerRule.MAKE_PADDING,
             TransformerRule.FUSE_ASTYPE,
+            TransformerRule.TRANSPOSE_PATTERN_AS_INPUT,
+            TransformerRule.EXPAND_MUL_ADD3,
         ]
         optimize_for_conversion(self.net, self._transformer_options)
 
@@ -70,11 +72,11 @@ class TFLiteConverter:
 
         def need_convert(mge_opr):
             is_const = [data.np_data is not None for data in mge_opr.inp_vars]
-            if isinstance(mge_opr, Host2DeviceCopyOpr):
+            if type(mge_opr) in (Host2DeviceCopyOpr, MultipleDeviceTensorHolderOpr):
                 return False
             return not all(is_const) or len(mge_opr.inp_vars) == 0
 
-        for mge_opr in self.net.all_oprs:
+        for mge_opr in tqdm(self.net.all_oprs):
             last_opr = mge_opr
             print(">>", mge_opr.name)
             if not need_convert(mge_opr):
@@ -112,7 +114,7 @@ class TFLiteConverter:
 
                 tfl_tensor = self.gen_tensor(
                     var.name,
-                    result_shape,
+                    var.shape,
                     mge2tflite_dtype_mapping[dtype],
                     len(self._buffer_list) - 1,
                     scale=scale,
@@ -314,7 +316,7 @@ class TFLiteConverter:
         Model.ModelAddBuffers(self._builder, buffers)
 
         model = Model.ModelEnd(self._builder)
-        self._builder.Finish(model, file_identifier=GetFileIdentifier().encode())
+        self._builder.Finish(model, file_identifier="TFL3".encode())
         return self._builder.Output()
 
 
