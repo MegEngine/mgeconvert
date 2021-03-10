@@ -1,7 +1,12 @@
 #!/bin/bash -e
 basepath=$(cd `dirname $0`; pwd)
 
+sudo python3 -m pip uninstall tensorflow flatbuffers -y
+sudo rm -rf /usr/local/bin/flatc
+sudo rm -rf /usr/local/lib/libflatbuffers*
+
 # build flatbuffers
+echo "building flatbuffers..."
 sudo rm -rf /tmp/flatbuffers
 git clone https://github.com/google/flatbuffers.git /tmp/flatbuffers
 cd /tmp/flatbuffers
@@ -10,18 +15,22 @@ make -j; sudo make install
 
 export PATH=$PATH:/usr/local/bin
 # build tflite interface from schema.fbs
+echo "building tflite schema..."
 cd /tmp
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/master/tensorflow/lite/schema/schema.fbs
 flatc --python schema.fbs
 cp -r /tmp/tflite $basepath
 
 # build pyflatbuffers
+echo "building pyflexbuffers..."
 cd /tmp/flatbuffers/python
 sudo python3 setup.py install
 
 sudo python3 -m pip install pybind11==2.6.2
 
+# try to find libflatbuffers.so
 export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
 # using pyflexbuffers
 cd $basepath/pyflexbuffers
 PYBIND11_HEADER=$(python3 -c "import pybind11; print(pybind11.get_include())")

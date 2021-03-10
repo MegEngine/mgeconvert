@@ -18,6 +18,14 @@ class FakeSymbolVar:
         self.owner = owner
         self.byte_list = byte_list
 
+    # in order to be compatible with v0.6.0
+    @property
+    def owner_opr(self):
+        return self.owner
+
+    def _get_imm_shape(self):
+        return self.shape
+
 
 class Tensor:
     def __init__(self, sym_var, owner_opr):

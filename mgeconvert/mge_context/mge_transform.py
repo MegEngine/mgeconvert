@@ -48,6 +48,7 @@ class TransformerRule(Enum):
     MAKE_PADDING = 109
     TRANSPOSE_PATTERN_AS_INPUT = 110
     EXPAND_MUL_ADD3 = 111
+    EXPAND_ADD_SIGMOID = 112
 
     # for Caffe
     FUSE_FOR_LEAKY_RELU = 200
@@ -497,6 +498,5 @@ def _expand_mul_add3(net):
         insert_intended[index] = (mul_opr.id, mul_opr)
 
     for index, generated_pair in list(insert_intended.items())[::-1]:
-        print("###", generated_pair[1].inp_vars)
         net._opr_ids.insert(index, generated_pair[0])
         net.all_oprs.insert(index, generated_pair[1])

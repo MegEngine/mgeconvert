@@ -15,7 +15,11 @@ from ..mge_context import (
     optimize_for_conversion,
     set_platform,
 )
-from ..mge_context.mge_op import Host2DeviceCopyOpr, MultipleDeviceTensorHolderOpr
+from ..mge_context.mge_op import (
+    Host2DeviceCopyOpr,
+    MultipleDeviceTensorHolderOpr,
+    SharedDeviceTensorOpr,
+)
 from .tflite import (  # pylint: disable=import-error
     Buffer,
     Model,
@@ -72,7 +76,14 @@ class TFLiteConverter:
 
         def need_convert(mge_opr):
             is_const = [data.np_data is not None for data in mge_opr.inp_vars]
-            if type(mge_opr) in (Host2DeviceCopyOpr, MultipleDeviceTensorHolderOpr):
+            if isinstance(
+                mge_opr,
+                (
+                    Host2DeviceCopyOpr,
+                    MultipleDeviceTensorHolderOpr,
+                    SharedDeviceTensorOpr,
+                ),
+            ):
                 return False
             return not all(is_const) or len(mge_opr.inp_vars) == 0
 
@@ -316,7 +327,7 @@ class TFLiteConverter:
         Model.ModelAddBuffers(self._builder, buffers)
 
         model = Model.ModelEnd(self._builder)
-        self._builder.Finish(model, file_identifier="TFL3".encode())
+        self._builder.Finish(model, "TFL3".encode())
         return self._builder.Output()
 
 
