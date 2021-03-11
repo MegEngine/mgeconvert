@@ -65,6 +65,7 @@ class TFLiteConverter:
             TransformerRule.FUSE_ASTYPE,
             TransformerRule.TRANSPOSE_PATTERN_AS_INPUT,
             TransformerRule.EXPAND_MUL_ADD3,
+            TransformerRule.EXPAND_ADD_SIGMOID,
         ]
         optimize_for_conversion(self.net, self._transformer_options)
 
@@ -89,7 +90,6 @@ class TFLiteConverter:
 
         for mge_opr in tqdm(self.net.all_oprs):
             last_opr = mge_opr
-            print(">>", mge_opr.name)
             if not need_convert(mge_opr):
                 continue
 
@@ -106,7 +106,6 @@ class TFLiteConverter:
 
                 result_shape, byte_list = get_shape_param(var, mge_opr)
                 var.shape = result_shape
-                print(" ", var.name, " shape =", var.shape)
 
                 scale = None
                 zero_point = 0

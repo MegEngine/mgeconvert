@@ -250,6 +250,9 @@ class ElemwiseOpr(M.Module):
         elif self.mode == "fuse_mul_add3":
             y = a * mge.tensor(self.data1)
             z = y + mge.tensor(self.data2)
+        elif self.mode == "fuse_add_sigmoid":
+            y = a + mge.tensor(self.data2)
+            z = F.sigmoid(y)
         else:
             raise NotImplementedError('no such elemwise mode "%s"' % self.mode)
         return z

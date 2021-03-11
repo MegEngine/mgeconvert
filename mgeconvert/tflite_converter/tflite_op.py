@@ -186,6 +186,8 @@ def _elemwise(mge_opr, builder):  # pylint: disable=too-many-return-statements
         MaximumMinimumOptions.MaximumMinimumOptionsStart(builder)
         options = MaximumMinimumOptions.MaximumMinimumOptionsEnd(builder)
         return BuiltinOperator.MINIMUM, BuiltinOptions.MaximumMinimumOptions, options
+    if mge_opr.mode == "SIGMOID":
+        return BuiltinOperator.LOGISTIC, None, None
     return None, None, None
 
 

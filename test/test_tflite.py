@@ -95,11 +95,14 @@ def test_reshape():
 
 
 @pytest.mark.parametrize(
-    "mode", ["add", "sub", "mul", "div", "exp", "max", "fuse_mul_add3"]
+    "mode",
+    ["add", "sub", "mul", "div", "exp", "max", "fuse_mul_add3", "fuse_add_sigmoid"],
 )
 def test_elemwise(mode):
     net = ElemwiseOpr(mode)
-    mge_result = dump_mge_model(net, net.data, tmp_file)
+    mge_result = dump_mge_model(
+        net, net.data, tmp_file, mode in ("fuse_mul_add3", "fuse_add_sigmoid")
+    )
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 

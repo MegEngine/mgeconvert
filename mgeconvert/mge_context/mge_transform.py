@@ -486,16 +486,68 @@ def _expand_mul_add3(net):
         mul_opr.type = "ElemwiseOpr"
         net.max_id += 1
         mul_out_tensor.owner = mul_opr
-        mul_opr.inp_oprs = op.inp_oprs[:2]
         mul_opr.inp_vars = op.inp_vars[:2]
         mul_opr.out_vars = [mul_out_tensor]
+        mul_opr.inp_oprs = op.inp_oprs[:2]
+        mul_opr.out_oprs = [op]
 
         op.mode = "ADD"
         op.inp_vars = [mul_out_tensor, op.inp_vars[2]]
-        op.inp_oprs = [mul_opr, op.inp_oprs[2]]
+        op.inp_oprs = [mul_opr]
+        if len(op.inp_oprs) > 2:
+            op.inp_oprs.append(op.inp_oprs[2])
 
         index = net._opr_ids.index(op.id)
         insert_intended[index] = (mul_opr.id, mul_opr)
+
+    for index, generated_pair in list(insert_intended.items())[::-1]:
+        net._opr_ids.insert(index, generated_pair[0])
+        net.all_oprs.insert(index, generated_pair[1])
+
+
+@_register_tranformation_rule(TransformerRule.EXPAND_ADD_SIGMOID)
+def _expand_add_sigmoid(net):
+    insert_intended = OrderedDict()
+
+    for op in net.all_oprs:
+        if not isinstance(op, ElemwiseOpr):
+            continue
+        if op.mode != "FUSE_ADD_SIGMOID":
+            continue
+
+        add_out_symvar = FakeSymbolVar(
+            sid=net.max_id,
+            name=op.name + "_add_out",
+            shape=op.inp_vars[0].shape,
+            dtype=op.inp_vars[0].dtype,
+            owner=None,
+            byte_list=None,
+        )
+        net.max_id += 1
+        net._var_ids.append(add_out_symvar.id)
+        add_out_tensor = Tensor(add_out_symvar, None)
+        net.all_vars.append(add_out_tensor)
+
+        sigmoid_config = OpBase()
+        sigmoid_config.name = "sigmoid_" + op.name
+        sigmoid_config.id = net.max_id
+        sigmoid_config.params = '{"mode": "SIGMOID"}'
+        sigmoid_opr = ElemwiseOpr(sigmoid_config)
+        sigmoid_opr.type = "ElemwiseOpr"
+        net.max_id += 1
+
+        sigmoid_opr.inp_vars = [add_out_tensor]
+        sigmoid_opr.out_vars = op.out_vars
+        sigmoid_opr.inp_oprs = [op]
+        sigmoid_opr.out_oprs = op.out_oprs
+
+        add_out_tensor.owner = op
+        op.mode = "ADD"
+        op.out_vars = [add_out_tensor]
+        op.out_oprs = [sigmoid_opr]
+
+        index = net._opr_ids.index(op.id) + 1
+        insert_intended[index] = (sigmoid_opr.id, sigmoid_opr)
 
     for index, generated_pair in list(insert_intended.items())[::-1]:
         net._opr_ids.insert(index, generated_pair[0])
