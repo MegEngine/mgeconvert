@@ -110,12 +110,14 @@ def _fuse_for_relu6(net):
         if len(op.inp_oprs) <= 0 or len(op.inp_oprs) >= 2:
             continue
         prev_op = op.inp_oprs[0]
+        cur_index = net._opr_ids.index(op.id)
 
         if op.mode == "MIN" and np.array_equal(op.inp_vars[1].np_data, np.array([6])):
             if (
                 isinstance(prev_op, ElemwiseOpr)
                 and prev_op.mode == "MAX"
                 and np.array_equal(prev_op.inp_vars[1].np_data, np.array([0]))
+                and net._opr_ids.index(prev_op.id) == cur_index - 1
             ):
                 relu6_opr = Relu6Opr()
                 relu6_opr.inp_vars = prev_op.inp_vars
@@ -129,6 +131,7 @@ def _fuse_for_relu6(net):
                 isinstance(prev_op, ElemwiseOpr)
                 and prev_op.mode == "MIN"
                 and np.array_equal(prev_op.inp_vars[1].np_data, np.array([6]))
+                and net._opr_ids.index(prev_op.id) == cur_index - 1
             ):
                 relu6_opr = Relu6Opr()
                 relu6_opr.inp_vars = prev_op.inp_vars
@@ -216,6 +219,7 @@ def _conv_add_zero_bias(net):
 
 @_register_tranformation_rule(TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT)
 def _depthwise_conv_reshape_weight(net):
+    # general group conv is not supported for TFLite
     for op in net.all_oprs:
         if not isinstance(op, ConvolutionForwardOpr):
             continue
@@ -239,23 +243,34 @@ def _fuse_softmax(net):
             continue
         try:
             prev_op = op.inp_oprs[1]
+            cur_index = net._opr_ids.index(op.id)
             if (
                 not isinstance(prev_op, ReduceOpr)
                 or prev_op.mode != "SUM"
                 or prev_op.axis != 1
+                or net._opr_ids.index(prev_op.id) != cur_index - 1
             ):
                 continue
             prev_op = op.inp_oprs[0]
-            if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "EXP":
+            if (
+                not isinstance(prev_op, ElemwiseOpr)
+                or prev_op.mode != "EXP"
+                or net._opr_ids.index(prev_op.id) != cur_index - 2
+            ):
                 continue
             prev_op = prev_op.prev_opr
-            if not isinstance(prev_op, ElemwiseOpr) or prev_op.mode != "SUB":
+            if (
+                not isinstance(prev_op, ElemwiseOpr)
+                or prev_op.mode != "SUB"
+                or net._opr_ids.index(prev_op.id) != cur_index - 3
+            ):
                 continue
             prev_op = prev_op.inp_oprs[1]
             if (
                 not isinstance(prev_op, ReduceOpr)
                 or prev_op.mode != "MAX"
                 or prev_op.axis != 1
+                or net._opr_ids.index(prev_op.id) != cur_index - 4
             ):
                 continue
         except IndexError:  # doesn't match
@@ -364,6 +379,7 @@ def _make_padding(net):
             net.all_vars.append(pad_out_tensor)
 
             pad_opr = PadOpr()
+            pad_opr.type = "PadOpr"
             pad_opr.name = "pad_" + op.name
             pad_opr.id = net.max_id
             net.max_id += 1

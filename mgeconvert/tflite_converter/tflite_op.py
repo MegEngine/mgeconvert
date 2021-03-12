@@ -60,23 +60,23 @@ from .tflite.Padding import Padding  # pylint: disable=import-error
 from .tflite.TensorType import TensorType  # pylint: disable=import-error
 
 
-def get_shape_param(tensor, mge_opr):
+def get_shape_param(tensor, mge_opr, disable_nhwc=False):
     if isinstance(mge_opr, ReshapeOpr):
         return tensor.shape, None
 
+    shape = list(tensor.shape)
     if tensor.ndim == 4:
         # OC, IC, H, W  to  OC, H, W, IC
         # NCHW to NHWC
         # except the output of reshape
-        shape = [
-            tensor.shape[0],
-            tensor.shape[2],
-            tensor.shape[3],
-            tensor.shape[1],
-        ]
-    elif tensor.ndim < 4:
-        shape = list(tensor.shape)
-    else:
+        if not disable_nhwc:
+            shape = [
+                tensor.shape[0],
+                tensor.shape[2],
+                tensor.shape[3],
+                tensor.shape[1],
+            ]
+    elif tensor.ndim > 4:
         assert False, "ERROR: output ndim {0} is not supported now".format(tensor.ndim)
 
     if tensor.is_faked:

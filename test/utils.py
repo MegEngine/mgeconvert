@@ -197,7 +197,7 @@ class ElemwiseOpr(M.Module):
         super().__init__()
         self.data = np.ones((2, 3, 224, 224)).astype(np.float32)
         self.data1 = np.random.random((1, 3, 1, 1)).astype(np.float32)
-        self.data2 = np.random.random((2, 3, 224, 224)).astype(np.float32)
+        self.data2 = np.random.random((2, 3, 224, 224)).astype(np.float32) - 0.8
         self.mode = mode
 
     def forward(self, a):
@@ -247,6 +247,9 @@ class ElemwiseOpr(M.Module):
         # log
         elif self.mode == "log":
             z = F.log(a)
+        elif self.mode == "fuse_add_relu":
+            y = a + mge.tensor(self.data2)
+            z = F.relu(y)
         elif self.mode == "fuse_mul_add3":
             y = a * mge.tensor(self.data1)
             z = y + mge.tensor(self.data2)
@@ -315,7 +318,8 @@ class TypeCvtOpr(M.Module):
 
 
 class XORNet(M.Module):
-    def __init__(self):
+    def __init__(self, converter="normal"):
+        self.converter = converter
         self.mid_dim = 14
         self.num_class = 2
         super().__init__()
@@ -324,15 +328,15 @@ class XORNet(M.Module):
         self.fc1 = M.Linear(self.mid_dim, self.mid_dim, bias=True)
         self.bn1 = M.BatchNorm1d(self.mid_dim)
         self.fc2 = M.Linear(self.mid_dim, self.num_class, bias=True)
-        self.data = np.random.random((12, 2)).astype(np.float32)
+        self.data = np.arange(24).reshape(12, 2).astype(np.float32)
 
     def forward(self, x):
         x = self.fc0(x)
         x = self.bn0(x)
-        x = F.tanh(x)
+        x = F.softmax(x) if self.converter == "tflite" else F.tanh(x)
         x = self.fc1(x)
         x = self.bn1(x)
-        x = F.tanh(x)
+        x = F.softmax(x) if self.converter == "tflite" else F.tanh(x)
         x = self.fc2(x)
         return x
 

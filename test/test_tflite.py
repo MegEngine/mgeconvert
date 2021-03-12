@@ -7,6 +7,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import megengine
+import megengine.hub
 import numpy as np
 import pytest
 from mgeconvert.mge_context import TopologyNetwork
@@ -24,6 +25,7 @@ from .utils import (
     ReshapeOpr,
     SoftmaxOpr,
     TransposeOpr,
+    XORNet,
     dump_mge_model,
 )
 
@@ -31,13 +33,15 @@ max_error = 1e-6
 tmp_file = "test_model"
 
 
-def _test_convert_result(inputs, fpath, mge_result, max_err, nhwc=True, nhwc2=True):
+def _test_convert_result(
+    inputs, fpath, mge_result, max_err, nhwc=True, nhwc2=True, disable_nhwc=False
+):
     if nhwc and inputs.ndim == 4:
         inputs = inputs.transpose((0, 2, 3, 1))
     net = TopologyNetwork(fpath + ".mge")
 
     converter = TFLiteConverter(net, graph_name="graph")
-    model = converter.convert()
+    model = converter.convert(disable_nhwc=disable_nhwc)
     with open(tmp_file + ".tflite", "wb") as fout:
         fout.write(model)
 
@@ -96,12 +100,30 @@ def test_reshape():
 
 @pytest.mark.parametrize(
     "mode",
-    ["add", "sub", "mul", "div", "exp", "max", "fuse_mul_add3", "fuse_add_sigmoid"],
+    [
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "exp",
+        "max",
+        "fuse_add_relu",
+        "fuse_mul_add3",
+        "fuse_add_sigmoid",
+    ],
 )
 def test_elemwise(mode):
+    if (
+        mode in ("fuse_add_relu", "fuse_mul_add3", "fuse_add_sigmoid")
+        and megengine.__version__ < "1.1.0"
+    ):
+        return
     net = ElemwiseOpr(mode)
     mge_result = dump_mge_model(
-        net, net.data, tmp_file, mode in ("fuse_mul_add3", "fuse_add_sigmoid")
+        net,
+        net.data,
+        tmp_file,
+        mode in ("fuse_add_relu", "fuse_mul_add3", "fuse_add_sigmoid"),
     )
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
@@ -133,3 +155,28 @@ def test_transopse():
     net = TransposeOpr()
     mge_result = dump_mge_model(net, net.data)
     _test_convert_result(net.data, tmp_file, mge_result, max_error, nhwc2=False)
+
+
+def test_xornet():
+    if megengine.__version__ < "1.1.0":
+        return
+    net = XORNet("tflite")
+    mge_result = dump_mge_model(net, net.data, tmp_file, True)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error, disable_nhwc=True)
+
+
+@pytest.mark.skip(reason="precision of tflite execution can not be guaranteed")
+@pytest.mark.parametrize(
+    "model", ["resnet18",],
+)
+def test_model(model):
+    data = np.ones((1, 3, 224, 224)).astype(np.float32)
+    if megengine.__version__ < "1.1.0":
+        commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
+    else:
+        commit_id = None
+    net = megengine.hub.load(
+        "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
+    )
+    mge_result = dump_mge_model(net, data, tmp_file, True)
+    _test_convert_result(data, tmp_file, mge_result, 1e-4)

@@ -69,7 +69,7 @@ class TFLiteConverter:
         ]
         optimize_for_conversion(self.net, self._transformer_options)
 
-    def convert(self):
+    def convert(self, disable_nhwc=False):
         # Note the 0th entry of this array must be an empty buffer (sentinel)
         Buffer.BufferStart(self._builder)
         buffer = Buffer.BufferEnd(self._builder)
@@ -89,6 +89,7 @@ class TFLiteConverter:
             return not all(is_const) or len(mge_opr.inp_vars) == 0
 
         for mge_opr in tqdm(self.net.all_oprs):
+            print(">>", mge_opr.name)
             last_opr = mge_opr
             if not need_convert(mge_opr):
                 continue
@@ -104,8 +105,9 @@ class TFLiteConverter:
                 if var in self._var2tensor:
                     continue
 
-                result_shape, byte_list = get_shape_param(var, mge_opr)
+                result_shape, byte_list = get_shape_param(var, mge_opr, disable_nhwc)
                 var.shape = result_shape
+                print("    ##", var.name, var.shape)
 
                 scale = None
                 zero_point = 0

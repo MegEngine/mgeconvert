@@ -167,6 +167,8 @@ class ElemwiseOpr(MgeOpr):
         super().__init__(opr)
         try:
             self.mode = self.params["mode"]
+            if "RELU" in self.mode:
+                self.activation = "RELU"
         except RuntimeError:
             self.mode = "NONE"
 
