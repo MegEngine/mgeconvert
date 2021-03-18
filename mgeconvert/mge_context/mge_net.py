@@ -6,8 +6,6 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from collections import OrderedDict
-
 from .mge_op import str_to_mge_class
 from .mge_tensor import Tensor
 from .mge_utils import (
@@ -40,8 +38,13 @@ class TopologyNetwork:
         self._orig_inputs = []
         self.output_vars = []
         self._orig_outputs = outputs
-        self.all_oprs_map = OrderedDict()
-        self.all_vars_map = OrderedDict()
+        # why using two lists instead of one ordereddict for oprs and vars:
+        # for network trasformation, it's hard to manipulate ordereddict
+        # index of opr_ids and all_oprs should be matched
+        self._opr_ids = []
+        self.all_oprs = []
+        self._var_ids = []
+        self.all_vars = []
 
         for mge_opr in all_oprs:
             if get_opr_type(mge_opr) == "Host2DeviceCopy":
@@ -71,6 +74,10 @@ class TopologyNetwork:
 
         for x in self._orig_outputs:
             self.output_vars.append(self.get_var(x))
+
+        self.max_id = max([out_var.id for out_var in self.output_vars]) + 1
+        # works iff all inputs have the same batch size
+        self.batch_size = self.input_vars[0].shape[0]
 
     def run(self, feed_input, end_op):
         if end_op is None:
@@ -105,26 +112,33 @@ class TopologyNetwork:
         return result_dict
 
     def add_opr(self, x):
-        assert x.id not in self.all_oprs_map
-        self.all_oprs_map[x.id] = str_to_mge_class(get_opr_type(x) + "Opr")(x)
+        assert x.id not in self._opr_ids
+        self._opr_ids.append(x.id)
+        self.all_oprs.append(str_to_mge_class(get_opr_type(x) + "Opr")(x))
 
     def get_opr(self, x):
-        if x.id in self.all_oprs_map:
-            return self.all_oprs_map[x.id]
+        if x.id in self._opr_ids:
+            return self.all_oprs[self._opr_ids.index(x.id)]
         else:
             return None
 
     def get_var(self, x):
         # auto convert to Tensor
-        if x.id not in self.all_vars_map:
+        if x.id not in self._var_ids:
             owner = x.owner_opr if get_mge_version() <= "0.6.0" else x.owner
-            self.all_vars_map[x.id] = Tensor(x, self.get_opr(owner))
-        return self.all_vars_map[x.id]
+            self._var_ids.append(x.id)
+            self.all_vars.append(Tensor(x, self.get_opr(owner)))
+        return self.all_vars[self._var_ids.index(x.id)]
 
-    @property
-    def all_oprs(self):
-        return self.all_oprs_map.values()
 
-    @property
-    def all_vars(self):
-        return self.all_vars_map.values()
+class Config:
+    platform = "official"
+
+
+def set_platform(platform):
+    assert platform in ["official", "mtk"]
+    Config.platform = platform
+
+
+def get_platform():
+    return Config.platform

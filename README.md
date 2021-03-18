@@ -8,38 +8,38 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 
 ## 当前支持的Op列表
 
-|   |Caffe|ONNX|Cambricon|
-|-- |-----|----|---------|
-|abs| ✓ | ✓ | ✓ |
-|add| ✓ | ✓ | ✓ |
-|average pool2d| ✓ | ✓ | ✓ |
-|batchnorm| ✓ | ✓ | ✓ |
-|broadcast| ✓ | ✓ | ✓ |
-|ceil| × | ✓ | × |
-|concat| ✓ | ✓ | ✓ |
-|conv2d| ✓ | ✓ | ✓ |
-|convtranspose2d| ✓ | ✓ | ✓ |
-|div(true_div)| ✓ | ✓ | ✓ |
-|exp| ✓ | ✓ | ✓ |
-|elemwise max|  ✓ | ✓ | ✓ |
-|floor| × | ✓ | ✓ |
-|log| ✓ | ✓ | ✓ |
-|matrix mul| ✓ | ✓ | ✓ |
-|max pool2d| ✓ | ✓ | ✓ |
-|mul| ✓ | ✓ | ✓ |
-|pow| ✓ | ✓ | ✓ |
-|reduce max| ✓ | ✓ | ✓ |
-|reduce sum| ✓ | ✓ | ✓ |
-|relu| ✓ | ✓ | ✓ |
-|reshape| ✓ | ✓ | ✓ |
-|sigmoid| ✓ | ✓ | ✓ |
-|softmax| ✓ | ✓ | ✓ |
-|sub| ✓ | ✓ | ✓ |
-|slice(subtensor)| ✓ | ✓ | ✓ |
-|squeeze(axis_add_remove)| ✓ | ✓ | ✓ |
-|tanh| ✓ | ✓ | ✓ |
-|typecvt|  ✓ | ✓ | ✓ |
-|transpose(dimshuffle)| ✓ | ✓ | ✓ |
+|   |Caffe|ONNX|Cambricon|TFLite|
+|-- |-----|----|---------|------|
+|abs| ✓ | ✓ | ✓ | × |
+|add| ✓ | ✓ | ✓ | ✓ |
+|average pool2d| ✓ | ✓ | ✓ | ✓ |
+|batchnorm| ✓ | ✓ | ✓ | × |
+|broadcast| ✓ | ✓ | ✓ | × |
+|ceil| × | ✓ | × | × |
+|concat| ✓ | ✓ | ✓ | ✓ |
+|conv2d| ✓ | ✓ | ✓ | ✓ |
+|convtranspose2d| ✓ | ✓ | ✓ | ✓ |
+|div(true_div)| ✓ | ✓ | ✓ | ✓ |
+|exp| ✓ | ✓ | ✓ | ✓ |
+|elemwise max|  ✓ | ✓ | ✓ | ✓ |
+|floor| × | ✓ | ✓ | × |
+|log| ✓ | ✓ | ✓ | × |
+|matrix mul| ✓ | ✓ | ✓ | ✓ |
+|max pool2d| ✓ | ✓ | ✓ | ✓ |
+|mul| ✓ | ✓ | ✓ | ✓ |
+|pow| ✓ | ✓ | ✓ | × |
+|reduce max| ✓ | ✓ | ✓ | ✓ |
+|reduce sum| ✓ | ✓ | ✓ | ✓ |
+|relu| ✓ | ✓ | ✓ | ✓ |
+|reshape| ✓ | ✓ | ✓ | ✓ |
+|sigmoid| ✓ | ✓ | ✓ | × |
+|softmax| ✓ | ✓ | ✓ | ✓ |
+|sub| ✓ | ✓ | ✓ | ✓ |
+|slice(subtensor)| ✓ | ✓ | ✓ | × |
+|squeeze(axis_add_remove)| ✓ | ✓ | ✓ | × |
+|tanh| ✓ | ✓ | ✓ | ✓ |
+|typecvt|  ✓ | ✓ | ✓ | ✓ |
+|transpose(dimshuffle)| ✓ | ✓ | ✓ | × |
 
 
 ## 安装说明
@@ -98,6 +98,14 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 
   [测试用例](test/test_cambricon.py) 中可以完成相应的转换测试，[子目录](mgeconvert/cambricon_converter/README.md)获取更多寒武纪转换器相关信息。
 
+* TFLite 转换器
+
+TFLite 使用 flatbuffer 作为序列化格式，并且为了支持 mtk 平台需要自定义一些序列化格式，就需要封装 flexbuffer 的接口。可使用如下命令进行软件安装和相关配置：
+
+```bash
+./mgeconvert/tflite_converter/init.sh
+```
+
 ### MgeConvert安装
 
 使用setup.py安装MgeConvert。
@@ -135,3 +143,10 @@ pip3 install .
   python3 -m mgeconvert.utils.convert_cambricon -i $MGE_MODEL -o $CAMBRICON_MODEL [-b $BATCH_SIZE] [-c $CORE_NUMBER] [-t $DATA_TYPE]
   ```
   转换成功将产生寒武纪离线模型文件`$CAMBRICON_MODEL`以及相应的后缀为`_twins`的描述文件，通过这个描述文件可以得到寒武纪离线模型的输入、输出、布局、批大小等信息。
+
+* 转 TFLite
+
+  执行[convert_tflite.py](mgeconvert/utils/convert_tflite.py)将MegEngine模型转为 TFLite 模型，具体使用方法如下：
+  ```bash
+  python3 -m mgeconvert.utils.convert_tflite -i $MGE_MODEL -o $TFLITEs_MODEL [--mtk]
+  ```

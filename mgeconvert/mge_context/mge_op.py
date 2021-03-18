@@ -36,13 +36,17 @@ class MgeOpr(OpBase):
         self.name = self.name.replace(",", "_")
 
         self.id = opr.id
-        self.type = get_opr_type(opr)
+        try:
+            self.type = get_opr_type(opr)
+        except AssertionError:
+            self.type = None
         self.flag = None
         self.inp_vars = []
         self.out_vars = []
         self.inp_oprs = []
         self.out_oprs = []
         self.params = opr.params if mge_version <= "0.6.0" else json.loads(opr.params)
+        self.activation = "IDENTITY"
 
     def add_inp_var(self, x):
         self.inp_vars.append(x)
@@ -153,7 +157,7 @@ class ConvBiasForwardOpr(ConvolutionForwardOpr):
 
     def __init__(self, opr):
         super().__init__(opr)
-        self.nonline_mode = self.params["nonlineMode"]
+        self.activation = self.params["nonlineMode"]
 
 
 class ElemwiseOpr(MgeOpr):
@@ -161,7 +165,12 @@ class ElemwiseOpr(MgeOpr):
 
     def __init__(self, opr):
         super().__init__(opr)
-        self.mode = self.params["mode"]
+        try:
+            self.mode = self.params["mode"]
+            if "RELU" in self.mode:
+                self.activation = "RELU"
+        except RuntimeError:
+            self.mode = "NONE"
 
 
 class ElemwiseMultiTypeOpr(MgeOpr):
@@ -310,6 +319,7 @@ class AxisAddRemoveOpr(MgeOpr):
         super().__init__(opr)
         self.desc = self.params["desc"]
         self.nr_desc = self.params["nr_desc"]
+        self.output_shape = get_shape(opr.outputs[0])
 
 
 class BroadcastOpr(MgeOpr):
@@ -351,9 +361,26 @@ class ConvolutionBackwardDataOpr(MgeOpr):
         self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
 
 
+class ResizeForwardOpr(MgeOpr):
+    name = "ResizeForward"
+
+
 class LeakyReluOpr(OpBase):
     name = "LeakyRelu"
 
     def __init__(self, name, negative_slope):
         self.name = name
         self.negative_slope = negative_slope
+
+
+class Relu6Opr(OpBase):
+    name = "Relu6"
+
+
+class SoftmaxOpr(OpBase):
+    name = "Softmax"
+    beta = 0
+
+
+class PadOpr(OpBase):
+    name = "Pad"
