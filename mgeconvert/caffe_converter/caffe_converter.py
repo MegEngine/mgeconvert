@@ -128,8 +128,86 @@ def _leaky_relu(opr):
     return None
 
 
+def _conv_bias(opr):
+
+    BiasNode = Node("ADD", is_output=True)
+    ConvNode = Node(str(Op.ConvolutionForwardOpr))
+    BiasNode.inp_oprs = [ConvNode]
+    if (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Op.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    ):
+        add_opr = opr.out_oprs[0]
+        if match(BiasNode, add_opr):
+            ConvForwardBias = Op.ConvForwardBiasOpr(
+                "ConvForwardBias_" + BiasNode.opnode.name,
+                ConvNode.opnode._opr,
+                BiasNode.inp_const[0][1],
+            )
+            ConvForwardBias.inp_vars = ConvNode.opnode.inp_vars
+            ConvForwardBias.out_vars = BiasNode.opnode.out_vars
+            BiasNode.opnode.skip = True
+            ConvNode.opnode.skip = True
+            return ConvForwardBias
+    return None
+
+
+def _deconv_bias(opr):
+
+    BiasNode = Node("ADD", is_output=True)
+    ConvNode = Node(str(Op.ConvolutionBackwardDataOpr))
+    BiasNode.inp_oprs = [ConvNode]
+    if (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Op.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    ):
+        add_opr = opr.out_oprs[0]
+        if match(BiasNode, add_opr):
+            ConvolutionBackwardDataBias = Op.ConvolutionBackwardDataBiasOpr(
+                "ConvolutionBackwardDataBias_" + BiasNode.opnode.name,
+                ConvNode.opnode._opr,
+                BiasNode.inp_const[0][1],
+            )
+            ConvolutionBackwardDataBias.inp_vars = ConvNode.opnode.inp_vars
+            ConvolutionBackwardDataBias.out_vars = BiasNode.opnode.out_vars
+            BiasNode.opnode.skip = True
+            ConvNode.opnode.skip = True
+            return ConvolutionBackwardDataBias
+    return None
+
+
+def _fully_connected(opr):
+
+    BiasNode = Node("ADD", is_output=True)
+    MMNode = Node(str(Op.MatrixMulOpr))
+    BiasNode.inp_oprs = [MMNode]
+    if (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Op.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    ):
+        add_opr = opr.out_oprs[0]
+        if match(BiasNode, add_opr):
+            FullyConnected = Op.FullyConnectedOpr(
+                "FullyConnected_" + BiasNode.opnode.name,
+                MMNode.opnode._opr,
+                BiasNode.inp_const[0][1],
+            )
+            FullyConnected.inp_vars = MMNode.opnode.inp_vars
+            FullyConnected.out_vars = BiasNode.opnode.out_vars
+            BiasNode.opnode.skip = True
+            MMNode.opnode.skip = True
+            return FullyConnected
+    return None
+
+
 replace_rules = {}
 replace_rules["MAX"] = _leaky_relu
+replace_rules[str(Op.ConvolutionForwardOpr)] = _conv_bias
+replace_rules[str(Op.ConvolutionBackwardDataOpr)] = _deconv_bias
+replace_rules[str(Op.MatrixMulOpr)] = _fully_connected
 
 
 class CaffeConverter:

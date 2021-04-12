@@ -64,11 +64,24 @@ class ConvOpr(M.Module):
             3, 30, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1), groups=3
         )
 
+        self.normal_conv.bias = mge.Parameter(
+            np.random.random(self.normal_conv.bias.shape).astype(np.float32)
+        )
+        self.group_conv.bias = mge.Parameter(
+            np.random.random(self.group_conv.bias.shape).astype(np.float32)
+        )
+
         self.transpose_conv = M.Sequential(
             M.ConvTranspose2d(
                 3, 5, (3, 4), dilation=(2, 2), stride=(3, 2), padding=(2, 3), groups=1
             ),
             M.ConvTranspose2d(5, 3, (3, 3)),
+        )
+        self.transpose_conv[0].bias = mge.Parameter(
+            np.random.random(self.transpose_conv[0].bias.shape).astype(np.float32)
+        )
+        self.transpose_conv[1].bias = mge.Parameter(
+            np.random.random(self.transpose_conv[1].bias.shape).astype(np.float32)
         )
 
     def forward(self, x):
@@ -81,6 +94,9 @@ class LinearOpr(M.Module):
         self.data = np.random.random((10, 100)).astype(np.float32)
         self.linear = M.Linear(100, 200, bias=False)
         self.linear_bias = M.Linear(200, 200, bias=True)
+        self.linear_bias.bias = mge.Parameter(
+            np.random.random(self.linear_bias.bias.shape).astype(np.float32)
+        )
 
     def forward(self, x):
         x = self.linear(x)

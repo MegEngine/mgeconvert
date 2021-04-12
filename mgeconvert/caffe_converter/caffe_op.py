@@ -16,10 +16,13 @@ from ..mge_context import (
     BatchNormForwardOpr,
     BroadcastOpr,
     ConcatOpr,
+    ConvForwardBiasOpr,
+    ConvolutionBackwardDataBiasOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
+    FullyConnectedOpr,
     GetVarShapeOpr,
     Host2DeviceCopyOpr,
     IdentityOpr,
@@ -608,7 +611,12 @@ def _eltwise(opr: ElemwiseOpr, context):
         )
 
 
-@_register_op(ConvolutionForwardOpr, ConvolutionBackwardDataOpr)
+@_register_op(
+    ConvolutionForwardOpr,
+    ConvolutionBackwardDataOpr,
+    ConvForwardBiasOpr,
+    ConvolutionBackwardDataBiasOpr,
+)
 def _convolution(opr, context):
     ph, pw = opr.ph, opr.pw
     sh, sw = opr.sh, opr.sw
@@ -621,7 +629,6 @@ def _convolution(opr, context):
     ), "caffe accept one dilation, so dilation_h and dilation_w must equal"
     param_W = param_W.reshape((-1,) + param_W.shape[-3:])
     bias_term = opr.bias_term
-    assert bias_term == False
     blobs = [
         context.gen_blob_proto(param_W),
     ]
@@ -644,6 +651,12 @@ def _convolution(opr, context):
     else:
         layer_type = "Convolution"
         bottom = [context.get_blob_name(opr.inp_vars[0])]
+
+    if isinstance(opr, (ConvForwardBiasOpr, ConvolutionBackwardDataBiasOpr)):
+        blobs.append(context.gen_blob_proto(opr.param_B.reshape(-1,)))
+        assert bias_term == True
+    else:
+        assert bias_term == False
 
     context.add_layer(
         cp.LayerParameter(
@@ -794,7 +807,7 @@ def _concat(opr, context):
     )
 
 
-@_register_op(MatrixMulOpr)
+@_register_op(MatrixMulOpr, FullyConnectedOpr)
 def _fully_connected(opr, context):
     assert opr.inp_vars[1].np_data is not None
     param_W = opr.inp_vars[1].np_data
@@ -802,10 +815,17 @@ def _fully_connected(opr, context):
 
     if not opr.transposeB:
         param_W = param_W.T
-    param = cp.InnerProductParameter(
-        bias_term=False, num_output=opr.out_vars[0].shape[1]
-    )
+
     blobs = [context.gen_blob_proto(param_W)]
+    bias_term = False
+
+    if isinstance(opr, FullyConnectedOpr):
+        bias_term = True
+        blobs.append(context.gen_blob_proto(opr.param_B.reshape(-1,)))
+
+    param = cp.InnerProductParameter(
+        bias_term=bias_term, num_output=opr.out_vars[0].shape[1]
+    )
     bottom = [context.get_blob_name(opr.inp_vars[0])]
     top = [context.set_blob_name(opr.out_vars[0], opr.out_vars[0].name)]
 
