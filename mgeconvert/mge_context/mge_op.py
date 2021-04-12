@@ -97,6 +97,15 @@ class MatrixMulOpr(MgeOpr):
         self.compute_mode = self.params["compute_mode"]
 
 
+class FullyConnectedOpr(MatrixMulOpr):
+    name = "FullyConnected"
+
+    def __init__(self, name, mm_opr, param_bias):
+        super().__init__(mm_opr)
+        self.name = name
+        self.param_B = param_bias
+
+
 class BatchedMatrixMulOpr(MgeOpr):
     name = "BatchedMatrixMul"
 
@@ -158,6 +167,16 @@ class ConvBiasForwardOpr(ConvolutionForwardOpr):
     def __init__(self, opr):
         super().__init__(opr)
         self.activation = self.params["nonlineMode"]
+
+
+class ConvForwardBiasOpr(ConvolutionForwardOpr):
+    name = "ConvForwardBias"
+
+    def __init__(self, name, conv_opr, param_bias):
+        super().__init__(conv_opr)
+        self.name = name
+        self.bias_term = True
+        self.param_B = param_bias
 
 
 class ElemwiseOpr(MgeOpr):
@@ -359,6 +378,17 @@ class ConvolutionBackwardDataOpr(MgeOpr):
         self.num_output = get_shape(opr.outputs[0])[1]
         self.bias_term = False
         self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
+
+
+class ConvolutionBackwardDataBiasOpr(ConvolutionBackwardDataOpr):
+    name = "ConvolutionBackwardDataBias"
+
+    def __init__(self, name, opr, param_bias):
+        super().__init__(opr)
+        self.name = name
+        self.param_B = param_bias
+        self.bias_term = True
+        # opr.inputs[0] is conv kernel
 
 
 class ResizeForwardOpr(MgeOpr):
