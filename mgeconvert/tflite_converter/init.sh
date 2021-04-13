@@ -8,7 +8,7 @@ sudo rm -rf /usr/local/lib/libflatbuffers*
 # build flatbuffers
 echo "building flatbuffers..."
 sudo rm -rf /tmp/flatbuffers
-git clone https://github.com/google/flatbuffers.git /tmp/flatbuffers
+git clone https://github.com/google/flatbuffers.git -b v1.12.0 /tmp/flatbuffers
 cd /tmp/flatbuffers
 cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFLATBUFFERS_BUILD_SHAREDLIB=on -DCMAKE_INSTALL_PREFIX=/usr/local
 make -j; sudo make install
