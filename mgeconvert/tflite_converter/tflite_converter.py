@@ -64,6 +64,7 @@ class TFLiteConverter:
             TransformerRule.MAKE_PADDING,
             TransformerRule.FUSE_ASTYPE,
             TransformerRule.TRANSPOSE_PATTERN_AS_INPUT,
+            TransformerRule.FUSE_FOR_LEAKY_RELU,
             TransformerRule.EXPAND_MUL_ADD3,
             TransformerRule.EXPAND_ADD_SIGMOID,
         ]
@@ -89,7 +90,6 @@ class TFLiteConverter:
             return not all(is_const) or len(mge_opr.inp_vars) == 0
 
         for mge_opr in tqdm(self.net.all_oprs):
-            print(">>", mge_opr.name)
             last_opr = mge_opr
             if not need_convert(mge_opr):
                 continue
@@ -107,7 +107,6 @@ class TFLiteConverter:
 
                 result_shape, byte_list = get_shape_param(var, mge_opr, disable_nhwc)
                 var.shape = result_shape
-                print("    ##", var.name, var.shape)
 
                 scale = None
                 zero_point = 0

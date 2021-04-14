@@ -144,7 +144,7 @@ def test_reduce(mode):
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["relu", "softmax", "relu6"])
+@pytest.mark.parametrize("mode", ["relu", "softmax", "relu6", "leaky_relu"])
 def test_active(mode):
     net = ActiveOpr(mode, fused=True)
     mge_result = dump_mge_model(net, net.data, tmp_file)
