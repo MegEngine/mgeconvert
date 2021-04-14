@@ -286,6 +286,8 @@ class ReduceOpr(M.Module):
     def forward(self, a):
         if self.mode == "sum":
             return F.sum(a, axis=2)
+        elif self.mode == "mean":
+            return F.mean(a, axis=2)
         else:
             return F.max(a, axis=2)
 

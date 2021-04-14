@@ -891,11 +891,12 @@ def _reduce(opr, context):
         "SUM",
         "MAX",
         "SUM_SQR",
+        "MEAN",
     ], "Reduce op doesn't support mode {}, you can implement it in _reduce".format(
         opr.mode
     )
-    if opr.mode == "SUM" or opr.mode == "SUM_SQR":
-        mode = "SUM"
+    if opr.mode in ("SUM", "SUM_SQR", "MEAN"):
+        mode = opr.mode
         if opr.mode == "SUM_SQR":
             mode = "SUMSQ"
         bottom = [context.get_blob_name(opr.inp_vars[0])]
