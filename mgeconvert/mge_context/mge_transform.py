@@ -18,6 +18,7 @@ from .mge_op import (
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
+    LeakyReluOpr,
     OpBase,
     PadOpr,
     PoolingForwardOpr,
@@ -47,11 +48,10 @@ class TransformerRule(Enum):
     FUSE_ASTYPE = 108
     MAKE_PADDING = 109
     TRANSPOSE_PATTERN_AS_INPUT = 110
-    EXPAND_MUL_ADD3 = 111
-    EXPAND_ADD_SIGMOID = 112
-
-    # for Caffe
-    FUSE_FOR_LEAKY_RELU = 200
+    # FUSE_FOR_LEAKY_RELU should happen before EXPAND_MUL_ADD3
+    FUSE_FOR_LEAKY_RELU = 111
+    EXPAND_MUL_ADD3 = 112
+    EXPAND_ADD_SIGMOID = 113
 
 
 TRANSFORMMAP: Dict[Enum, Callable] = {}
@@ -469,6 +469,57 @@ def _transpose_pattern_as_input(net):
 
         pattern_tensor = net.get_var(pattern_symvar)
         op.add_inp_var(pattern_tensor)
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_FOR_LEAKY_RELU)
+def _fuse_for_leaky_relu(net):
+    matches = OrderedDict()
+
+    for op in net.all_oprs:
+        if not isinstance(op, ElemwiseOpr):
+            continue
+        if op.mode != "FUSE_MUL_ADD3":
+            continue
+        try:
+            prev_op = op.inp_oprs[0]
+            cur_index = net._opr_ids.index(op.id)
+            if (
+                not isinstance(prev_op, ReduceOpr)
+                or prev_op.mode != "MIN"
+                or prev_op.axis != 1
+                or net._opr_ids.index(prev_op.id) != cur_index - 1
+            ):
+                continue
+            prev_op = op.inp_oprs[1]
+            if (
+                not isinstance(prev_op, ElemwiseOpr)
+                or prev_op.mode != "MAX"
+                or net._opr_ids.index(prev_op.id) != cur_index - 2
+            ):
+                continue
+            if op.inp_vars[1].np_data is None:
+                continue
+        except IndexError:  # doesn't match
+            continue
+
+        leaky_relu_opr = LeakyReluOpr(
+            name=op.name + "_leakyrelu", negative_slope=op.inp_vars[1].np_data
+        )
+        leaky_relu_opr.inp_vars = prev_op.inp_vars[:1]
+        leaky_relu_opr.out_vars = op.out_vars
+        leaky_relu_opr.inp_oprs = [prev_op.inp_oprs[0]]
+        leaky_relu_opr.out_oprs = op.out_oprs
+        leaky_relu_opr.prev_opr = prev_op.inp_oprs[0]
+        matches[prev_op.id] = (net.max_id, leaky_relu_opr)
+        net.max_id += 1
+
+    for original_id, generated_pair in list(matches.items())[::-1]:
+        index = net._opr_ids.index(original_id)
+        del net._opr_ids[index : index + 2]
+        del net.all_oprs[index : index + 2]
+
+        net._opr_ids.insert(index, generated_pair[0])
+        net.all_oprs.insert(index, generated_pair[1])
 
 
 @_register_tranformation_rule(TransformerRule.EXPAND_MUL_ADD3)

@@ -34,6 +34,7 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 |reshape| ✓ | ✓ | ✓ | ✓ |
 |sigmoid| ✓ | ✓ | ✓ | × |
 |softmax| ✓ | ✓ | ✓ | ✓ |
+|leaky_relu| ✓ | × | × | ✓ |
 |sub| ✓ | ✓ | ✓ | ✓ |
 |slice(subtensor)| ✓ | ✓ | ✓ | × |
 |squeeze(axis_add_remove)| ✓ | ✓ | ✓ | × |
@@ -100,11 +101,11 @@ MgeConvert前端的部分都在`mge_context`目录下, 可以直接将MegEngine 
 
 * TFLite 转换器
 
-TFLite 使用 flatbuffer 作为序列化格式，并且为了支持 mtk 平台需要自定义一些序列化格式，就需要封装 flexbuffer 的接口。可使用如下命令进行软件安装和相关配置：
+  TFLite 使用 flatbuffer 作为序列化格式，并且为了支持 mtk 平台需要自定义一些序列化格式，就需要封装 flexbuffer 的接口。可使用如下命令进行软件安装和相关配置：
 
-```bash
-./mgeconvert/tflite_converter/init.sh
-```
+  ```bash
+  ./mgeconvert/tflite_converter/init.sh
+  ```
 
 ### MgeConvert安装
 
