@@ -8,6 +8,7 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import numpy as np
 from google.protobuf import text_format  # type: ignore[attr-defined]
+from tqdm import tqdm
 
 from ..mge_context import TopologyNetwork
 from ..mge_context import mge_op as Op
@@ -306,7 +307,7 @@ class CaffeConverter:
             if all_oprs[index].skip:
                 del all_oprs[index]
 
-        for opr in all_oprs:
+        for opr in tqdm(all_oprs):
             if not need_convert(opr):
                 for tensor in opr.out_vars:
                     if tensor.np_data is None:

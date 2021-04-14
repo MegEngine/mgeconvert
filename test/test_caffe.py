@@ -143,7 +143,7 @@ def test_active(mode):
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["max", "sum"])
+@pytest.mark.parametrize("mode", ["max", "sum", "mean"])
 def test_reduce(mode):
     net = ReduceOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)

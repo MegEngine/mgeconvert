@@ -137,8 +137,10 @@ def test_elemwise_broadcast(mode):
     )
 
 
-@pytest.mark.parametrize("mode", ["max", "sum"])
+@pytest.mark.parametrize("mode", ["max", "sum", "mean"])
 def test_reduce(mode):
+    if mode == "mean" and megengine.__version__ < "1.0.0":
+        return
     net = ReduceOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
