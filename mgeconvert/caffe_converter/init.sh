@@ -13,6 +13,6 @@ wget https://github.com/BVLC/caffe/raw/master/src/caffe/proto/caffe.proto -O $BU
 echo "Compiling caffe.proto"
 protoc $BUILD_DIR/caffe.proto --python_out=./
 
-touch $BUILD_DIR/__init__.pysu
+touch $BUILD_DIR/__init__.py
 
 echo "Init done"
