@@ -6,4 +6,4 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from .converter import convert_to_cambricon
+from .cambricon_converter import convert_to_cambricon
