@@ -1,69 +1,75 @@
-import glob
 import os
 import re
 import subprocess
 
 from setuptools import Extension, find_packages, setup
-from setuptools.command.build_ext import build_ext
+from setuptools.command.build_ext import build_ext as _build_ext
+from setuptools.command.install import install as _install
 
 with open(os.path.join("./mgeconvert", "version.py")) as f:
     __version_py__ = f.read()
 
-MEGENGINE_LOWER = re.search(r"MEGENGINE_LOWER = \"(.*)\"", __version_py__).group(1)
-
 __version__ = re.search(r"__version__ = \"(.*)\"", __version_py__).group(1)
 
 
-class CMakeExtension(Extension):
-    def __init__(self, name, source_dir, lib_dir, products):
-        super().__init__(name, sources=[])
-        self.source_dir = source_dir
-        self.lib_dir = os.path.join(source_dir, lib_dir)
-        self.products = products
+targets = []
 
-
-class cmake_build_ext(build_ext):
-    def run(self):
-        for ext in self.extensions:
-            try:
-                self.build_cmake(ext)
-            except subprocess.CalledProcessError:
-                continue
-
-    def build_cmake(self, ext):
-        source_dir = os.path.abspath(ext.source_dir)
-
-        if not os.path.exists(self.build_temp):
-            os.makedirs(self.build_temp)
-
-        path = os.path.join(source_dir, "swig", "numpy.i")
-        url = "https://raw.githubusercontent.com/numpy/numpy/master/tools/swig/numpy.i"
-        if not os.path.exists(path):
-            subprocess.check_call(["wget", "-P", os.path.dirname(path), url])
-
-        subprocess.check_call(["cmake", source_dir], cwd=self.build_temp)
-        subprocess.check_call(["cmake", "--build", "."], cwd=self.build_temp)
-
-        for product in ext.products:
-            source_file = os.path.join(self.build_temp, product)
-            dest_file = os.path.join(self.build_lib, ext.lib_dir, product)
-            self.copy_file(source_file, dest_file)
-
-
-if os.getenv("USE_CAMBRICON_CONVERTER"):
-    ext_modules = [
-        CMakeExtension(
-            name="_cambriconLib",
-            source_dir="mgeconvert/cambricon_converter",
-            lib_dir="lib/cnlib",
-            products=["_cambriconLib.so", "cambriconLib.py"],
-        )
+class install(_install):
+    user_options = _install.user_options + [
+        ("framework=", None, "<description for this custom option>"),
     ]
-    cmdclass = {"build_ext": cmake_build_ext}
-else:
-    ext_modules = []
-    cmdclass = {}
 
+    def initialize_options(self):
+        _install.initialize_options(self)
+        self.framework = None
+
+    def finalize_options(self):
+        _install.finalize_options(self)
+
+    def run(self):
+        options = ["caffe", "onnx", "cambricon", "tflite"]
+        if self.framework == "all":
+            targets.extend(options)
+        else:
+            targets.extend(i for i in options if self.framework.find(i) > 0)
+        _install.run(self)
+
+
+class build_ext(_build_ext):
+    def run(self):
+        for target in targets:
+            self.build_all(self.find_extension(target))
+
+    def find_extension(self, name):
+        for ext in self.extensions:
+            if ext.name == name:
+                return ext
+        raise TypeError("can not build %s" % name)
+
+    def build_all(self, ext):
+        subprocess.check_call(ext.script)
+        self.copy_tree(ext.artifacts, os.path.join(self.build_lib, ext.artifacts))
+
+
+class BuildExtension(Extension):
+    def __init__(self, name, script, artifacts):
+        super().__init__(name, sources=[])
+        self.script = script
+        self.artifacts = artifacts
+
+
+ext_modules = [
+    BuildExtension(
+        name="caffe",
+        script="mgeconvert/caffe_converter/init.sh",
+        artifacts="mgeconvert/caffe_converter/caffe_pb",
+    ),
+    BuildExtension(
+        name="cambricon",
+        script="mgeconvert/cambricon_converter/init.sh",
+        artifacts="mgeconvert/cambricon_converter/lib/cnlib",
+    ),
+]
 
 setup(
     name="mgeconvert",
@@ -74,9 +80,8 @@ setup(
     url="https://github.com/MegEngine/mgeconvert",
     packages=find_packages(exclude=["test", "test.*"]),
     ext_modules=ext_modules,
-    cmdclass=cmdclass,
+    cmdclass={"install": install, "build_ext": build_ext},
     include_package_data=True,
-    setup_requires=["Cython >= 0.20", "numpy"],
     install_requires=["numpy"],
-    scripts=glob.glob("util/*"),
+    scripts=["convert"],
 )
