@@ -12,7 +12,8 @@ import onnx.helper
 import onnx.numpy_helper
 from onnx import optimizer
 
-from ..mge_context import TopologyNetwork, get_symvar_value
+from ..mge_context import TopologyNetwork, optimize_for_conversion
+from ..mge_context.mge_utils import get_symvar_value
 from .onnx_op import MGE2ONNX, mge2onnx_dtype_mapping, set_opset_version
 
 
@@ -27,6 +28,8 @@ class OnnxConverter:
         )
         self.graph_name = graph_name
         self.opset_version = opset_version
+        self._transformer_options = []
+        optimize_for_conversion(self.net, self._transformer_options)
 
     def convert(self):
         inputs = []
