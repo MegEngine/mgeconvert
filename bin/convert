@@ -1,0 +1,160 @@
+#!/usr/bin/python3
+
+import argparse
+
+import mgeconvert
+
+
+def get_targets(module):
+    targets = []
+    for attr in dir(module):
+        if attr.startswith("convert_to"):
+            targets.append(attr[11:])
+    return targets
+
+
+def init(subparsers):
+    targets = get_targets(mgeconvert)
+
+    if "caffe" in targets:
+        def to_caffe(args):
+            outspec = None
+            if args.end_point is not None:
+                outspec = args.end_point.split(";")
+            mgeconvert.convert_to_caffe(
+                args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
+            )
+        def caffe_parser(subparsers):
+            p = subparsers.add_parser("caffe",)
+            p.set_defaults(func=to_caffe)
+            p.add_argument(
+                "-i", "--input", required=True, type=str, help="Input megengine dump model file"
+            )
+            p.add_argument(
+                "-c", "--prototxt", required=True, type=str, help="Output caffe .prototxt file"
+            )
+            p.add_argument(
+                "-b",
+                "--caffemodel",
+                required=True,
+                type=str,
+                help="Output caffe .caffemodel file",
+            )
+
+            p.add_argument(
+                "--end_point",
+                default=None,
+                type=str,
+                help="end_point is used to specify which part of the mge model should be converted",
+            )
+        caffe_parser(subparsers)
+    if "cambricon" in targets:
+        def to_cambricon(args):
+            mgeconvert.convert_to_cambricon(
+                args.input,
+                args.output,
+                args.batch_size,
+                args.core_number,
+                args.data_type,
+                args.use_nhwc,
+            )
+        def cambricon_parser(subparsers):
+            p = subparsers.add_parser("cambricon")
+            p.set_defaults(func=to_cambricon)
+            p.add_argument(
+                "-i", "--input", required=True, type=str, help="megengine dumped model file"
+            )
+            p.add_argument(
+                "-o", "--output", required=True, type=str, help="converted Cambricon model file"
+            )
+            p.add_argument(
+                "-b", "--batch-size", default=4, type=int, help="best practice: 4"
+            )
+            p.add_argument("-c", "--core-number", default=1, type=int, help="c <= 16")
+            p.add_argument(
+                "-t", "--data-type", default="float32", type=str, help="float32, float16"
+            )
+            p.add_argument("--use-nhwc", action="store_true", help="default nchw")
+        cambricon_parser(subparsers)
+    if "onnx" in targets:
+        def to_onnx(args):
+            outspec = None
+            if args.end_point is not None:
+                outspec = args.end_point.split(";")
+
+            mgeconvert.convert_to_onnx(
+                args.input,
+                args.output,
+                graph_name=args.graph,
+                opset=args.opset,
+                outspec=outspec,
+            )
+        def onnx_parser(subparsers):
+            p = subparsers.add_parser("onnx")
+            p.set_defaults(func=to_onnx)
+            p.add_argument(
+                "-i", "--input", required=True, type=str, help="Input megengine dump model file"
+            )
+            p.add_argument(
+                "-o", "--output", required=True, type=str, help="Output onnx .onnx file"
+            )
+            p.add_argument("--opset", default=8, type=int, help="Onnx opset version")
+            p.add_argument("--graph", default="graph", type=str, help="Onnx graph name")
+            p.add_argument(
+                "--end_point",
+                default=None,
+                type=str,
+                help="end_point is used to specify which part of the mge model should be converted",
+            )
+        onnx_parser(subparsers)
+    if "tflite" in targets:
+        def to_tflite(args):
+            mgeconvert.convert_to_tflite(
+                mge_fpath=args.input,
+                output=args.output,
+                graph_name=args.graph_name,
+                batch_size=args.batch_size,
+                mtk=args.mtk,
+            )
+        def tflite_parser(subparsers):
+            p = subparsers.add_parser("tflite")
+            p.set_defaults(func=to_tflite)
+            p.add_argument(
+                "-i", "--input", required=True, type=str, help="megengine dumped model file"
+            )
+            p.add_argument(
+                "-o", "--output", required=True, type=str, help="converted TFLite model file"
+            )
+            p.add_argument(
+                "--graph-name",
+                default="graph0",
+                type=str,
+                help="default subgraph name in TFLite model",
+            )
+            p.add_argument(
+                "-b", "--batch-size", default=1, type=int, help="default value: 1"
+            )
+            p.add_argument(
+                "--mtk", action="store_true", help="If target flatform is MTK(P70, P80)"
+            )
+        tflite_parser(subparsers)
+
+
+def main():
+    targets = get_targets(mgeconvert)
+    msg = targets[0] if len(targets) == 1 else "{" + ",".join(targets) + "}"
+    parser = argparse.ArgumentParser(
+        description="use \"convert %s -h\" for more details" % msg
+    )
+    subparsers = parser.add_subparsers()
+    init(subparsers)
+    args = parser.parse_args()
+    if hasattr(args, "func"):
+        args.func(args)
+    else:
+        print("[error] please point out which framework you want to convert")
+        print("use \"convert -h\" for help")
+
+
+if __name__ == "__main__":
+    main()
