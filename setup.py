@@ -14,24 +14,32 @@ __version__ = re.search(r"__version__ = \"(.*)\"", __version_py__).group(1)
 
 targets = []
 
+
 class install(_install):
     user_options = _install.user_options + [
-        ("framework=", None, "<description for this custom option>"),
+        ("targets=", None, "<description for this custom option>"),
     ]
 
     def initialize_options(self):
         _install.initialize_options(self)
-        self.framework = None
+        self.targets = None
 
     def finalize_options(self):
         _install.finalize_options(self)
 
     def run(self):
         options = ["caffe", "onnx", "cambricon", "tflite"]
-        if self.framework == "all":
+        if self.targets == "all":
             targets.extend(options)
         else:
-            targets.extend(i for i in options if self.framework.find(i) > 0)
+            targets.extend(i for i in options if self.targets.find(i) >= 0)
+
+        with open("mgeconvert/__init__.py", "a+") as init_file:
+            [
+                init_file.write("from .%s_converter import convert_to_%s\n" % (i, i))
+                for i in targets
+            ]
+
         _install.run(self)
 
 
@@ -48,11 +56,12 @@ class build_ext(_build_ext):
 
     def build_all(self, ext):
         subprocess.check_call(ext.script)
-        self.copy_tree(ext.artifacts, os.path.join(self.build_lib, ext.artifacts))
+        if ext.artifacts is not None:
+            self.copy_tree(ext.artifacts, os.path.join(self.build_lib, ext.artifacts))
 
 
 class BuildExtension(Extension):
-    def __init__(self, name, script, artifacts):
+    def __init__(self, name, script, artifacts=None):
         super().__init__(name, sources=[])
         self.script = script
         self.artifacts = artifacts
@@ -64,10 +73,16 @@ ext_modules = [
         script="mgeconvert/caffe_converter/init.sh",
         artifacts="mgeconvert/caffe_converter/caffe_pb",
     ),
+    BuildExtension(name="onnx", script="mgeconvert/onnx_converter/init.sh"),
     BuildExtension(
         name="cambricon",
         script="mgeconvert/cambricon_converter/init.sh",
         artifacts="mgeconvert/cambricon_converter/lib/cnlib",
+    ),
+    BuildExtension(
+        name="tflite",
+        script="mgeconvert/tflite_converter/init.sh",
+        artifacts="mgeconvert/tflite_converter/pyflexbuffers",
     ),
 ]
 
@@ -83,5 +98,5 @@ setup(
     cmdclass={"install": install, "build_ext": build_ext},
     include_package_data=True,
     install_requires=["numpy"],
-    scripts=["convert"],
+    scripts=["bin/convert"],
 )

@@ -9,7 +9,7 @@
 import megengine
 import numpy as np
 import pytest
-from mgeconvert.cambricon_converter.converter import CambriconConverter
+from mgeconvert.cambricon_converter.cambricon_converter import CambriconConverter
 from mgeconvert.mge_context import TopologyNetwork
 
 from .quantization_utils import (
