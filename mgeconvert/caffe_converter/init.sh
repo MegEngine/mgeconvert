@@ -1,4 +1,7 @@
 #!/bin/bash -e
+
+python3 -m pip install protobuf --user
+
 hash wget || (echo "please install wget package" && exit -1)
 hash protoc || (echo "please install protobuf-compiler package" && exit -1)
 
