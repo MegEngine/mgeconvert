@@ -1,4 +1,7 @@
 #!/bin/bash -e
+
+python3 -m pip install protobuf --user
+
 hash wget || (echo "please install wget package" && exit -1)
 hash protoc || (echo "please install protobuf-compiler package" && exit -1)
 
@@ -13,6 +16,6 @@ wget https://github.com/BVLC/caffe/raw/master/src/caffe/proto/caffe.proto -O $BU
 echo "Compiling caffe.proto"
 protoc $BUILD_DIR/caffe.proto --python_out=./
 
-touch $BUILD_DIR/__init__.pysu
+touch $BUILD_DIR/__init__.py
 
 echo "Init done"
