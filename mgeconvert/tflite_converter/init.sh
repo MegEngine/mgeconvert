@@ -18,7 +18,8 @@ export PATH=$PATH:/usr/local/bin
 echo "building tflite schema..."
 cd /tmp
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/master/tensorflow/lite/schema/schema.fbs
-flatc --python schema.fbs
+sudo flatc --python schema.fbs
+sudo chmod 755 /tmp/tflite
 cp -r /tmp/tflite $basepath
 
 # build pyflatbuffers

@@ -55,7 +55,7 @@ convert caffe -h
 
 4. tflite
 
- - @yzchen
+ - Python packages: pybind11==2.6.2
 
 
 ## 算子支持列表
