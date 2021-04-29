@@ -82,7 +82,7 @@ ext_modules = [
     BuildExtension(
         name="tflite",
         script="mgeconvert/tflite_converter/init.sh",
-        artifacts="mgeconvert/tflite_converter/pyflexbuffers",
+        artifacts="mgeconvert/tflite_converter/",
     ),
 ]
 

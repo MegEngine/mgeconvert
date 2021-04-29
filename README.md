@@ -55,7 +55,8 @@ convert caffe -h
 
 4. tflite
 
- - @yzchen
+ - Python packages: pybind11==2.6.2, tensorflow==2.4.0
+ - third party: [flatbuffers](https://github.com/google/flatbuffers.git)
 
 
 ## 算子支持列表
