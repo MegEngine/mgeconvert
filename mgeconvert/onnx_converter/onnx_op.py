@@ -504,6 +504,14 @@ class ReduceConverter(OperatorBaseConverter):
     def _get_attrs(self):
         return {"axes": [self._opr.axis]}
 
+    def convert(self):
+        inputs = self._get_inputs()
+        outputs = self._get_outputs()
+        nodes = onnx.helper.make_node(
+            self.__opr_type__, [inputs[0]], outputs, **self._get_attrs()
+        )
+        return [nodes], self._net_sources, self._parameters
+
 
 @_register_op(AxisAddRemoveOpr)
 class AxisAddRemoveConverter(OperatorBaseConverter):
