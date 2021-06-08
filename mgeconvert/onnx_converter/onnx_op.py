@@ -15,6 +15,7 @@ from ..mge_context import (
     BroadcastOpr,
     ConcatOpr,
     ConvolutionBackwardDataOpr,
+    ConvolutionBackwardFilterOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
@@ -392,6 +393,159 @@ class Conv2DConverter(OperatorBaseConverter):
             inputs = [inputs[1], inputs[0]]
         conv2d = onnx.helper.make_node(onnx_op, inputs, [outputs[0]], **attrs)
         nodes.extend([conv2d])
+        return (nodes, self._net_sources, self._parameters)
+
+
+@_register_op(ConvolutionBackwardFilterOpr)
+class Conv2DBackwardFilterConverter(OperatorBaseConverter):
+    def convert(self):
+        opr = self._opr
+        # src, grad_out, weight = self._opr.inp_vars
+
+        nodes = []
+        inputs = self._get_inputs()
+        outputs = self._get_outputs()
+
+        # Tile
+        # grad_out: (no, co, ho, wo) -> (no, co x ci / group, ho, wo)
+        grad_out_tile_in = outputs[0] + "_grad_out_tile_in"
+        grad_out_tile_source = onnx.helper.make_tensor_value_info(
+            grad_out_tile_in, mge2onnx_dtype_mapping[np.int64], (4,)
+        )
+        grad_out_tile_param = onnx.numpy_helper.from_array(
+            np.array([1, opr.ci // opr.group, 1, 1]), grad_out_tile_in
+        )
+        self._net_sources.append(grad_out_tile_source)
+        self._parameters.append(grad_out_tile_param)
+        grad_out_tile_out = outputs[0] + "_grad_out_tile_out"
+        grad_out_tile = onnx.helper.make_node(
+            "Tile", [inputs[1], grad_out_tile_in], [grad_out_tile_out]
+        )
+        nodes.append(grad_out_tile)
+
+        # Reshape
+        # grad_out: (no, co x ci / group, ho, wo) -> (no x co x ci / group, 1, ho, wo)
+        grad_out_reshape_in = outputs[0] + "_grad_out_reshape_in"
+        grad_out_reshape_source = onnx.helper.make_tensor_value_info(
+            grad_out_reshape_in, mge2onnx_dtype_mapping[np.int64], (4,)
+        )
+        grad_out_reshape_param = onnx.numpy_helper.from_array(
+            np.array([opr.no * opr.co * opr.ci // opr.group, 1, opr.ho, opr.wo]),
+            grad_out_reshape_in,
+        )
+        self._net_sources.append(grad_out_reshape_source)
+        self._parameters.append(grad_out_reshape_param)
+        grad_out_reshape_out = outputs[0] + "_grad_out_reshape_out"
+        reshape = onnx.helper.make_node(
+            "Reshape", [grad_out_tile_out, grad_out_reshape_in], [grad_out_reshape_out]
+        )
+        nodes.append(reshape)
+
+        # Reshape
+        # src: (ni, ci, hi, wi) -> (1, ni x ci, hi, wi)
+        src_reshape_in = outputs[0] + "_src_reshape_in"
+        src_reshape_source = onnx.helper.make_tensor_value_info(
+            src_reshape_in, mge2onnx_dtype_mapping[np.int64], (4,)
+        )
+        src_reshape_param = onnx.numpy_helper.from_array(
+            np.array([1, opr.ni * opr.ci, opr.hi, opr.wi]), src_reshape_in
+        )
+        self._net_sources.append(src_reshape_source)
+        self._parameters.append(src_reshape_param)
+        src_reshape_out = outputs[0] + "_src_reshape_out"
+        reshape = onnx.helper.make_node(
+            "Reshape", [inputs[0], src_reshape_in], [src_reshape_out]
+        )
+        nodes.append(reshape)
+
+        # Conv:
+        # group = ni * ci
+        # src(1, ni x ci, hi, wi) + grad_out(no x co x ci / group, 1, ho, wo)
+        # -> grad_weight(1, no x co x ci / group, ?, ?)
+        grad_weight = outputs[0] + "_grad_weight"
+        grad_weight_conv = onnx.helper.make_node(
+            "Conv",
+            [src_reshape_out, grad_out_reshape_out],
+            [grad_weight],
+            kernel_shape=[opr.ho, opr.wo],
+            strides=[opr.dilate_h, opr.dilate_w],
+            pads=[opr.ph, opr.pw, opr.ph, opr.pw],
+            dilations=[opr.sh, opr.sw],
+            group=opr.ci * opr.ni,
+        )
+        nodes.append(grad_weight_conv)
+
+        # Slice
+        # grad_weight: (1, no x co x ci // group, ?, ?) -> (1, no x co x ci // group, kh, kw)
+        grad_weight_slice_out = outputs[0] + "_grad_weight_slice_out"
+        grad_weight_slice = onnx.helper.make_node(
+            "Slice",
+            [grad_weight],
+            [grad_weight_slice_out],
+            axes=[2, 3],
+            starts=[0, 0],
+            ends=[opr.kh, opr.kw],
+        )
+        nodes.append(grad_weight_slice)
+
+        # Reshape
+        # grad_weight: (1, no x co x ci // group, kh, kw) -> (no, co x ci // group, kh, kw)
+        grad_weight_reshape_in = outputs[0] + "_grad_weight_reshape_in"
+        grad_weight_reshape_source = onnx.helper.make_tensor_value_info(
+            grad_weight_reshape_in, mge2onnx_dtype_mapping[np.int64], (4,)
+        )
+        grad_weight_reshape_param = onnx.numpy_helper.from_array(
+            np.array([opr.no, opr.co * opr.ci // opr.group, opr.kh, opr.kw]),
+            grad_weight_reshape_in,
+        )
+        self._net_sources.append(grad_weight_reshape_source)
+        self._parameters.append(grad_weight_reshape_param)
+        grad_weight_reshape_out = outputs[0] + "_grad_weight_reshape_out"
+        reshape = onnx.helper.make_node(
+            "Reshape",
+            [grad_weight_slice_out, grad_weight_reshape_in],
+            [grad_weight_reshape_out],
+        )
+        nodes.append(reshape)
+
+        # ReduceSum
+        # grad_weight: (no, co x ci // group, kh, kw) -> (1, co x ci // goup, kh, kw)
+        grad_weight_reduce_out = outputs[0] + "_grad_weight_reduce_out"
+        grad_weight_reduce = onnx.helper.make_node(
+            "ReduceSum", [grad_weight_reshape_out], [grad_weight_reduce_out], axes=[0],
+        )
+        nodes.append(grad_weight_reduce)
+
+        # Reshape
+        # grad_weight: (1, co x ci // group, kh, kw) -> (ci // group, co, kh, kw)
+        grad_weight_reshape2_in = outputs[0] + "_grad_weight_reshape2_in"
+        grad_weight_reshape2_source = onnx.helper.make_tensor_value_info(
+            grad_weight_reshape2_in, mge2onnx_dtype_mapping[np.int64], (4,)
+        )
+        grad_weight_reshape2_param = onnx.numpy_helper.from_array(
+            np.array([opr.ci // opr.group, opr.co, opr.kh, opr.kw]),
+            grad_weight_reshape2_in,
+        )
+        self._net_sources.append(grad_weight_reshape2_source)
+        self._parameters.append(grad_weight_reshape2_param)
+        grad_weight_reshape2_out = outputs[0] + "_grad_weight_reshape2_out"
+        reshape = onnx.helper.make_node(
+            "Reshape",
+            [grad_weight_reduce_out, grad_weight_reshape2_in],
+            [grad_weight_reshape2_out],
+        )
+        nodes.append(reshape)
+
+        # Transpose
+        grad_weight_transpose_out = outputs[0]
+        transpose = onnx.helper.make_node(
+            "Transpose",
+            [grad_weight_reshape2_out],
+            [grad_weight_transpose_out],
+            perm=[1, 0, 2, 3],
+        )
+        nodes.append(transpose)
+
         return (nodes, self._net_sources, self._parameters)
 
 

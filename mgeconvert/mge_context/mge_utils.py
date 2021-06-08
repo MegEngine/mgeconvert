@@ -104,7 +104,9 @@ def load_comp_graph_from_file(path):
     if mge_version <= "0.6.0":
         cg, _, outputs = mgb.load_comp_graph_from_file(path)
     else:
-        cg, _, outputs = G.load_graph(path)
+        ret = G.load_graph(path)
+        cg = ret.graph
+        outputs = ret.output_vars_list
     return cg, outputs
 
 
