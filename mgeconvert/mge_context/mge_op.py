@@ -380,6 +380,39 @@ class ConvolutionBackwardDataOpr(MgeOpr):
         self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
 
 
+class ConvolutionBackwardFilterOpr(MgeOpr):
+    r"""refer to https://github.com/pytorch/pytorch/blob/master/torch/nn/grad.py#L170
+    """
+
+    name = "ConvolutionBackwardFilter"
+
+    def __init__(self, opr):
+        super().__init__(opr)
+        assert self.params["format"] == "NCHW", "do not support this {}".format(
+            self.params["format"]
+        )
+
+        src, grad_out, weight = opr.inputs
+
+        self.ni, self.ci, self.hi, self.wi = src.shape
+        self.no, self.co, self.ho, self.wo = grad_out.shape
+        assert self.ni == self.no
+
+        self.dilate_w = self.params["dilate_w"]
+        self.dilate_h = self.params["dilate_h"]
+        self.ph, self.pw = self.params["pad_h"], self.params["pad_w"]
+        self.sh, self.sw = self.params["stride_h"], self.params["stride_w"]
+
+        if len(weight.shape) == 5:
+            self.group = weight.shape[0]
+            self.kh = weight.shape[3]
+            self.kw = weight.shape[4]
+        else:
+            self.group = 1
+            self.kh = weight.shape[2]
+            self.kw = weight.shape[3]
+
+
 class ConvolutionBackwardDataBiasOpr(ConvolutionBackwardDataOpr):
     name = "ConvolutionBackwardDataBias"
 

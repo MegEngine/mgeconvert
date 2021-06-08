@@ -6,12 +6,14 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+import os
+
 import megengine
 import megengine.hub
 import numpy as np
 import onnxruntime as ort
 import pytest
-from mgeconvert.mge_context import TopologyNetwork
+from mgeconvert.mge_context import TopologyNetwork, get_mge_version
 from mgeconvert.onnx_converter.onnx_converter import OnnxConverter
 
 from .utils import (
@@ -156,6 +158,27 @@ def test_typecvt():
     net = TypeCvtOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error, min_version=10)
+
+
+@pytest.mark.skipif(
+    get_mge_version() < "1.5.0",
+    reason="MGE file for testing was dumped at version 1.5.0",
+)
+def test_convolutionbackwardfilter():
+    import megengine.utils.comp_graph_tools as cgtools  # pylint: disable=import-outside-toplevel
+
+    def infer_mge(x, file):
+        infer_cg = cgtools.GraphInference(file + ".mge")  # pylint: disable=no-member
+        y = list(infer_cg.run(x).values())[0]
+        print(y.mean())
+        return y
+
+    file = os.path.join(os.path.dirname(__file__), "convolution-backward-filter")
+    data = np.ones((8, 1, 32, 32), dtype=np.float32)
+    mge_result = infer_mge(data, file)
+    _test_convert_result(
+        data, file, mge_result, max_error, min_version=8, max_version=8
+    )
 
 
 @pytest.mark.parametrize(
