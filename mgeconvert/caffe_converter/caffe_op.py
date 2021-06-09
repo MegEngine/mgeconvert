@@ -330,9 +330,10 @@ def _subtensor(opr: SubtensorOpr, context):
         n = opr.inp_vars[0].shape[axis]
 
         slice_list = get_slice_list(n, sl, step < 0)
+        if slice_list == []:
+            continue
         concat_list = get_concat_list(n, axis, sl)
-
-        if slice_list == [] or concat_list == []:
+        if concat_list == []:
             continue
 
         bottom = top
