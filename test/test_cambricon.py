@@ -37,7 +37,7 @@ tmp_file = "test_model"
 def _test_convert_only(*_):
     toponet = TopologyNetwork("test_model.mge")
     batch_size = 1
-    converter = CambriconConverter(toponet, batch_size, 1, "float32")
+    converter = CambriconConverter(toponet, None, batch_size, 1, "float32")
     converter.convert()
     converter.fuse()
     converter.dump(tmp_file + ".cambriconmodel")
@@ -46,7 +46,7 @@ def _test_convert_only(*_):
 def _test_convert_result(inputs, mge_results, max_err):
     toponet = TopologyNetwork("test_model.mge")
     batch_size = inputs.shape[0]
-    converter = CambriconConverter(toponet, batch_size, 1, "float32")
+    converter = CambriconConverter(toponet, None, batch_size, 1, "float32")
     converter.convert()
     converter.fuse()
     cn_results = converter.forward(inputs).reshape(mge_results.shape)

@@ -28,6 +28,18 @@ jobs:
     - name: lint
       run: ./ci/lint.sh
 
+  pytest-transform:
+    runs-on: ubuntu-latest
+    container:
+      image: xpdnbd/mgeconvert_ci:v0.1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: test transform
+        run: ./ci/pytest_transform.sh
+
   pytest-cambricon:
     runs-on: ubuntu-latest
     container:

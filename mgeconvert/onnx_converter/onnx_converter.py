@@ -6,19 +6,25 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+from typing import List
+
 import megengine as mge
 import onnx.checker
 import onnx.helper
 import onnx.numpy_helper
 from onnx import optimizer
 
-from ..mge_context import TopologyNetwork, optimize_for_conversion
+from ..mge_context import TopologyNetwork, TransformerRule, optimize_for_conversion
 from ..mge_context.mge_utils import get_symvar_value
 from .onnx_op import MGE2ONNX, mge2onnx_dtype_mapping, set_opset_version
 
 
 class OnnxConverter:
-    def __init__(self, toponet, opset_version=8, graph_name="graph"):
+    transformer_options: List[TransformerRule] = []
+
+    def __init__(
+        self, toponet, transform_options=None, opset_version=8, graph_name="graph"
+    ):
         assert isinstance(
             toponet, TopologyNetwork
         ), "net must be instance of TopologyNetwork"
@@ -28,8 +34,9 @@ class OnnxConverter:
         )
         self.graph_name = graph_name
         self.opset_version = opset_version
-        self._transformer_options = []
-        optimize_for_conversion(self.net, self._transformer_options)
+        if transform_options is not None:
+            self.transformer_options = transform_options
+        optimize_for_conversion(self.net, self.transformer_options)
 
     def convert(self):
         inputs = []
@@ -124,7 +131,7 @@ def convert_to_onnx(
     """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     net = TopologyNetwork(mge_fpath, prune_reshape=True, outspec=outspec)
-    converter = OnnxConverter(net, opset, graph_name)
+    converter = OnnxConverter(net, None, opset, graph_name)
     model = converter.convert()
 
     assert isinstance(output, str), "onnx_fpath must be string"

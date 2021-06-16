@@ -9,5 +9,8 @@
 from .mge_net import TopologyNetwork, get_platform, set_platform
 from .mge_op import *
 from .mge_tensor import Tensor
-from .mge_transform import TransformerRule, optimize_for_conversion
+from .mge_transform import (  # type: ignore[attr-defined]
+    TransformerRule,
+    optimize_for_conversion,
+)
 from .mge_utils import get_dtype_name, get_logger

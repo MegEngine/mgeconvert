@@ -2,7 +2,7 @@
 
 set -e
 
-sudo -H python3 -m pip install -q megengine==1.3.1 -f https://megengine.org.cn/whl/mge.html
+sudo -H python3 -m pip install -q megengine==1.3.0 -f https://megengine.org.cn/whl/mge.html
 pytest test/test_cambricon.py
 sudo -H python3 -m pip uninstall -y megengine
 

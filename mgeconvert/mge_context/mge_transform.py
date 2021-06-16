@@ -6,19 +6,23 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+# type: ignore[no-redef]
+
 from collections import OrderedDict
 from enum import Enum
-from typing import Callable, Dict
+from typing import Callable, Dict, List, Sequence
 
 import numpy as np
 
+from . import mge_op as Ops
 from .mge_op import (
     ConvBiasForwardOpr,
+    ConvForwardBiasOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseOpr,
-    LeakyReluOpr,
     OpBase,
     PadOpr,
     PoolingForwardOpr,
@@ -29,6 +33,82 @@ from .mge_op import (
     TypeCvtOpr,
 )
 from .mge_tensor import FakeSymbolVar, Tensor
+from .mge_utils import isconst
+
+
+class PatternNode:
+    def __init__(self, type, is_output=False, const_value=None):
+        self.op = None
+        self.type = type
+        self.inp_oprs = []
+        self.inp_const = []
+        self.inp_vars = []
+        self.is_output = is_output
+        self.const_value = const_value
+
+    def check_const_value(self, op):
+        inp_vars = [v.np_data for v in op.inp_vars]
+        for const in self.const_value:
+            idx = const[0]
+            if idx == -1:
+                find = False
+                for index, v in enumerate(inp_vars):
+                    if np.array_equal(const[1], v):
+                        find = True
+                        del inp_vars[index]
+                        break
+                if not find:
+                    return False
+            elif not np.array_equal(const[1], inp_vars[idx]):
+                return False
+        return True
+
+
+get_type = lambda op: op.mode if isinstance(op, Ops.ElemwiseOpr) else type(op).__name__
+
+
+def match(node, opr):
+    node_queue = [node]
+    opr_queue = [opr]
+    matched_opr = set()
+    matched_node = set()
+    while len(node_queue) != 0:
+        cur_node = node_queue.pop(0)
+        cur_opr = opr_queue.pop(0)
+        if cur_node.type != get_type(cur_opr) and cur_node.type != "*" or cur_opr.skip:
+            return False
+        if cur_node.op == None:
+            cur_node.op = cur_opr
+            if cur_node.const_value != None:
+                if not cur_node.check_const_value(cur_opr):
+                    return False
+        elif cur_node.op != cur_opr:
+            return False
+
+        matched_opr.add(cur_opr)
+        matched_node.add(cur_node)
+        for i, var in enumerate(cur_opr.inp_vars):
+            if isconst(var):
+                cur_node.inp_const.append([i, var.np_data])
+            else:
+                cur_node.inp_vars.append([i, var])
+        if len(cur_node.inp_oprs) == 0:
+            continue
+        if len(cur_node.inp_oprs) != len(cur_opr.inp_oprs):
+            return False
+
+        for i, j in zip(cur_node.inp_oprs, cur_opr.inp_oprs):
+            node_queue.append(i)
+            opr_queue.append(j)
+
+    for n in matched_node:
+        if n.is_output:
+            continue
+        for op in n.op.out_oprs:
+            if op not in matched_opr:
+                return False
+
+    return True
 
 
 class TransformerRule(Enum):
@@ -46,18 +126,24 @@ class TransformerRule(Enum):
     FUSE_SOFTMAX = 106
     DECONV_SHAPE_AS_INPUT = 107
     FUSE_ASTYPE = 108
-    MAKE_PADDING = 109
+    PADDING_FOR_CONV = 109
     TRANSPOSE_PATTERN_AS_INPUT = 110
     # FUSE_FOR_LEAKY_RELU should happen before EXPAND_MUL_ADD3
     FUSE_FOR_LEAKY_RELU = 111
     EXPAND_MUL_ADD3 = 112
     EXPAND_ADD_SIGMOID = 113
+    FUSE_FOR_CONV_BIAS = 114
+    FUSE_FOR_DECONV_BIAS = 115
+    FUSE_FOR_FULLY_CONNECTED = 116
+    RESHAPE_BIAS_TO_1DIM = 117
 
 
 TRANSFORMMAP: Dict[Enum, Callable] = {}
 
 
 def optimize_for_conversion(net, transformer_options):
+    if not isinstance(transformer_options, Sequence):
+        transformer_options = (transformer_options,)
     for option in transformer_options:
         TRANSFORMMAP[option](net)
 
@@ -184,7 +270,7 @@ def _conv_add_zero_bias(net):
     for op in net.all_oprs:
         if not isinstance(op, ConvolutionForwardOpr):
             continue
-        if isinstance(op, ConvBiasForwardOpr):
+        if isinstance(op, (ConvBiasForwardOpr, ConvForwardBiasOpr)):
             continue
 
         result_shape = [op.out_vars[0].shape[1]]
@@ -324,7 +410,7 @@ def _deconv_shape_as_input(net):
         op.inp_vars = [shape_tensor, op.inp_vars[1], op.inp_vars[0]]
 
 
-@_register_tranformation_rule(TransformerRule.MAKE_PADDING)
+@_register_tranformation_rule(TransformerRule.PADDING_FOR_CONV)
 def _make_padding(net):
     def have_padding(opr):
         if (
@@ -471,57 +557,6 @@ def _transpose_pattern_as_input(net):
         op.add_inp_var(pattern_tensor)
 
 
-@_register_tranformation_rule(TransformerRule.FUSE_FOR_LEAKY_RELU)
-def _fuse_for_leaky_relu(net):
-    matches = OrderedDict()
-
-    for op in net.all_oprs:
-        if not isinstance(op, ElemwiseOpr):
-            continue
-        if op.mode != "FUSE_MUL_ADD3":
-            continue
-        try:
-            prev_op = op.inp_oprs[0]
-            cur_index = net._opr_ids.index(op.id)
-            if (
-                not isinstance(prev_op, ReduceOpr)
-                or prev_op.mode != "MIN"
-                or prev_op.axis != 1
-                or net._opr_ids.index(prev_op.id) != cur_index - 1
-            ):
-                continue
-            prev_op = op.inp_oprs[1]
-            if (
-                not isinstance(prev_op, ElemwiseOpr)
-                or prev_op.mode != "MAX"
-                or net._opr_ids.index(prev_op.id) != cur_index - 2
-            ):
-                continue
-            if op.inp_vars[1].np_data is None:
-                continue
-        except IndexError:  # doesn't match
-            continue
-
-        leaky_relu_opr = LeakyReluOpr(
-            name=op.name + "_leakyrelu", negative_slope=op.inp_vars[1].np_data
-        )
-        leaky_relu_opr.inp_vars = prev_op.inp_vars[:1]
-        leaky_relu_opr.out_vars = op.out_vars
-        leaky_relu_opr.inp_oprs = [prev_op.inp_oprs[0]]
-        leaky_relu_opr.out_oprs = op.out_oprs
-        leaky_relu_opr.prev_opr = prev_op.inp_oprs[0]
-        matches[prev_op.id] = (net.max_id, leaky_relu_opr)
-        net.max_id += 1
-
-    for original_id, generated_pair in list(matches.items())[::-1]:
-        index = net._opr_ids.index(original_id)
-        del net._opr_ids[index : index + 2]
-        del net.all_oprs[index : index + 2]
-
-        net._opr_ids.insert(index, generated_pair[0])
-        net.all_oprs.insert(index, generated_pair[1])
-
-
 @_register_tranformation_rule(TransformerRule.EXPAND_MUL_ADD3)
 def _expand_mul_add3(net):
     insert_intended = OrderedDict()
@@ -619,3 +654,223 @@ def _expand_add_sigmoid(net):
     for index, generated_pair in list(insert_intended.items())[::-1]:
         net._opr_ids.insert(index, generated_pair[0])
         net.all_oprs.insert(index, generated_pair[1])
+
+
+def _fuse_for_leaky_relu(opr):
+    assert (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Ops.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    )
+    add_node = PatternNode("ADD", is_output=True)
+    mul_node = PatternNode("MUL")
+    max_node = PatternNode("MAX", const_value=[(-1, [0.0])])
+    min_node = PatternNode("MIN", const_value=[(-1, [0.0])])
+    add_node.inp_oprs = [max_node, mul_node]
+    mul_node.inp_oprs = [min_node]
+
+    add_opr = opr.out_oprs[0]
+    if match(add_node, add_opr):
+        if (
+            max_node.inp_vars[0] == min_node.inp_vars[0]
+            and len(mul_node.inp_const) == 1
+            and mul_node.inp_const[0][1].shape == (1,)
+        ):
+            leaky_relu = Ops.LeakyReluOpr(
+                "leaky_relu_" + add_node.op.name,
+                add_node.op._opr,
+                mul_node.inp_const[0][1],
+            )
+            leaky_relu.inp_vars = [max_node.inp_vars[0][1]]
+            leaky_relu.out_vars = add_node.op.out_vars
+            leaky_relu.inp_oprs = max_node.op.inp_oprs
+            leaky_relu.out_oprs = add_node.op.out_oprs
+            for node in [add_node, mul_node, max_node, min_node]:
+                node.op.skip = True
+            return leaky_relu
+
+    return None
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_FOR_LEAKY_RELU)
+def _(net):
+    """
+    Elemwise(ADD) + Elemwise(MUL) + Elemwise(MAX) + Elemwise(MIN) -> LeakyRelu
+    """
+    matches = list()
+    for opr in net.all_oprs:
+        if (
+            get_type(opr) == "MAX"
+            and len(opr.out_oprs) == 1
+            and get_type(opr.out_oprs[0]) == "ADD"
+        ):
+            leaky_relu = _fuse_for_leaky_relu(opr)
+            if leaky_relu:
+                matches.append(leaky_relu)
+    _replace_opr(net, matches)
+
+
+def _fuse_for_conv_bias(opr):
+    assert (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Ops.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    )
+
+    bias_node = PatternNode("ADD", is_output=True)
+    conv_node = PatternNode(Ops.ConvolutionForwardOpr.__name__)
+    bias_node.inp_oprs = [conv_node]
+
+    add_opr = opr.out_oprs[0]
+    if match(bias_node, add_opr):
+        conv_bias = Ops.ConvForwardBiasOpr(
+            "ConvForwardBias_" + bias_node.op.name,
+            conv_node.op._opr,
+            bias_node.inp_const[0][1],
+        )
+        conv_bias.inp_vars = conv_node.op.inp_vars + bias_node.op.inp_vars[1:]
+        conv_bias.out_vars = bias_node.op.out_vars
+        conv_bias.inp_oprs = conv_node.op.inp_oprs
+        conv_bias.out_oprs = bias_node.op.out_oprs
+        for node in [conv_node, bias_node]:
+            node.op.skip = True
+        return conv_bias
+    return None
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_FOR_CONV_BIAS)
+def _(net):
+    """
+    ConvolutionForward + Elemwise(ADD) -> ConvForwardBias
+    """
+    matches = list()
+    for opr in net.all_oprs:
+        if (
+            get_type(opr) == Ops.ConvolutionForwardOpr.__name__
+            and len(opr.out_oprs) == 1
+            and get_type(opr.out_oprs[0]) == "ADD"
+        ):
+            conv_bias = _fuse_for_conv_bias(opr)
+            if conv_bias:
+                matches.append(conv_bias)
+    _replace_opr(net, matches)
+
+
+@_register_tranformation_rule(TransformerRule.RESHAPE_BIAS_TO_1DIM)
+def _(net):
+    for opr in net.all_oprs:
+        if isinstance(opr, Ops.ConvForwardBiasOpr) and opr.inp_vars[2].ndim != 1:
+            bias = opr.inp_vars[2]
+            assert bias.shape == (1, bias.shape[1], 1, 1), (
+                "bias.shape = %s" % bias.shape
+            )
+            bias.np_data = bias.np_data.reshape(-1)
+            bias.shape = bias.np_data.shape
+            bias.ndim = 1
+
+
+def _fuse_for_deconv_bias(opr):
+    assert (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Ops.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    )
+
+    bias_node = PatternNode("ADD", is_output=True)
+    conv_node = PatternNode(Ops.ConvolutionBackwardDataOpr.__name__)
+    bias_node.inp_oprs = [conv_node]
+
+    add_opr = opr.out_oprs[0]
+    if match(bias_node, add_opr):
+        deconv_bias = Ops.ConvolutionBackwardDataBiasOpr(
+            "ConvolutionBackwardDataBias_" + bias_node.op.name,
+            conv_node.op._opr,
+            bias_node.inp_const[0][1],
+        )
+        deconv_bias.inp_vars = conv_node.op.inp_vars + bias_node.op.inp_vars[1:]
+        deconv_bias.out_vars = bias_node.op.out_vars
+        deconv_bias.inp_oprs = conv_node.op.inp_oprs
+        deconv_bias.out_oprs = bias_node.op.out_oprs
+        for node in [conv_node, bias_node]:
+            node.op.skip = True
+        return deconv_bias
+
+    return None
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_FOR_DECONV_BIAS)
+def _(net):
+    """
+    ConvolutionBackwardData + Elemwise(ADD) -> ConvolutionBackwardDataBias
+    """
+    matches = list()
+    for opr in net.all_oprs:
+        if (
+            get_type(opr) == Ops.ConvolutionBackwardDataOpr.__name__
+            and len(opr.out_oprs) == 1
+            and get_type(opr.out_oprs[0]) == "ADD"
+        ):
+            deconv_bias = _fuse_for_deconv_bias(opr)
+            if deconv_bias:
+                matches.append(deconv_bias)
+    _replace_opr(net, matches)
+
+
+def _fuse_for_fully_connected(opr):
+    assert (
+        len(opr.out_oprs) == 1
+        and isinstance(opr.out_oprs[0], Ops.ElemwiseOpr)
+        and opr.out_oprs[0].mode == "ADD"
+    )
+    bias_node = PatternNode("ADD", is_output=True)
+    matrix_mul_node = PatternNode(Ops.MatrixMulOpr.__name__)
+    bias_node.inp_oprs = [matrix_mul_node]
+    add_opr = opr.out_oprs[0]
+    if match(bias_node, add_opr):
+        fully_connected = Ops.FullyConnectedOpr(
+            "FullyConnected_" + bias_node.op.name,
+            matrix_mul_node.op._opr,
+            bias_node.inp_const[0][1],
+        )
+        fully_connected.inp_vars = (
+            matrix_mul_node.op.inp_vars + bias_node.op.inp_vars[1:]
+        )
+        fully_connected.out_vars = bias_node.op.out_vars
+        fully_connected.inp_oprs = matrix_mul_node.op.inp_oprs
+        fully_connected.out_oprs = bias_node.op.out_oprs
+        for node in [matrix_mul_node, bias_node]:
+            node.op.skip = True
+        return fully_connected
+    return None
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_FOR_FULLY_CONNECTED)
+def _(net):
+    """
+    MatrixMul + Elemwise(ADD) -> FullyConnected
+    """
+    matches = list()
+    for opr in net.all_oprs:
+        if (
+            get_type(opr) == Ops.MatrixMulOpr.__name__
+            and len(opr.out_oprs) == 1
+            and get_type(opr.out_oprs[0]) == "ADD"
+        ):
+            fc = _fuse_for_fully_connected(opr)
+            if fc:
+                matches.append(fc)
+    _replace_opr(net, matches)
+
+
+def _replace_opr(net, matches: List[Ops.MgeOpr]):
+    """
+    Recieve a list of :class:`~.Ops.MgeOpr`.
+    For each operator in :attr:`matches`, this function will insert it and its id.
+
+    At the end, delete the orignal operators who matchs the transform rule.
+    """
+    for opr in matches:
+        max_idx = max(net._opr_ids.index(i.id) for i in opr.inp_oprs)
+        net._opr_ids.insert(max_idx + 1, opr.id)
+        net.all_oprs.insert(max_idx + 1, opr)
+    net.all_oprs = list(filter(lambda opr: not opr.skip, net.all_oprs))
