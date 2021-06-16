@@ -3,7 +3,7 @@ set -e
 cd $(dirname $0)/..
 
 echo "Running mypy..."
-mypy mgeconvert test --show-error-codes --ignore-missing-imports || mypy_ret=$?
+mypy mgeconvert test --show-error-codes || mypy_ret=$?
 echo "Running pylint ..."
 pylint mgeconvert test --rcfile=.pylintrc || pylint_ret=$?
 

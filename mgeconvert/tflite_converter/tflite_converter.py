@@ -36,7 +36,28 @@ from .tflite_op import MGE2TFLITE, get_shape_param, mge2tflite_dtype_mapping
 
 
 class TFLiteConverter:
-    def __init__(self, toponet, graph_name="graph"):
+    transformer_options = [
+        TransformerRule.REDUCE_AXIS_AS_INPUT,
+        TransformerRule.REMOVE_RESHAPE_INPUT,
+        TransformerRule.FUSE_FOR_RELU6,
+        TransformerRule.FUSE_ACTIVATION,
+        TransformerRule.PADDING_FOR_CONV,
+        TransformerRule.FUSE_FOR_CONV_BIAS,
+        # In TFLite Converter, ``RESHAPE_BIAS_TO_1DIM`` is required after ``FUSE_FOR_CONV_BIAS``.
+        TransformerRule.RESHAPE_BIAS_TO_1DIM,
+        # ``CONV_ADD_ZERO_BIAS`` should be after ``FUSE_FOR_CONV_BIAS`` and ``RESHAPE_BIAS_TO_1DIM``.
+        TransformerRule.CONV_ADD_ZERO_BIAS,
+        TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,
+        TransformerRule.FUSE_SOFTMAX,
+        TransformerRule.DECONV_SHAPE_AS_INPUT,
+        TransformerRule.FUSE_ASTYPE,
+        TransformerRule.TRANSPOSE_PATTERN_AS_INPUT,
+        TransformerRule.FUSE_FOR_LEAKY_RELU,
+        TransformerRule.EXPAND_MUL_ADD3,
+        TransformerRule.EXPAND_ADD_SIGMOID,
+    ]
+
+    def __init__(self, toponet, transformer_options=None, graph_name="graph"):
         assert isinstance(
             toponet, TopologyNetwork
         ), "net must be instance of TopologyNetwork"
@@ -52,23 +73,9 @@ class TFLiteConverter:
         # buffer size will automatically increase if needed
         self._builder = flatbuffers.Builder(1024)
 
-        self._transformer_options = [
-            TransformerRule.REDUCE_AXIS_AS_INPUT,
-            TransformerRule.REMOVE_RESHAPE_INPUT,
-            TransformerRule.FUSE_FOR_RELU6,
-            TransformerRule.FUSE_ACTIVATION,
-            TransformerRule.CONV_ADD_ZERO_BIAS,
-            TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,
-            TransformerRule.FUSE_SOFTMAX,
-            TransformerRule.DECONV_SHAPE_AS_INPUT,
-            TransformerRule.MAKE_PADDING,
-            TransformerRule.FUSE_ASTYPE,
-            TransformerRule.TRANSPOSE_PATTERN_AS_INPUT,
-            TransformerRule.FUSE_FOR_LEAKY_RELU,
-            TransformerRule.EXPAND_MUL_ADD3,
-            TransformerRule.EXPAND_ADD_SIGMOID,
-        ]
-        optimize_for_conversion(self.net, self._transformer_options)
+        if transformer_options is not None:
+            self.transformer_options = transformer_options
+        optimize_for_conversion(self.net, self.transformer_options)
 
     def convert(self, disable_nhwc=False):
         # Note the 0th entry of this array must be an empty buffer (sentinel)
@@ -356,7 +363,7 @@ def convert_to_tflite(
         # MTK devices only support batch_size 1
         net.batch_size = 1
         set_platform("mtk")
-    converter = TFLiteConverter(net, graph_name)
+    converter = TFLiteConverter(net, None, graph_name)
     model = converter.convert()
 
     assert isinstance(output, str), "tflite_fpath must be string"

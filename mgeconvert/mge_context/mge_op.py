@@ -428,10 +428,11 @@ class ResizeForwardOpr(MgeOpr):
     name = "ResizeForward"
 
 
-class LeakyReluOpr(OpBase):
+class LeakyReluOpr(MgeOpr):
     name = "LeakyRelu"
 
-    def __init__(self, name, negative_slope):
+    def __init__(self, name, opr, negative_slope):
+        super().__init__(opr)
         self.name = name
         self.negative_slope = negative_slope
 

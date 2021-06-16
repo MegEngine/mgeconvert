@@ -6,6 +6,8 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+from typing import List
+
 import numpy as np
 
 from ..mge_context import (
@@ -15,6 +17,7 @@ from ..mge_context import (
     ConvolutionForwardOpr,
     MatrixMulOpr,
     TopologyNetwork,
+    TransformerRule,
     optimize_for_conversion,
 )
 from ..mge_context.mge_utils import get_dtype_name, get_logger
@@ -34,7 +37,17 @@ map_dtype = {
 
 
 class CambriconConverter:
-    def __init__(self, net, batch_size, core_number, data_type, use_nhwc=False):
+    transformer_options: List[TransformerRule] = []
+
+    def __init__(
+        self,
+        net,
+        transformer_options=None,
+        batch_size=4,
+        core_number=1,
+        data_type="float32",
+        use_nhwc=False,
+    ):
         if use_nhwc:
             Tensor.NCHW2NHWC = True
         Tensor._default_dtype = map_dtype[data_type]
@@ -42,8 +55,9 @@ class CambriconConverter:
         self.core_number = core_number
         self.data_type = map_dtype[data_type]
         self.mge_net = net
-        self._transformer_options = []
-        optimize_for_conversion(self.mge_net, self._transformer_options)
+        if transformer_options is not None:
+            self.transformer_options = transformer_options
+        optimize_for_conversion(self.mge_net, self.transformer_options)
         self.var_map = {}
         self.cn_inputs = []
         self.cn_outputs = []
@@ -205,7 +219,13 @@ def convert_to_cambricon(
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     net = TopologyNetwork(mge_fpath)
     logger.info("init converter...")
-    converter = CambriconConverter(net, batch_size, core_number, data_type, use_nhwc)
+    converter = CambriconConverter(
+        net,
+        batch_size=batch_size,
+        core_number=core_number,
+        data_type=data_type,
+        use_nhwc=use_nhwc,
+    )
     logger.info("convert operators to cambricon...")
     converter.convert()
     logger.info("%d operators converted...", len(converter.cn_oprs))

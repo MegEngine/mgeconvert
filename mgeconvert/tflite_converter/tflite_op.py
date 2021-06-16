@@ -7,6 +7,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import collections
+from typing import List
 
 import numpy as np
 from numpy import dtype
@@ -15,22 +16,27 @@ from ..mge_context import (
     AxisAddRemoveOpr,
     ConcatOpr,
     ConvBiasForwardOpr,
+    ConvForwardBiasOpr,
     ConvolutionBackwardDataOpr,
     ConvolutionForwardOpr,
     DimshuffleOpr,
     ElemwiseMultiTypeOpr,
     ElemwiseOpr,
+    LeakyReluOpr,
     MatrixMulOpr,
+    MgeOpr,
     PadOpr,
     PoolingForwardOpr,
     ReduceOpr,
     ReshapeOpr,
     ResizeForwardOpr,
     SoftmaxOpr,
+    Tensor,
     get_platform,
 )
 from .pyflexbuffers import dumps  # pylint: disable=import-error
 from .tflite import (  # pylint: disable=import-error
+    AbsOptions,
     AddOptions,
     ConcatenationOptions,
     Conv2DOptions,
@@ -38,11 +44,13 @@ from .tflite import (  # pylint: disable=import-error
     DivOptions,
     ExpOptions,
     FullyConnectedOptions,
+    LeakyReluOptions,
     MaximumMinimumOptions,
     MulOptions,
     NegOptions,
     PadOptions,
     Pool2DOptions,
+    PowOptions,
     ReducerOptions,
     ReshapeOptions,
     ResizeBilinearOptions,
@@ -60,12 +68,16 @@ from .tflite.Padding import Padding  # pylint: disable=import-error
 from .tflite.TensorType import TensorType  # pylint: disable=import-error
 
 
-def get_shape_param(tensor, mge_opr, disable_nhwc=False):
+def get_shape_param(tensor: Tensor, mge_opr: MgeOpr, disable_nhwc=False):
+    """
+    Return a tuple of shape and bytes(1dim) object for tflite operator, which will
+    restore its inp/out at runtime by the shape and bytes.
+    """
     if isinstance(mge_opr, ReshapeOpr):
         return tensor.shape, None
 
     shape = list(tensor.shape)
-    if tensor.ndim == 4:
+    if tensor.ndim == 4 and not tensor.is_faked:
         # OC, IC, H, W  to  OC, H, W, IC
         # NCHW to NHWC
         # except the output of reshape
@@ -82,7 +94,7 @@ def get_shape_param(tensor, mge_opr, disable_nhwc=False):
     if tensor.is_faked:
         return shape, tensor.byte_list
 
-    number_list = []
+    number_list: List[np.ndarray] = []
     value = tensor.np_data
     if value is not None:
         if value.ndim == 4:
@@ -90,7 +102,7 @@ def get_shape_param(tensor, mge_opr, disable_nhwc=False):
         number_list = value.reshape(-1)
 
     if len(number_list) > 0:
-        byte_list = []
+        byte_list: List[bytes] = []
         for i in number_list:
             byte_list.extend(i.tobytes())
         return shape, byte_list
@@ -142,6 +154,10 @@ def _elemwise(mge_opr, builder):  # pylint: disable=too-many-return-statements
         return BuiltinOperator.ADD, BuiltinOptions.AddOptions, options
 
     # return tuple of (tfl_op_type, option type, option)
+    if mge_opr.mode == "ABS":
+        AbsOptions.AbsOptionsStart(builder)
+        options = AbsOptions.AbsOptionsEnd(builder)
+        return BuiltinOperator.ABS, BuiltinOptions.AbsOptions, options
     if mge_opr.mode == "NEG":
         NegOptions.NegOptionsStart(builder)
         options = NegOptions.NegOptionsEnd(builder)
@@ -174,6 +190,10 @@ def _elemwise(mge_opr, builder):  # pylint: disable=too-many-return-statements
         )
         options = DivOptions.DivOptionsEnd(builder)
         return BuiltinOperator.DIV, BuiltinOptions.DivOptions, options
+    if mge_opr.mode == "POW":
+        PowOptions.PowOptionsStart(builder)
+        options = PowOptions.PowOptionsEnd(builder)
+        return BuiltinOperator.POW, BuiltinOptions.PowOptions, options
     if mge_opr.mode == "EXP":
         ExpOptions.ExpOptionsStart(builder)
         options = ExpOptions.ExpOptionsEnd(builder)
@@ -267,7 +287,7 @@ def _pooling(mge_opr, builder):
     return tfl_opr_type, BuiltinOptions.Pool2DOptions, options
 
 
-@_register_op(ConvolutionForwardOpr, ConvBiasForwardOpr)
+@_register_op(ConvolutionForwardOpr, ConvBiasForwardOpr, ConvForwardBiasOpr)
 def _conv2d(mge_opr, builder):
     if mge_opr.group > 1:
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsStart(builder)
@@ -398,3 +418,11 @@ def _dimshuffle(_, builder):
     TransposeOptions.TransposeOptionsStart(builder)
     options = TransposeOptions.TransposeOptionsEnd(builder)
     return BuiltinOperator.TRANSPOSE, BuiltinOptions.TransposeOptions, options
+
+
+@_register_op(LeakyReluOpr)
+def _leaky_relu(mge_opr, builder):
+    LeakyReluOptions.LeakyReluOptionsStart(builder)
+    LeakyReluOptions.LeakyReluOptionsAddAlpha(builder, mge_opr.negative_slope[0])
+    options = LeakyReluOptions.LeakyReluOptionsEnd(builder)
+    return BuiltinOperator.LEAKY_RELU, BuiltinOptions.LeakyReluOptions, options

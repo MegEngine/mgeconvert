@@ -59,6 +59,9 @@ def _test_convert_result(
     assert np.allclose(pred_tfl, mge_result, atol=max_err)
 
 
+@pytest.mark.skipif(
+    megengine.__version__ <= "0.6.0", reason="Transformer does not support 0.6.0"
+)
 def test_conv2d():
     net = ConvOpr("normal")
     mge_result = dump_mge_model(net, net.data, tmp_file)
@@ -101,10 +104,12 @@ def test_reshape():
 @pytest.mark.parametrize(
     "mode",
     [
+        "abs",
         "add",
         "sub",
         "mul",
         "div",
+        "pow",
         "exp",
         "max",
         "fuse_add_relu",
@@ -128,7 +133,7 @@ def test_elemwise(mode):
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "exp", "max"])
+@pytest.mark.parametrize("mode", ["add", "sub", "mul", "div", "exp", "max", "abs"])
 def test_elemwise_broadcast(mode):
     net = ElemwiseOpr(mode)
     mge_result = dump_mge_model(net, np.array([2.0]).astype("float32"), tmp_file)

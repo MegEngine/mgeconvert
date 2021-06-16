@@ -63,7 +63,7 @@ convert caffe -h
 
 |   |Caffe|ONNX|Cambricon|TFLite|
 |-- |-----|----|---------|------|
-|abs| ✓ | ✓ | ✓ | × |
+|abs| ✓ | ✓ | ✓ | ✓ |
 |add| ✓ | ✓ | ✓ | ✓ |
 |average pool2d| ✓ | ✓ | ✓ | ✓ |
 |batchnorm| ✓ | ✓ | ✓ | × |
@@ -80,7 +80,7 @@ convert caffe -h
 |matrix mul| ✓ | ✓ | ✓ | ✓ |
 |max pool2d| ✓ | ✓ | ✓ | ✓ |
 |mul| ✓ | ✓ | ✓ | ✓ |
-|pow| ✓ | ✓ | ✓ | × |
+|pow| ✓ | ✓ | ✓ | ✓ |
 |reduce max| ✓ | ✓ | ✓ | ✓ |
 |reduce sum| ✓ | ✓ | ✓ | ✓ |
 |relu| ✓ | ✓ | ✓ | ✓ |
