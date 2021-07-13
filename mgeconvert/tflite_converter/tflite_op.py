@@ -70,12 +70,24 @@ def get_shape_param(tensor, mge_opr, disable_nhwc=False):
         # NCHW to NHWC
         # except the output of reshape
         if not disable_nhwc:
-            shape = [
-                tensor.shape[0],
-                tensor.shape[2],
-                tensor.shape[3],
-                tensor.shape[1],
-            ]
+            if (
+                hasattr(mge_opr, "type")
+                and mge_opr.type == "ConvolutionBackwardData"
+                and tensor.np_data is not None
+            ):
+                shape = [
+                    tensor.shape[1],
+                    tensor.shape[2],
+                    tensor.shape[3],
+                    tensor.shape[0],
+                ]
+            else:
+                shape = [
+                    tensor.shape[0],
+                    tensor.shape[2],
+                    tensor.shape[3],
+                    tensor.shape[1],
+                ]
     elif tensor.ndim > 4:
         assert False, "ERROR: output ndim {0} is not supported now".format(tensor.ndim)
 
@@ -86,7 +98,10 @@ def get_shape_param(tensor, mge_opr, disable_nhwc=False):
     value = tensor.np_data
     if value is not None:
         if value.ndim == 4:
-            value = value.transpose(0, 2, 3, 1)
+            if hasattr(mge_opr, "type") and mge_opr.type == "ConvolutionBackwardData":
+                value = value.transpose(1, 2, 3, 0)
+            else:
+                value = value.transpose(0, 2, 3, 1)
         number_list = value.reshape(-1)
 
     if len(number_list) > 0:
