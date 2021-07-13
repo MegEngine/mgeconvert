@@ -68,6 +68,12 @@ def test_conv2d():
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
+def test_deconv2d():
+    net = ConvOpr("tflite_transpose")
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
 def test_linear():
     net = LinearOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)

@@ -84,6 +84,17 @@ class ConvOpr(M.Module):
             np.random.random(self.transpose_conv[1].bias.shape).astype(np.float32)
         )
 
+        self.tflite_transpose_conv = M.Sequential(
+            M.ConvTranspose2d(3, 5, (3, 4), stride=(3, 2), groups=1),
+            M.ConvTranspose2d(5, 3, (3, 3)),
+        )
+        self.tflite_transpose_conv[0].bias = mge.Parameter(
+            np.random.random(self.transpose_conv[0].bias.shape).astype(np.float32)
+        )
+        self.tflite_transpose_conv[1].bias = mge.Parameter(
+            np.random.random(self.transpose_conv[1].bias.shape).astype(np.float32)
+        )
+
     def forward(self, x):
         return getattr(self, self.mode + "_conv")(x)
 

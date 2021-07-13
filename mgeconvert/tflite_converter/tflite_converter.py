@@ -107,6 +107,11 @@ class TFLiteConverter:
             if tfl_opr_type not in self._opr_type_list:
                 self._opr_type_list.append(tfl_opr_type)
 
+            if hasattr(mge_opr, "type") and mge_opr.type == "ConvolutionBackwardData":
+                mge_opr.inp_vars = [mge_opr.inp_vars[0]] + list(
+                    reversed(mge_opr.inp_vars[-2:])
+                )  # shape, weight, input
+
             # buffer and tensor
             for var in mge_opr.inp_vars + mge_opr.out_vars:
                 if var in self._var2tensor:
