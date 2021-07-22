@@ -31,6 +31,8 @@ from ..mge_context import (
     ReshapeOpr,
     ResizeForwardOpr,
     SoftmaxOpr,
+    SqueezeOpr,
+    SubtensorOpr,
     Tensor,
     get_platform,
 )
@@ -55,6 +57,8 @@ from .tflite import (  # pylint: disable=import-error
     ReshapeOptions,
     ResizeBilinearOptions,
     SoftmaxOptions,
+    SqueezeOptions,
+    StridedSliceOptions,
     SubOptions,
     TransposeConvOptions,
     TransposeOptions,
@@ -441,3 +445,24 @@ def _leaky_relu(mge_opr, builder):
     LeakyReluOptions.LeakyReluOptionsAddAlpha(builder, mge_opr.negative_slope[0])
     options = LeakyReluOptions.LeakyReluOptionsEnd(builder)
     return BuiltinOperator.LEAKY_RELU, BuiltinOptions.LeakyReluOptions, options
+
+
+@_register_op(SubtensorOpr)
+def _subtensor(_, builder):
+    StridedSliceOptions.StridedSliceOptionsStart(builder)
+    options = StridedSliceOptions.StridedSliceOptionsEnd(builder)
+    return BuiltinOperator.STRIDED_SLICE, BuiltinOptions.StridedSliceOptions, options
+
+
+@_register_op(SqueezeOpr)
+def _squeeze(mge_opr, builder):
+    SqueezeOptions.SqueezeOptionsStartSqueezeDimsVector(
+        builder, len(mge_opr.squeeze_dims)
+    )
+    for i in mge_opr.squeeze_dims:
+        builder.PrependInt32(i)
+    squeeze_dims = builder.EndVector(len(mge_opr.squeeze_dims))
+    SqueezeOptions.SqueezeOptionsStart(builder)
+    SqueezeOptions.SqueezeOptionsAddSqueezeDims(builder, squeeze_dims)
+    options = SqueezeOptions.SqueezeOptionsEnd(builder)
+    return BuiltinOperator.SQUEEZE, BuiltinOptions.SqueezeOptions, options

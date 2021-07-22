@@ -448,3 +448,8 @@ class SoftmaxOpr(OpBase):
 
 class PadOpr(OpBase):
     name = "Pad"
+
+
+class SqueezeOpr(OpBase):
+    name = "Squeeze"
+    squeeze_dims = []  # type: ignore[var-annotated]

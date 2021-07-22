@@ -55,6 +55,7 @@ class TFLiteConverter:
         TransformerRule.FUSE_FOR_LEAKY_RELU,
         TransformerRule.EXPAND_MUL_ADD3,
         TransformerRule.EXPAND_ADD_SIGMOID,
+        TransformerRule.SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE,
     ]
 
     def __init__(self, toponet, transformer_options=None, graph_name="graph"):

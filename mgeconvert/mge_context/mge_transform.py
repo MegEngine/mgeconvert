@@ -136,6 +136,8 @@ class TransformerRule(Enum):
     FUSE_FOR_DECONV_BIAS = 115
     FUSE_FOR_FULLY_CONNECTED = 116
     RESHAPE_BIAS_TO_1DIM = 117
+    # for TFLite Converter
+    SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE = 200
 
 
 TRANSFORMMAP: Dict[Enum, Callable] = {}
@@ -410,6 +412,73 @@ def _deconv_shape_as_input(net):
         net.max_id += 1
         shape_tensor = net.get_var(shape_symvar)
         op.inp_vars = [shape_tensor, op.inp_vars[1], op.inp_vars[0]]
+
+
+@_register_tranformation_rule(TransformerRule.SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE)
+def _make_slice_as_inputs(net):
+    for op in net.all_oprs:
+        if not isinstance(op, Ops.SubtensorOpr):
+            continue
+
+        ndim = op.inp_vars[0].ndim
+
+        def make_input(axis, param, init_value):
+            # make inputs: begin, end and step.
+            ret = [init_value] * ndim  # pylint: disable=cell-var-from-loop
+            for k, v in zip(axis, param):
+                ret[k] = v
+            ret = FakeSymbolVar(
+                sid=net.max_id,
+                name=op.name + "fake_input",  # pylint: disable=cell-var-from-loop
+                shape=[len(ret)],
+                dtype=np.int32,
+                owner=op,  # pylint: disable=cell-var-from-loop
+                byte_list=np.array(ret, np.int32).tobytes(),
+            )
+            net.max_id += 1
+            return net.get_var(ret)
+
+        begins_tensor = make_input(op.axis, op.begin_param, 0)
+        ends_tensor = make_input(op.axis, op.end_param, np.iinfo(np.int32).max)
+        steps_tensor = make_input(op.axis, op.step_param, 1)
+
+        op.inp_vars = [op.inp_vars[0], begins_tensor, ends_tensor, steps_tensor]
+
+        # TFLite slice do not support squeeze axis, so insert a squeeze opr here.
+        # infer actual output shape of tflite slice
+        desired_out_shape = op.out_vars[0].shape
+        actual_out_shape = [1] * ndim
+        idx = 0
+        for i in range(ndim):
+            if i in op.squeeze_axis:
+                continue
+            actual_out_shape[i] = desired_out_shape[idx]
+            idx += 1
+        slice_out_symvar = FakeSymbolVar(
+            sid=net.max_id,
+            name=op.name + "fake_output",
+            shape=actual_out_shape,
+            dtype=op.out_vars[0].dtype,
+            owner=op,
+        )
+        net.max_id += 1
+        slice_op_output = net.get_var(slice_out_symvar)
+        old_out = op.out_vars
+        op.out_vars = [slice_op_output]
+
+        squeeze = Ops.SqueezeOpr()
+        squeeze.squeeze_dims = op.squeeze_axis
+        squeeze.inp_vars = [slice_op_output]
+        squeeze.out_vars = old_out
+        squeeze.inp_oprs = [op]
+        squeeze.out_oprs = op.out_oprs
+        op.out_oprs = [squeeze]
+        squeeze.id = net.max_id
+        net.max_id += 1
+
+        idx = net._opr_ids.index(op.id) + 1
+        net._opr_ids.insert(idx, squeeze.id)
+        net.all_oprs.insert(idx, squeeze)
 
 
 @_register_tranformation_rule(TransformerRule.PADDING_FOR_CONV)
