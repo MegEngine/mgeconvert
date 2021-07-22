@@ -24,6 +24,7 @@ from .utils import (
     ReduceOpr,
     ReshapeOpr,
     SoftmaxOpr,
+    SubtensorOpr,
     TransposeOpr,
     XORNet,
     dump_mge_model,
@@ -168,6 +169,12 @@ def test_transopse():
     net = TransposeOpr()
     mge_result = dump_mge_model(net, net.data)
     _test_convert_result(net.data, tmp_file, mge_result, max_error, nhwc2=False)
+
+
+def test_slice():
+    net = SubtensorOpr()
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error, False, False)
 
 
 def test_xornet():

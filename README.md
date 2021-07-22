@@ -89,8 +89,8 @@ convert caffe -h
 |softmax| ✓ | ✓ | ✓ | ✓ |
 |leaky_relu| ✓ | × | × | ✓ |
 |sub| ✓ | ✓ | ✓ | ✓ |
-|slice(subtensor)| ✓ | ✓ | ✓ | × |
-|squeeze(axis_add_remove)| ✓ | ✓ | ✓ | × |
+|slice(subtensor)| ✓ | ✓ | ✓ | ✓ |
+|squeeze(axis_add_remove)| ✓ | ✓ | ✓ | ✓ |
 |tanh| ✓ | ✓ | ✓ | ✓ |
 |typecvt|  ✓ | ✓ | ✓ | ✓ |
-|transpose(dimshuffle)| ✓ | ✓ | ✓ | × |
+|transpose(dimshuffle)| ✓ | ✓ | ✓ | ✓ |
