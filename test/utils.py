@@ -112,6 +112,7 @@ class LinearOpr(M.Module):
     def forward(self, x):
         x = self.linear(x)
         x = self.linear_bias(x)
+        x = F.relu(x)
         return x
 
 

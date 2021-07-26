@@ -88,7 +88,9 @@ def test_fuse_for_fully_connected():
     net = LinearOpr()
     dump_mge_model(net, net.data, "test_model.mge")
     net = TopologyNetwork("test_model.mge")
+    optimize_for_conversion(net, TransformerRule.FUSE_ACTIVATION)
     optimize_for_conversion(net, TransformerRule.FUSE_FOR_FULLY_CONNECTED)
+    assert net.all_oprs[-1].activation == "RELU"
     actual = list(type(opr).__name__ for opr in net.all_oprs)
     desired = ["Host2DeviceCopyOpr", "MatrixMulOpr", "FullyConnectedOpr"]
     assert actual == desired

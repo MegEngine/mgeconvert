@@ -245,6 +245,8 @@ def _fuse_activation(net):
             isinstance(op, ElemwiseOpr) and op.mode in ("RELU", "TANH")
         ):
             prev_op = op.inp_oprs[0]
+            if prev_op.activation != "IDENTITY":
+                continue
 
             # activation(relu/relu6/tanh) must be fused with previous opr
             activation = getattr(op, "mode", "IDENTITY")
@@ -728,6 +730,7 @@ def _fuse_for_conv_bias(opr):
             conv_node.op._opr,
             bias_node.inp_const[0][1],
         )
+        conv_bias.activation = add_opr.activation
         conv_bias.inp_vars = conv_node.op.inp_vars + bias_node.op.inp_vars[1:]
         conv_bias.out_vars = bias_node.op.out_vars
         conv_bias.inp_oprs = conv_node.op.inp_oprs
@@ -787,6 +790,7 @@ def _fuse_for_deconv_bias(opr):
             conv_node.op._opr,
             bias_node.inp_const[0][1],
         )
+        deconv_bias.activation = add_opr.activation
         deconv_bias.inp_vars = conv_node.op.inp_vars + bias_node.op.inp_vars[1:]
         deconv_bias.out_vars = bias_node.op.out_vars
         deconv_bias.inp_oprs = conv_node.op.inp_oprs
@@ -825,6 +829,7 @@ def _fuse_for_fully_connected(opr):
     bias_node = PatternNode("ADD", is_output=True)
     matrix_mul_node = PatternNode(Ops.MatrixMulOpr.__name__)
     bias_node.inp_oprs = [matrix_mul_node]
+
     add_opr = opr.out_oprs[0]
     if match(bias_node, add_opr):
         fully_connected = Ops.FullyConnectedOpr(
@@ -832,6 +837,7 @@ def _fuse_for_fully_connected(opr):
             matrix_mul_node.op._opr,
             bias_node.inp_const[0][1],
         )
+        fully_connected.activation = add_opr.activation
         fully_connected.inp_vars = (
             matrix_mul_node.op.inp_vars + bias_node.op.inp_vars[1:]
         )
