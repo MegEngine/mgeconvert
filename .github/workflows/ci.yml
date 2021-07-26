@@ -31,7 +31,7 @@ jobs:
   pytest-transform:
     runs-on: ubuntu-latest
     container:
-      image: xpdnbd/mgeconvert_ci:v0.1
+      image: enginesh233/mgeconvert_ci:v1.0
     defaults:
       run:
         shell: bash
@@ -43,7 +43,7 @@ jobs:
   pytest-cambricon:
     runs-on: ubuntu-latest
     container:
-      image: xpdnbd/mgeconvert_ci:v0.1
+      image: enginesh233/mgeconvert_ci:v1.0
     defaults:
       run:
         shell: bash
@@ -61,7 +61,7 @@ jobs:
   pytest-caffe-and-onnx:
     runs-on: ubuntu-latest
     container:
-      image: xpdnbd/mgeconvert_ci:v0.1
+      image: enginesh233/mgeconvert_ci:v1.0
     defaults:
       run:
         shell: bash
@@ -73,7 +73,7 @@ jobs:
   pytest-tflite:
     runs-on: ubuntu-latest
     container:
-      image: xpdnbd/mgeconvert_ci:v0.1
+      image: enginesh233/mgeconvert_ci:v1.0
     defaults:
       run:
         shell: bash
