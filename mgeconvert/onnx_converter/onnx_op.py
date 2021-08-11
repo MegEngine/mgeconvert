@@ -321,8 +321,16 @@ class ReshapeConverter(OperatorBaseConverter):
         outputs = self._get_outputs()
         inp_var = self._opr.inp_vars
         inputs[1] = self._opr.name + "shape_onnx"
+        contain_neg_1 = np.any(np.array(inp_var[1].shape) == -1)
+
+        if not contain_neg_1:
+            shape = list(inp_var[1].shape)
+            shape[0] = -1
+        else:
+            shape = inp_var[1].shape
+
         shape_tensor = onnx.helper.make_tensor_value_info(
-            inputs[1], mge2onnx_dtype_mapping[np.int64], inp_var[1].shape
+            inputs[1], mge2onnx_dtype_mapping[np.int64], shape
         )
         shape_param = onnx.numpy_helper.from_array(
             self._opr.shape_param.astype(np.int64), inputs[1]
