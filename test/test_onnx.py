@@ -126,7 +126,20 @@ def test_reshape():
 
 @pytest.mark.parametrize(
     "mode",
-    ["add", "sub", "mul", "div", "abs", "exp", "log", "pow", "ceil", "floor", "max"],
+    [
+        "add",
+        "sub",
+        "mul",
+        "div",
+        "abs",
+        "exp",
+        "log",
+        "pow",
+        "ceil",
+        "floor",
+        "max",
+        "switch_gt0",
+    ],
 )
 def test_elemwise(mode):
     net = ElemwiseOpr(mode)
@@ -181,6 +194,32 @@ def test_convolutionbackwardfilter():
     )
 
 
+@pytest.mark.skipif(
+    get_mge_version() < "1.5.0",
+    reason="MGE file for testing was dumped at version 1.5.0",
+)
+@pytest.mark.parametrize("mode", ["max", "avg"])
+def test_pooling_backward(mode):
+    net = PoolOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    import megengine.utils.comp_graph_tools as cgtools
+
+    def infer_mge(x, file):
+        infer_cg = cgtools.GraphInference(file + ".mge")
+        y = list(infer_cg.run(x).values())[0]
+        return y
+
+    if mode == "max":
+        file = os.path.join(os.path.dirname(__file__), tmp_file)
+        data = np.ones((30, 3, 224, 224), dtype=np.float32)
+        mge_result = infer_mge(data, file)
+        _test_convert_result(
+            data, file, mge_result, max_error, min_version=8, max_version=10
+        )
+    elif mode == "avg":
+        return
+
+
 @pytest.mark.parametrize(
     "model",
     [
@@ -215,3 +254,23 @@ def test_xornet():
     net = XORNet()
     mge_result = dump_mge_model(net, net.data, tmp_file, True)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+resblock = "resblock_l2loss.mge"
+resnet = "resnet18_celoss.mge"
+
+
+def test_resblock():
+    if megengine.__version__ < "1.4.0":
+        return
+    net = TopologyNetwork(resblock)
+    converter = OnnxConverter(net, opset_version=10, graph_name="graph")
+    model = converter.convert()
+
+
+def test_resnet():
+    if megengine.__version__ < "1.4.0":
+        return
+    net = TopologyNetwork(resnet)
+    converter = OnnxConverter(net, opset_version=10, graph_name="graph")
+    model = converter.convert()

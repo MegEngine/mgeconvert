@@ -25,6 +25,7 @@ from ..mge_context import (
     MarkNoBroadcastElemwiseOpr,
     MatrixMulOpr,
     MultipleDeviceTensorHolderOpr,
+    PoolingBackwardOpr,
     PoolingForwardOpr,
     ReduceOpr,
     ReshapeOpr,
@@ -165,6 +166,8 @@ class ElemwiseConverter(OperatorBaseConverter):
         "CEIL": "Ceil",
         "POW": "Pow",
         "MAX": "Max",
+        "NEGATE": "Neg",
+        "SWITCH_GT0": "SWITCH_GT0",
     }
 
     def __init__(self, opr):
@@ -192,6 +195,30 @@ class ElemwiseConverter(OperatorBaseConverter):
             mul = onnx.helper.make_node("Mul", [inputs[0], inputs[1]], [tmp_tensor])
             add = onnx.helper.make_node("Add", [tmp_tensor, inputs[2]], [outputs[0]])
             return [mul, add], self._net_sources, self._parameters
+        if self.__opr_type__ == "SWITCH_GT0":
+            inputs = self._get_inputs()
+            outputs = self._get_outputs()
+            zero = inputs[0] + "_ZERO"
+            dtype = self._opr.inp_vars[0].dtype
+            zero_source = onnx.helper.make_tensor_value_info(
+                zero, mge2onnx_dtype_mapping[dtype], (1,)
+            )
+            zero_param = onnx.numpy_helper.from_array(np.zeros(1, dtype=dtype), zero)
+            self._net_sources.append(zero_source)
+            self._parameters.append(zero_param)
+
+            GT_0_OUT = inputs[0] + "_GT0"
+            gt_0 = onnx.helper.make_node("Less", [zero, inputs[0]], [GT_0_OUT])
+            gt_0_cast = onnx.helper.make_node(
+                "Cast",
+                inputs=[GT_0_OUT],
+                outputs=[GT_0_OUT + "_Cast"],
+                to=mge2onnx_dtype_mapping[self._opr.inp_vars[1].dtype],
+            )
+            GT_0_OUT = GT_0_OUT + "_Cast"
+            gt_mat_y = onnx.helper.make_node("Mul", [GT_0_OUT, inputs[1]], [outputs[0]])
+
+            return [gt_0, gt_0_cast, gt_mat_y], self._net_sources, self._parameters
         else:
             return super().convert()
 
@@ -477,16 +504,56 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
 
         # Slice
         # grad_weight: (1, no x co x ci // group, ?, ?) -> (1, no x co x ci // group, kh, kw)
-        grad_weight_slice_out = outputs[0] + "_grad_weight_slice_out"
-        grad_weight_slice = onnx.helper.make_node(
-            "Slice",
-            [grad_weight],
-            [grad_weight_slice_out],
-            axes=[2, 3],
-            starts=[0, 0],
-            ends=[opr.kh, opr.kw],
-        )
-        nodes.append(grad_weight_slice)
+        if opset_version < 10:
+            grad_weight_slice_out = outputs[0] + "_grad_weight_slice_out"
+            grad_weight_slice = onnx.helper.make_node(
+                "Slice",
+                [grad_weight],
+                [grad_weight_slice_out],
+                axes=[2, 3],
+                starts=[0, 0],
+                ends=[opr.kh, opr.kw],
+            )
+            nodes.append(grad_weight_slice)
+        else:
+            grad_weight_slice_out = outputs[0] + "_grad_weight_slice_out"
+
+            grad_slice_begin = outputs[0] + "_grad_weight_slice_begin"
+            grad_slice_end = outputs[0] + "_grad_weight_slice_end"
+            grad_slice_axis = outputs[0] + "_grad_weight_slice_axis"
+
+            grad_slice_begin_source = onnx.helper.make_tensor_value_info(
+                grad_slice_begin, mge2onnx_dtype_mapping[np.int64], (1,)
+            )
+            grad_slice_end_source = onnx.helper.make_tensor_value_info(
+                grad_slice_end, mge2onnx_dtype_mapping[np.int64], (1,)
+            )
+            grad_slice_axis_source = onnx.helper.make_tensor_value_info(
+                grad_slice_axis, mge2onnx_dtype_mapping[np.int64], (1,)
+            )
+            grad_slice_begin_param = onnx.numpy_helper.from_array(
+                np.array([0, 0], dtype=np.int64), grad_slice_begin
+            )
+            grad_slice_end_param = onnx.numpy_helper.from_array(
+                np.array([opr.kh, opr.kw], dtype=np.int64), grad_slice_end
+            )
+            grad_slice_axis_param = onnx.numpy_helper.from_array(
+                np.array([2, 3], dtype=np.int64), grad_slice_axis
+            )
+
+            self._net_sources.extend(
+                [grad_slice_begin_source, grad_slice_end_source, grad_slice_axis_source]
+            )
+            self._parameters.extend(
+                [grad_slice_begin_param, grad_slice_end_param, grad_slice_axis_param]
+            )
+
+            grad_weight_slice = onnx.helper.make_node(
+                "Slice",
+                inputs=[grad_weight, grad_slice_begin, grad_slice_end, grad_slice_axis],
+                outputs=[grad_weight_slice_out],
+            )
+            nodes.append(grad_weight_slice)
 
         # Reshape
         # grad_weight: (1, no x co x ci // group, kh, kw) -> (no, co x ci // group, kh, kw)
@@ -579,6 +646,87 @@ class Pooling2DConverter(OperatorBaseConverter):
             attribute["count_include_pad"] = 0 if self.exclude_pad else 1
 
         return attribute
+
+
+@_register_op(PoolingBackwardOpr)
+class PoolingBackward2DConverter(Pooling2DConverter):
+    """
+    for more information , see:
+    https://github.com/pytorch/pytorch/blob/4cb534f92ef6f5b2ec99109b0329f93a859ae831/aten/src/ATen/native/mkldnn/Pooling.cpp
+    average_pooling dP_prev[h*stride_h: h*stride_h + f_h, w*stride_w: w*stride_w+f_w, c] = dP[h,w,c] * 1/(f_h*f_w) * np.ones(f_h,f_w)
+    max_pooling  dP_prev[h*stride_h: h*stride_h + f_h, w*stride_w: w*stride_w+f_w, c] = dP[h,w,c] * (P_prev[h*stride_h: h*stride_h + f_h, w*stride_w: w*stride_w+f_w, c] == max(P_prev[h*stride_h: h*stride_h + f_h, w*stride_w: w*stride_w+f_w, c]))
+    """
+
+    def __init__(self, opr):
+        super().__init__(opr)
+
+    def convert(self):
+        opr = self._opr
+        mode = self.__opr_type__
+        inputs = self._get_inputs()
+        outputs = self._get_outputs()
+        attribute = self._get_attrs()
+
+        input_relu_var, input_pooling_var, input_reshape_var = opr.inp_vars
+        output_var = opr.out_vars[0]
+
+        if mode == "AveragePool":
+            if opr.kh != opr.sh or opr.kw != opr.sw:
+                raise BaseException(
+                    "current convert can not support windows size not equal with stride size"
+                )
+            dp_expand = inputs[2] + "_expaned"
+            new_shape = inputs[0] + "_shape_average"
+            new_shape_tensor = onnx.helper.make_tensor_value_info(
+                new_shape, mge2onnx_dtype_mapping[np.int64], (4,)
+            )
+            self._parameters.append(
+                onnx.numpy_helper.from_array(
+                    np.array(input_relu_var.shape, dtype=np.int64), new_shape
+                )
+            )
+            self._net_sources.append(new_shape_tensor)
+
+            nodes = []
+            dp_expand_node = onnx.helper.make_node(
+                "Expand", inputs=[inputs[2], new_shape], outputs=[dp_expand],
+            )
+            nodes.append(dp_expand_node)
+            size_reciprocal = 1 / (opr.kh * opr.kw)
+            mean_name = inputs[2] + "_mean"
+            mean = onnx.helper.make_tensor_value_info(
+                mean_name, mge2onnx_dtype_mapping[input_pooling_var.dtype], (1,)
+            )
+            mean_value = onnx.numpy_helper.from_array(
+                np.array(size_reciprocal, dtype=input_pooling_var.dtype), mean_name
+            )
+            self._net_sources.append(mean)
+            self._parameters.append(mean_value)
+
+            mat_mean_node = onnx.helper.make_node(
+                "Mul", inputs=[dp_expand, mean_name], outputs=[outputs[0]],
+            )
+            nodes.append(mat_mean_node)
+            return (nodes, self._net_sources, self._parameters)
+
+        elif mode == "MaxPool":
+            # redo pooling to get index
+            pooling_idx = inputs[0] + "_max_index"
+            pooling_not_use = inputs[0] + "_repooling"
+            pooling_idx_node = onnx.helper.make_node(
+                "MaxPool",
+                inputs=[inputs[0]],
+                outputs=[pooling_not_use, pooling_idx],
+                **self._get_attrs(),
+            )
+            # unpooling
+            unpooling = onnx.helper.make_node(
+                "MaxUnpool",
+                inputs=[inputs[2], pooling_idx],
+                outputs=[outputs[0]],
+                **self._get_attrs(),
+            )
+            return [pooling_idx_node, unpooling], self._net_sources, self._parameters
 
 
 @_register_op(BatchNormForwardOpr)

@@ -86,6 +86,20 @@ class PoolingForwardOpr(MgeOpr):
         self.kh, self.kw = self.params["window_h"], self.params["window_w"]
 
 
+class PoolingBackwardOpr(MgeOpr):
+    name = "PoolingBackward"
+
+    def __init__(self, opr):
+        super().__init__(opr)
+
+        self.data_format = self.params["format"]
+        self.mode = self.params["mode"]
+
+        self.ph, self.pw = self.params["pad_h"], self.params["pad_w"]
+        self.sh, self.sw = self.params["stride_h"], self.params["stride_w"]
+        self.kh, self.kw = self.params["window_h"], self.params["window_w"]
+
+
 class MatrixMulOpr(MgeOpr):
     name = "MatrixMul"
 

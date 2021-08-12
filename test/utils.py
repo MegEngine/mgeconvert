@@ -12,6 +12,8 @@ import megengine as mge
 import megengine.functional as F
 import megengine.module as M
 import numpy as np
+from megengine.core.ops.builtin import Elemwise
+from megengine.core.tensor.array_method import _elwise
 from megengine.jit import trace
 
 
@@ -284,6 +286,10 @@ class ElemwiseOpr(M.Module):
         elif self.mode == "fuse_add_sigmoid":
             y = a + mge.tensor(self.data2)
             z = F.sigmoid(y)
+        elif self.mode == "switch_gt0":
+            x = a - mge.tensor(self.data2)
+            y = a + mge.tensor(self.data2)
+            z = _elwise(x, y, mode=Elemwise.Mode.SWITCH_GT0)
         else:
             raise NotImplementedError('no such elemwise mode "%s"' % self.mode)
         return z
