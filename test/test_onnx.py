@@ -178,19 +178,18 @@ def test_typecvt():
     reason="MGE file for testing was dumped at version 1.5.0",
 )
 def test_convolutionbackwardfilter():
-    import megengine.utils.comp_graph_tools as cgtools  # pylint: disable=import-outside-toplevel
+    import megengine.utils.comp_graph_tools as cgtools
 
     def infer_mge(x, file):
-        infer_cg = cgtools.GraphInference(file + ".mge")  # pylint: disable=no-member
+        infer_cg = cgtools.GraphInference(file + ".mge")
         y = list(infer_cg.run(x).values())[0]
-        print(y.mean())
         return y
 
     file = os.path.join(os.path.dirname(__file__), "convolution-backward-filter")
     data = np.ones((8, 1, 32, 32), dtype=np.float32)
     mge_result = infer_mge(data, file)
     _test_convert_result(
-        data, file, mge_result, max_error, min_version=8, max_version=8
+        data, file, mge_result, max_error, min_version=8, max_version=10
     )
 
 
@@ -201,23 +200,27 @@ def test_convolutionbackwardfilter():
 @pytest.mark.parametrize("mode", ["max", "avg"])
 def test_pooling_backward(mode):
     net = PoolOpr(mode)
-    mge_result = dump_mge_model(net, net.data, tmp_file)
-    import megengine.utils.comp_graph_tools as cgtools
 
     def infer_mge(x, file):
+        import megengine.utils.comp_graph_tools as cgtools
         infer_cg = cgtools.GraphInference(file + ".mge")
         y = list(infer_cg.run(x).values())[0]
         return y
 
     if mode == "max":
+        dump_mge_model(net, net.data2, tmp_file)
         file = os.path.join(os.path.dirname(__file__), tmp_file)
-        data = np.ones((30, 3, 224, 224), dtype=np.float32)
-        mge_result = infer_mge(data, file)
+        mge_result = infer_mge(net.data2, file)
         _test_convert_result(
-            data, file, mge_result, max_error, min_version=8, max_version=10
+            net.data2, file, mge_result, max_error, min_version=8, max_version=10
         )
     elif mode == "avg":
-        return
+        dump_mge_model(net, net.data1, tmp_file)
+        file = os.path.join(os.path.dirname(__file__), tmp_file)
+        mge_result = infer_mge(net.data1, file)
+        _test_convert_result(
+            net.data1, file, mge_result, max_error, min_version=8, max_version=10
+        )
 
 
 @pytest.mark.parametrize(
@@ -267,6 +270,28 @@ def test_resblock():
     converter = OnnxConverter(net, opset_version=10, graph_name="graph")
     model = converter.convert()
 
+    def infer_mge(x,y,file):
+        import megengine.utils.comp_graph_tools as cgtools
+        infer_cg = cgtools.GraphInference(file)
+        y = list(infer_cg.run(x,y).values())[0]
+        # print(y.mean())
+        return y
+
+    file = os.path.join(os.path.dirname(__file__), resnet)
+    data = np.random.randn(1, 64,2,2).astype("float32")
+    label = np.random.randn(1,1000).astype("float32")
+    mge_result = infer_mge(data,label,file)
+
+    with open(tmp_file + ".onnx", "wb") as fout:
+        fout.write(model.SerializeToString())
+    onnx_net = ort.InferenceSession(tmp_file + ".onnx")
+    input_name = onnx_net.get_inputs()[0].name
+    label_name = onnx_net.get_inputs()[1].name
+    pred_onx = onnx_net.run(None, {input_name: data , label_name: label})[0]
+    assert pred_onx.shape == mge_result.shape
+    assert pred_onx.dtype == mge_result.dtype
+    assert np.allclose(pred_onx, mge_result, atol=1e-4)
+
 
 def test_resnet():
     if megengine.__version__ < "1.4.0":
@@ -274,3 +299,25 @@ def test_resnet():
     net = TopologyNetwork(resnet)
     converter = OnnxConverter(net, opset_version=10, graph_name="graph")
     model = converter.convert()
+
+    def infer_mge(x,y,file):
+        import megengine.utils.comp_graph_tools as cgtools
+        infer_cg = cgtools.GraphInference(file)
+        y = list(infer_cg.run(x,y).values())[0]
+        return y
+
+    file = os.path.join(os.path.dirname(__file__), resnet)
+    data = np.random.randn(1, 3, 224, 224).astype("float32")
+    label = np.random.randn(1,1000).astype("float32")
+    mge_result = infer_mge(data,label,file)
+
+    with open(tmp_file + ".onnx", "wb") as fout:
+        fout.write(model.SerializeToString())
+    onnx_net = ort.InferenceSession(tmp_file + ".onnx")
+    input_name = onnx_net.get_inputs()[0].name
+    label_name = onnx_net.get_inputs()[1].name
+    pred_onx = onnx_net.run(None, {input_name: data , label_name: label})[0]
+    assert pred_onx.shape == mge_result.shape
+    assert pred_onx.dtype == mge_result.dtype
+    assert np.allclose(pred_onx, mge_result, atol=1e-4)
+

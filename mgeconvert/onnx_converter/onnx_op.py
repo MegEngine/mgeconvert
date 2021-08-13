@@ -523,13 +523,13 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
             grad_slice_axis = outputs[0] + "_grad_weight_slice_axis"
 
             grad_slice_begin_source = onnx.helper.make_tensor_value_info(
-                grad_slice_begin, mge2onnx_dtype_mapping[np.int64], (1,)
+                grad_slice_begin, mge2onnx_dtype_mapping[np.int64], (2,)
             )
             grad_slice_end_source = onnx.helper.make_tensor_value_info(
-                grad_slice_end, mge2onnx_dtype_mapping[np.int64], (1,)
+                grad_slice_end, mge2onnx_dtype_mapping[np.int64], (2,)
             )
             grad_slice_axis_source = onnx.helper.make_tensor_value_info(
-                grad_slice_axis, mge2onnx_dtype_mapping[np.int64], (1,)
+                grad_slice_axis, mge2onnx_dtype_mapping[np.int64], (2,)
             )
             grad_slice_begin_param = onnx.numpy_helper.from_array(
                 np.array([0, 0], dtype=np.int64), grad_slice_begin
@@ -670,6 +670,7 @@ class PoolingBackward2DConverter(Pooling2DConverter):
         input_relu_var, input_pooling_var, input_reshape_var = opr.inp_vars
         output_var = opr.out_vars[0]
 
+        print("var0 : {} , var1 : {}  var2: {}, kh: {} , kw :{} , sh :{} sw : {}".format(input_relu_var.shape,input_pooling_var.shape,input_reshape_var.shape, opr.kh,opr.kw,opr.sh,opr.sw))
         if mode == "AveragePool":
             if opr.kh != opr.sh or opr.kw != opr.sw:
                 raise BaseException(
@@ -692,19 +693,25 @@ class PoolingBackward2DConverter(Pooling2DConverter):
                 "Expand", inputs=[inputs[2], new_shape], outputs=[dp_expand],
             )
             nodes.append(dp_expand_node)
-            size_reciprocal = 1 / (opr.kh * opr.kw)
-            mean_name = inputs[2] + "_mean"
-            mean = onnx.helper.make_tensor_value_info(
-                mean_name, mge2onnx_dtype_mapping[input_pooling_var.dtype], (1,)
+
+            const_name = "average_unpool_const_value"
+            const_node_name = inputs[2] + "_average_unpool_mean"
+            const_value = onnx.helper.make_tensor(
+                    name = const_name,
+                    data_type = mge2onnx_dtype_mapping[input_pooling_var.dtype],
+                    dims=(1,),
+                    vals=np.array([opr.kw*opr.kh]).astype(input_pooling_var.dtype),
+                    )
+            const_node = onnx.helper.make_node(
+                    'Constant',
+                    inputs=[],
+                    outputs=[const_node_name],
+                    value=const_value,
             )
-            mean_value = onnx.numpy_helper.from_array(
-                np.array(size_reciprocal, dtype=input_pooling_var.dtype), mean_name
-            )
-            self._net_sources.append(mean)
-            self._parameters.append(mean_value)
+            nodes.append(const_node)
 
             mat_mean_node = onnx.helper.make_node(
-                "Mul", inputs=[dp_expand, mean_name], outputs=[outputs[0]],
+                "Div", inputs=[dp_expand, const_node_name], outputs=[outputs[0]],
             )
             nodes.append(mat_mean_node)
             return (nodes, self._net_sources, self._parameters)

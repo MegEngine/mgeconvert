@@ -122,9 +122,10 @@ class PoolOpr(M.Module):
     def __init__(self, mode):
         super().__init__()
         self.mode = mode
-        self.data = np.random.random((30, 3, 224, 224)).astype(np.float32)
-        self.maxpool = M.pooling.MaxPool2d(kernel_size=3, stride=2, padding=2)
-        self.avgpool = M.pooling.AvgPool2d(kernel_size=3, stride=2, padding=2)
+        self.data1 = np.random.random((1,512,7,7)).astype(np.float32)
+        self.data2 = np.random.random((1,64,112,112)).astype(np.float32)
+        self.maxpool = M.pooling.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.avgpool = M.pooling.AvgPool2d(kernel_size=7, stride=7, padding=0)
 
     def forward(self, x):
         return getattr(self, self.mode + "pool")(x)
