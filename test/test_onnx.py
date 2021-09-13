@@ -9,10 +9,12 @@
 import os
 
 import megengine
+import megengine.functional as F
 import megengine.hub
 import numpy as np
 import onnxruntime as ort
 import pytest
+from megengine.jit import trace
 from mgeconvert.mge_context import TopologyNetwork, get_mge_version
 from mgeconvert.onnx_converter.onnx_converter import OnnxConverter
 
@@ -63,6 +65,44 @@ def test_conv2d(mode):
     net = ConvOpr(mode)
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+def test_conv_functional():
+    if megengine.__version__ < "1.2.0":
+        return
+
+    def convf(x, kernel):
+        batch = int(kernel.shape[0])
+        channel = int(kernel.shape[1])
+        bc = batch * channel
+        x = x.reshape((1, bc, int(x.shape[2]), int(x.shape[3])))
+        kernel = kernel.reshape(bc, 1, 1, int(kernel.shape[2]), int(kernel.shape[3]))
+        out = F.conv2d(x, kernel, groups=bc)
+        out = out.reshape(batch, channel, int(out.shape[2]), int(out.shape[3]))
+        return out
+
+    @trace(symbolic=True, capture_as_const=True)
+    def inference(x, kernel):
+        output = convf(x, kernel)
+        return output
+
+    inpx = np.random.random((1, 48, 100, 100)).astype("float32")
+    inpk = np.random.random((1, 48, 64, 64)).astype("float32")
+    expect = inference(megengine.tensor(inpx), megengine.tensor(inpk)).numpy()
+    inference.dump(
+        tmp_file + ".mge", arg_names=["x", "kernel"], optimize_for_inference=False,
+    )
+    net = TopologyNetwork(tmp_file + ".mge")
+    for version in range(8, 13):
+        converter = OnnxConverter(net, opset_version=version, graph_name="graph")
+        model = converter.convert()
+        with open(tmp_file + ".onnx", "wb") as fout:
+            fout.write(model.SerializeToString())
+        onnx_net = ort.InferenceSession(tmp_file + ".onnx")
+        pred_onx = onnx_net.run(None, {"x": inpx, "kernel": inpk})[0]
+        assert pred_onx.shape == expect.shape
+        assert pred_onx.dtype == expect.dtype
+        assert np.allclose(pred_onx, expect, atol=1e-6)
 
 
 def test_linear():

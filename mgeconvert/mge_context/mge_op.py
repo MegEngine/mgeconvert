@@ -11,7 +11,13 @@ import sys
 from typing import List  # pylint: disable=unused-import
 
 from .mge_tensor import Tensor  # pylint: disable=unused-import
-from .mge_utils import get_mge_version, get_opr_type, get_shape, get_symvar_value
+from .mge_utils import (
+    get_dep_vars,
+    get_mge_version,
+    get_opr_type,
+    get_shape,
+    get_symvar_value,
+)
 
 mge_version = get_mge_version()
 
@@ -141,7 +147,10 @@ class ConvolutionForwardOpr(MgeOpr):
     def __init__(self, opr):
         super().__init__(opr)
         self.kernel_shape = get_shape(opr.inputs[1])
-        self.param_W = get_symvar_value(opr.inputs[1])
+        if len(get_dep_vars(opr.inputs[1], "Host2DeviceCopy")) == 0:
+            self.param_W = get_symvar_value(opr.inputs[1])
+        else:
+            self.param_W = None
         self.data_format = self.params["format"]
         self.dilation_w = self.params["dilate_w"]
         self.dilation_h = self.params["dilate_h"]
@@ -158,7 +167,7 @@ class ConvolutionForwardOpr(MgeOpr):
 
         self.num_output = get_shape(opr.outputs[0])[1]
         self.bias_term = False
-        self.group = self.param_W.shape[0] if self.param_W.ndim == 5 else 1
+        self.group = self.kernel_shape[0] if len(self.kernel_shape) == 5 else 1
 
 
 class ConvBiasForwardOpr(ConvolutionForwardOpr):
