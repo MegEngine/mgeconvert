@@ -28,36 +28,6 @@ jobs:
     - name: lint
       run: ./ci/lint.sh
 
-  pytest-transform:
-    runs-on: ubuntu-latest
-    container:
-      image: enginesh233/mgeconvert_ci:v1.0
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v2
-      - name: test transform
-        run: ./ci/pytest_transform.sh
-
-  pytest-cambricon:
-    runs-on: ubuntu-latest
-    container:
-      image: enginesh233/mgeconvert_ci:v1.0
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v2
-      - name: build cambricon
-        run: |
-          source ./ci/utils.sh
-          ./ci/build_cambricon.sh
-      - name: test cambricon
-        run: |
-          source ./ci/utils.sh
-          ./ci/pytest_cambricon.sh
-
   pytest-caffe-and-onnx:
     runs-on: ubuntu-latest
     container:
