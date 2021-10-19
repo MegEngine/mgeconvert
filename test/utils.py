@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # MegEngine is Licensed under the Apache License, Version 2.0 (the "License")
 #
 # Copyright (c) 2014-2020 Megvii Inc. All rights reserved.
@@ -6,6 +5,9 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+
+# pylint: disable=no-member
+
 import random
 
 import megengine as mge
@@ -112,7 +114,6 @@ class LinearOpr(M.Module):
     def forward(self, x):
         x = self.linear(x)
         x = self.linear_bias(x)
-        x = F.relu(x)
         return x
 
 
@@ -176,6 +177,25 @@ class ConcatOpr(M.Module):
 
     def forward(self, a):
         return F.concat([a, a], self.concat_idx)
+
+
+class FConcatOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.concat_idx = random.randint(0, 3)
+
+    def forward(self, inps):
+        return F.concat(inps, self.concat_idx)
+
+
+class MConcatOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.concat_idx = random.randint(0, 3)
+        self.m = M.Concat()
+
+    def forward(self, inps, axis=0):
+        return self.m(inps, axis)
 
 
 class SoftmaxOpr(M.Module):
@@ -249,6 +269,10 @@ class ElemwiseOpr(M.Module):
             x = a + mge.tensor(self.data)
             y = a + mge.tensor(self.data2)
             z = F.maximum(x, y)
+        elif self.mode == "min":
+            x = a + mge.tensor(self.data)
+            y = a + mge.tensor(self.data2)
+            z = F.minimum(x, y)
 
         elif self.mode == "pow":
             z = a ** 2
@@ -304,6 +328,19 @@ class ReduceOpr(M.Module):
             return F.max(a, axis=2)
 
 
+class ResizeOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((1, 2, 3, 4)).astype(np.float32)
+        self.out_shape = [8, 8]
+        self.out_shape2 = [3, 4]
+
+    def forward(self, x):
+        x = F.vision.interpolate(x, size=self.out_shape, mode="bilinear")
+        x = F.vision.interpolate(x, size=self.out_shape2, mode="bilinear")
+        return x
+
+
 class ActiveOpr(M.Module):
     str2fun = {
         "relu": F.relu,
@@ -311,20 +348,26 @@ class ActiveOpr(M.Module):
         "sigmoid": F.sigmoid,
         "leaky_relu": F.leaky_relu,
         "softmax": F.softmax,
-        "relu6": lambda x: F.maximum(F.minimum(x, 6), 0),
+        "relu6": F.relu6,
+        "hswish": F.hswish,
+        "hsigmoid": F.hsigmoid,
     }
+    if mge.__version__ >= "1.5.0":
+        str2fun["silu"] = F.silu
 
     def __init__(self, mode, fused=False):
         super().__init__()
         self.mode = mode
         self.fused = fused
         self.data = (np.random.random((1, 2, 3, 4)).astype(np.float32) - 0.5) * 8.0
+        self.sigmoid = M.Sigmoid()
+        self.act = ActiveOpr.str2fun[self.mode]
 
     def forward(self, x):
         if self.fused:
-            return ActiveOpr.str2fun[self.mode](x + x)
+            return self.act(x + x)
         else:
-            return ActiveOpr.str2fun[self.mode](x)
+            return self.act(x)
 
 
 class BroadcastOpr(M.Module):
@@ -396,3 +439,42 @@ class XORNet_LeakyRelu(M.Module):
         x = self.fc2(x)
         x = F.leaky_relu(x)
         return x
+
+
+class RepeatOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((2, 3, 4)).astype("float32")
+
+    def forward(self, x):
+        x = F.repeat(x, 2, axis=1)
+        return x
+
+
+class FlattenOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((1, 2, 3, 4)).astype(np.float32)
+
+    def forward(self, inps):
+        return F.flatten(inps)
+
+
+class DropoutOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((1, 2, 3, 4)).astype(np.float32)
+        self.drop_out = M.Dropout()
+
+    def forward(self, inps):
+        return self.drop_out(inps)
+
+
+class AdaptiveAvgPool2dOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((2, 512, 64, 64)).astype(np.float32)
+        self.gap = M.AdaptiveAvgPool2d((2, 2))
+
+    def forward(self, inps):
+        return self.gap(inps)

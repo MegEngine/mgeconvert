@@ -13,22 +13,25 @@ __version__ = re.search(r"__version__ = \"(.*)\"", __version_py__).group(1)
 
 
 targets = []
+tfversion = None
 
 
 class install(_install):
     user_options = _install.user_options + [
         ("targets=", None, "<description for this custom option>"),
+        ("tfversion=", None, "the version of tflite schema"),
     ]
 
     def initialize_options(self):
         _install.initialize_options(self)
         self.targets = None
+        self.tfversion = None
 
     def finalize_options(self):
         _install.finalize_options(self)
 
     def run(self):
-        options = ["caffe", "onnx", "cambricon", "tflite"]
+        options = ["caffe", "onnx", "tflite"]
         if self.targets == "all":
             targets.extend(options)
         else:
@@ -36,9 +39,20 @@ class install(_install):
 
         with open("mgeconvert/__init__.py", "a+") as init_file:
             [
-                init_file.write("from .%s_converter import convert_to_%s\n" % (i, i))
+                init_file.write(
+                    "from .converters.mge_to_%s import mge_to_%s\n" % (i, i)
+                )
                 for i in targets
             ]
+            [
+                init_file.write(
+                    "from .converters.tm_to_%s import tracedmodule_to_%s\n" % (i, i)
+                )
+                for i in targets
+            ]
+
+        global tfversion
+        tfversion = self.tfversion
 
         _install.run(self)
 
@@ -55,7 +69,10 @@ class build_ext(_build_ext):
         raise TypeError("can not build %s" % name)
 
     def build_all(self, ext):
-        subprocess.check_call(ext.script)
+        if ext.name == "tflite" and tfversion is not None:
+            subprocess.check_call([ext.script, tfversion])
+        else:
+            subprocess.check_call(ext.script)
         if ext.artifacts is not None:
             self.copy_tree(ext.artifacts, os.path.join(self.build_lib, ext.artifacts))
 
@@ -70,19 +87,14 @@ class BuildExtension(Extension):
 ext_modules = [
     BuildExtension(
         name="caffe",
-        script="mgeconvert/caffe_converter/init.sh",
-        artifacts="mgeconvert/caffe_converter/caffe_pb",
+        script="mgeconvert/backend/ir_to_caffe/init.sh",
+        artifacts="mgeconvert/backend/ir_to_caffe/caffe_pb",
     ),
-    BuildExtension(name="onnx", script="mgeconvert/onnx_converter/init.sh"),
-    BuildExtension(
-        name="cambricon",
-        script="mgeconvert/cambricon_converter/init.sh",
-        artifacts="mgeconvert/cambricon_converter/lib/cnlib",
-    ),
+    BuildExtension(name="onnx", script="mgeconvert/backend/ir_to_onnx/init.sh"),
     BuildExtension(
         name="tflite",
-        script="mgeconvert/tflite_converter/init.sh",
-        artifacts="mgeconvert/tflite_converter/",
+        script="mgeconvert/backend/ir_to_tflite/init.sh",
+        artifacts="mgeconvert/backend/ir_to_tflite/",
     ),
 ]
 

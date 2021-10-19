@@ -1,7 +1,8 @@
 __pycache__
-mgeconvert/caffe_converter/caffe_pb
-mgeconvert/tflite_converter/tflite/
+mgeconvert/backend/ir_to_caffe/caffe_pb
+mgeconvert/backend/ir_to_tflite/tflite/
 *.tflite
 *.onnx
 *.so
 .mypy_cache
+*.tm
