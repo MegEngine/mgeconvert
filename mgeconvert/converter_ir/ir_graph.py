@@ -42,6 +42,11 @@ class IRGraph:
         del self.all_oprs[index]
         del self._opr_ids[index]
 
+    def replace_op(self, old_op, new_op):
+        index = self.all_oprs.index(old_op)
+        self.all_oprs[index] = new_op
+        self._opr_ids[index] = id(new_op)
+
     def get_tensor(self, var_id, ir_tensor: IRTensor, origin_tensor: IRTensor = None):
         """
         var_id: origin var id

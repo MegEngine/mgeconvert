@@ -93,8 +93,9 @@ class PadOpr(OpBase):
 class BatchNormalizationOpr(OpBase):
     name = "BatchNormalization"
 
-    def __init__(self, output_idx=0):
+    def __init__(self, eps=1e-5, output_idx=-1):
         super().__init__()
+        self.eps = eps
         self.output_idx = output_idx
 
 

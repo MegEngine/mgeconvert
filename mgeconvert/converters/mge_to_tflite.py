@@ -38,6 +38,9 @@ def mge_to_tflite(
         TransformerRule.EXPAND_MUL_ADD3,
         TransformerRule.FUSE_FOR_CONV_BIAS,
         TransformerRule.FUSE_FOR_LEAKY_RELU,
+        TransformerRule.REMOVE_RESHAPE_INPUT,
+        TransformerRule.FUSE_CONV_BN,
+        TransformerRule.REMOVE_IDENTITY,
     ]
     if mtk:
         # MTK devices only support batch_size 1

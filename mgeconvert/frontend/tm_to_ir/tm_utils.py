@@ -5,8 +5,21 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+from typing import Sequence
+
 from megengine import get_logger as mge_get_logger
 
 
 def get_logger(*args):
     return mge_get_logger(*args)
+
+
+def _unexpand(x):
+    if isinstance(x, Sequence):
+        return x[0], x[1]
+    elif isinstance(x, int):
+        return x, x
+    else:
+        raise TypeError(
+            "get error type! got {} expect int or tuple[int,..]".format(type(x))
+        )

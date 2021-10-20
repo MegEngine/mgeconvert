@@ -86,6 +86,9 @@ def tracedmodule_to_tflite(
         TransformerRule.SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE,
         TransformerRule.RESIZE_PARAMS_AS_INPUT,
         TransformerRule.TRANSPOSE_PATTERN_AS_INPUT,
+        TransformerRule.FUSE_CONV_BN,
+        TransformerRule.REMOVE_IDENTITY,
+        TransformerRule.REPLACE_FLATTEN_TO_RESHAPE,
     ]
     if mtk:
         # MTK devices only support batch_size 1

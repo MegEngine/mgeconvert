@@ -46,13 +46,13 @@ class GenPool2dOpr(OpGenBase):
             self.padding = _pair(m.padding)
             op_cls = mode_map[type(m)]
         elif isinstance(expr, CallFunction):
-            self.kernel_size = self.expr.args[1]
+            self.kernel_size = _pair_nonzero(self.expr.args[1])
             self.stride = self.kernel_size
-            self.padding = 0
+            self.padding = (0, 0)
             if len(self.expr.args) > 2:
-                self.stride = self.expr.args[2]
+                self.stride = _pair_nonzero(self.expr.args[2])
             if len(self.expr.args) > 3:
-                self.padding = self.expr.args[3]
+                self.padding = _pair(self.expr.args[3])
             op_cls = mode_map[expr.func]
         self.op = op_cls(self.kernel_size, self.stride, self.padding)
         self.add_opr_vars()

@@ -172,8 +172,7 @@ def test_model(model):
     net = megengine.hub.load(
         "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
     )
-    net.eval()
-    mge_result = dump_mge_model(net, data, tmp_file, True)
+    mge_result = dump_mge_model(net, data, tmp_file)
     _test_convert_result(data, tmp_file, mge_result, 1e-4)
 
 

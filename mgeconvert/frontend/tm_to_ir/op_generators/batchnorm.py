@@ -32,7 +32,9 @@ class GenBatchNormalizationOpr(OpGenBase):
             self.bias = state_dict["bias"].squeeze()
         elif isinstance(self.expr, CallFunction):
             assert False, "not inplement function batchnorm"
-        self.op = BatchNormalizationOpr()
+        self.op = BatchNormalizationOpr(
+            eps=bn_module.eps
+        )  # 'num_features', 'eps', 'momentum'
         self.add_opr_vars()
 
     def add_opr_vars(self):
