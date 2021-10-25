@@ -37,7 +37,7 @@ class install(_install):
         else:
             targets.extend(i for i in options if self.targets.find(i) >= 0)
 
-        with open("mgeconvert/__init__.py", "a+") as init_file:
+        with open("mgeconvert/__init__.py", "w") as init_file:
             [
                 init_file.write(
                     "from .converters.mge_to_%s import mge_to_%s\n" % (i, i)

@@ -31,7 +31,7 @@ jobs:
   pytest-caffe-and-onnx:
     runs-on: ubuntu-latest
     container:
-      image: enginesh233/mgeconvert_ci:v1.0
+      image: enginesh233/mgeconvert_ci:v1.1
     defaults:
       run:
         shell: bash
@@ -43,7 +43,7 @@ jobs:
   pytest-tflite:
     runs-on: ubuntu-latest
     container:
-      image: enginesh233/mgeconvert_ci:v1.0
+      image: enginesh233/mgeconvert_ci:v1.1
     defaults:
       run:
         shell: bash

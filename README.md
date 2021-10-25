@@ -54,12 +54,12 @@ convert -h
 convert mge_to_caffe -h
 ```
 
-### Feature 支持说明 
+### Feature 支持说明
 
-- :white_check_mark: 已支持，并完成测试 
-- :memo: 未支持，或尚未测试完全 
+- :white_check_mark: 已支持，并完成测试
+- :memo: 未支持，或尚未测试完全
 - :boom: 明确不支持
-  
+
 | TracedModule        | tflite             | caffe              | onnx               |
 |---------------------|--------------------|--------------------|--------------------|
 | QAT                 | :white_check_mark: | :memo:             | :memo:             |
@@ -136,7 +136,7 @@ convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --input_data_typ
 | reduce mean              | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | reduce sum               | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | relu                     | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
-| relu6                    | ✓<br/>✓ | ×<br/>× | ✓<br/>✓ |
+| relu6                    | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | reshape                  | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | resize                   | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | sigmoid(logistic)        | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
@@ -148,5 +148,5 @@ convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --input_data_typ
 | tanh                     | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | typecvt                  | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | transpose(dimshuffle)    | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
-| AdaptiveAvgPool2d        | ×<br/>× | ×<br/>× | ✓<br/>✓ |
+| AdaptiveAvgPool2d        | ×<br/>× | ✓<br/>✓ | ✓<br/>✓ |
 | flatten                  | ×<br/>× | ×<br/>× | ✓<br/>✓ |

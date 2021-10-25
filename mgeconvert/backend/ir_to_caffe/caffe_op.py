@@ -48,6 +48,7 @@ from ...converter_ir.ir_op import (
     ReduceOpr,
     Relu6Opr,
     ReluOpr,
+    RepeatOpr,
     ReshapeOpr,
     SharedDeviceTensorOpr,
     SigmoidOpr,
@@ -63,8 +64,11 @@ from ...converter_ir.ir_op import (
 )
 from ...converter_ir.ir_tensor import IRTensor
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
-from .caffe_pb import caffe_pb2 as cp
 
+if "USE_CAFFE_PROTO" not in os.environ:
+    from .caffe_pb import caffe_pb2 as cp
+else:
+    from caffe.proto import caffe_pb2 as cp
 logger = get_logger(__name__)
 MGE2CAFFE = {}
 
@@ -1221,5 +1225,54 @@ def _batchnorm(opr, context):
             type="Scale",
             scale_param=scale_param,
             blobs=scale_blobs,
+        )
+    )
+
+
+@_register_op(RepeatOpr)
+def _fake_repeat(opr, context):
+    unsqueeze_shape = list(opr.inp_tensors[0].shape)
+    unsqueeze_shape.insert(opr.axis + 1, 1)
+    fake_unsqueeze_out = IRTensor(
+        opr.inp_tensors[0].name + "_unsqueeze",
+        unsqueeze_shape,
+        opr.inp_tensors[0].dtype,
+    )
+    param = cp.ReshapeParameter(shape=cp.BlobShape(dim=unsqueeze_shape))
+    bottom = [context.get_blob_name(opr.inp_tensors[0])]
+    top = [context.set_blob_name(fake_unsqueeze_out, fake_unsqueeze_out.name)]
+    context.add_layer(
+        cp.LayerParameter(
+            name=fake_unsqueeze_out.name,
+            type="Reshape",
+            bottom=bottom,
+            top=top,
+            reshape_param=param,
+        )
+    )
+    param = cp.TileParameter(axis=opr.axis + 1, tiles=opr.repeats)
+    unsqueeze_shape[opr.axis + 1] = unsqueeze_shape[opr.axis + 1] * opr.repeats
+    fake_tile = IRTensor(
+        opr.inp_tensors[0].name + "_unsqueeze_tile",
+        unsqueeze_shape,
+        opr.inp_tensors[0].dtype,
+    )
+    bottom = top
+    top = [context.set_blob_name(fake_tile, fake_tile.name)]
+    context.add_layer(
+        cp.LayerParameter(
+            name=fake_tile.name, type="Tile", bottom=bottom, top=top, tile_param=param
+        )
+    )
+    param = cp.ReshapeParameter(shape=cp.BlobShape(dim=opr.out_tensors[0].shape))
+    bottom = top
+    top = [context.set_blob_name(opr.out_tensors[0], opr.out_tensors[0].name)]
+    context.add_layer(
+        cp.LayerParameter(
+            name=opr.out_tensors[0].name,
+            type="Reshape",
+            bottom=bottom,
+            top=top,
+            reshape_param=param,
         )
     )

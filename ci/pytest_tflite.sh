@@ -5,8 +5,7 @@ set -e
 ./mgeconvert/backend/ir_to_tflite/init.sh
 
 # try to find libflatbuffers.so
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
-
+export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH:
 sudo python3 -m pip uninstall flatbuffers -y
 sudo python3 -m pip install tensorflow==2.5.0
 
