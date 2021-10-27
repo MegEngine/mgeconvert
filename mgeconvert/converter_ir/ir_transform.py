@@ -12,6 +12,8 @@ from typing import Set  # pylint: disable=unused-import
 from typing import Callable, Dict, Sequence
 
 import numpy as np
+from megengine import Tensor
+from megengine.functional import sqrt
 
 from ..converter_ir.ir_graph import IRGraph
 from .ir_op import (
@@ -20,10 +22,12 @@ from .ir_op import (
     Deconv2dOpr,
     DropoutOpr,
     ExpOpr,
+    FlattenOpr,
     FuseMulAdd3Opr,
     GetSubTensorOpr,
     HardSigmoidOpr,
     HardSwishOpr,
+    IdentityOpr,
     LeakyReluOpr,
     MulOpr,
     OpBase,
@@ -52,8 +56,8 @@ class TransformerRule(Enum):
     REMOVE_RESHAPE_INPUT = 101
     # FUSE_FOR_RELU6 pass should happen before FUSE_ACTIVATION
     FUSE_FOR_RELU6 = 102  ##
-    FUSE_ACTIVATION = 103
-    CONV_ADD_ZERO_BIAS = 104
+    CONV_ADD_ZERO_BIAS = 103
+    FUSE_CONV_BN = 104
     DECONV_ADD_ZERO_BIAS = 105
     # DEPTHWISE_CONV_RESHAPE_WEIGHT requirs RESHAPE_BIAS_TO_1DIM
     DEPTHWISE_CONV_RESHAPE_WEIGHT = 106
@@ -74,10 +78,15 @@ class TransformerRule(Enum):
     # for TFLite Converter
     SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE = 119
     RESIZE_PARAMS_AS_INPUT = 120
+    REPLACE_FLATTEN_TO_RESHAPE = 120.1
 
     # remove reshape
     REMOVE_RESHAPE_REALTED_OP = 121
     REMOVE_DROPOUT = 122
+
+    FUSE_ACTIVATION = 123
+    REMOVE_IDENTITY = 124
+
     REMOVE_UNRELATED_IROP = 130
     ADD_FAKE_HSIGMOID_OUT = 131
 
@@ -137,7 +146,6 @@ def _remove_reshape_input(net):
 
         if len(op.inp_tensors) == 2:
             del op.inp_tensors[1]
-            # TODO： delete _tensor_ids, all_tensors
 
 
 @_register_tranformation_rule(TransformerRule.TRANSPOSE_PATTERN_AS_INPUT)
@@ -425,7 +433,8 @@ def _fuse_activation(net):
             activation = op.name.upper()
             prev_op.activation = activation
             prev_op.out_tensors = op.out_tensors
-
+            for t in prev_op.out_tensors:
+                t.owner_opr = prev_op
             delete_intended.append(net._opr_ids.index(op_id))
 
     for delete_idx in delete_intended[::-1]:
@@ -815,6 +824,22 @@ def _expand_mul_add3(net: IRGraph):
         net.add_op(add_op, index + 1)
 
 
+@_register_tranformation_rule(TransformerRule.REPLACE_FLATTEN_TO_RESHAPE)
+def _replace_flatten_to_reshape(net: IRGraph):
+    for opr in net.all_oprs:
+        if isinstance(opr, FlattenOpr):
+            out_shape = tuple(list(opr.inp_tensors[0].shape[: opr.start_axis]) + [-1])
+            reshape_op = ReshapeOpr(out_shape=out_shape)
+            reshape_op.inp_tensors = opr.inp_tensors
+            for t in reshape_op.inp_tensors:
+                idx = t.user_opr.index(opr)
+                t.user_opr[idx] = reshape_op
+            reshape_op.out_tensors = opr.out_tensors
+            for t in reshape_op.out_tensors:
+                t.owner_opr = reshape_op
+            net.replace_op(opr, reshape_op)
+
+
 @_register_tranformation_rule(TransformerRule.REMOVE_RESHAPE_REALTED_OP)
 def _remove_reshape_tensors(net: IRGraph):
     for opr in net.all_oprs:
@@ -888,3 +913,65 @@ def _add_fake_hsigmoid_tensor(net: IRGraph):
                     opr.inp_tensors[0].dtype,
                 )
                 opr.add_inp_tensors(div6_out_tensor)
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_CONV_BN)
+def _fuse_conv_bn(net: IRGraph):
+    for opr in net.all_oprs:
+        if (
+            opr.name == "BatchNormalization"
+            and len(net.find_inp_oprs(opr)) == 1
+            and net.find_inp_oprs(opr)[0].name == "Conv2d"
+        ):
+            # bn_istd = 1 / bn_std
+            # w_fold = gamma / bn_std * W
+            # b_fold = gamma * (b - bn_mean) / bn_std + beta
+            gamma = Tensor(opr.inp_tensors[1].np_data).reshape(1, -1, 1, 1)
+            beta = Tensor(opr.inp_tensors[2].np_data).reshape(1, -1, 1, 1)
+            bn_mean = Tensor(opr.inp_tensors[3].np_data).reshape(1, -1, 1, 1)
+            bn_var = Tensor(opr.inp_tensors[4].np_data).reshape(1, -1, 1, 1)
+            conv_op = net.find_inp_oprs(opr)[0]
+
+            conv_weight = conv_op.inp_tensors[1].np_data
+            if len(conv_op.inp_tensors) < 3:
+                _add_bias_for_conv(net)
+            conv_bias = conv_op.inp_tensors[2].np_data.reshape(1, -1, 1, 1)
+
+            # bn_istd = 1 / bn_std
+            bn_istd = 1.0 / sqrt(bn_var + opr.eps)  # type: ignore[attr-defined]
+            # w_fold = gamma / bn_std * W
+            scale_factor = gamma * bn_istd
+            if conv_op.groups == 1:
+                w_fold = conv_weight * scale_factor.reshape(-1, 1, 1, 1)
+            else:
+                w_fold = conv_weight * scale_factor.reshape(conv_op.groups, -1, 1, 1, 1)
+
+            # b_fold = gamma * (b - bn_mean) / bn_std + beta
+            b_fold = beta + gamma * (conv_bias - bn_mean) * bn_istd
+            conv_op.inp_tensors[1].np_data = w_fold.numpy()
+            conv_op.inp_tensors[2].np_data = b_fold.numpy()
+
+            # delete bn opr
+            conv_op.out_tensors[0] = opr.out_tensors[-1]
+            conv_op.out_tensors[0].owner_opr = conv_op
+            index = net._opr_ids.index(id(opr))
+            net.delete_ops(index)
+
+
+@_register_tranformation_rule(TransformerRule.REMOVE_IDENTITY)
+def _remove_identity(net: IRGraph):
+    delete_intended = []
+    for op_id, opr in zip(net._opr_ids, net.all_oprs):
+        if not isinstance(opr, IdentityOpr):
+            continue
+
+        user_ops = net.find_out_oprs(opr)
+        for user in user_ops:
+            idx = user.inp_tensors.index(opr.out_tensors[0])
+            user.inp_tensors[idx] = opr.inp_tensors[0]
+            idx = opr.inp_tensors[0].user_opr.index(opr)
+            opr.inp_tensors[0].user_opr[idx] = user
+        delete_intended.append(net._opr_ids.index(op_id))
+
+    for delete_idx in delete_intended[::-1]:
+        net.delete_ops(delete_idx)

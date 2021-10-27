@@ -162,11 +162,12 @@ class GenBatchNormalizationOpr(OpGenBase):
     def __init__(self, mge_opr, irgraph):
         super().__init__(mge_opr, irgraph)
         self.output_idx = -1
-        self.op = BatchNormalizationOpr(output_idx=self.output_idx)
+        epsilon = self.params["epsilon"] if "epsilon" in self.params else 1e-5
+        self.op = BatchNormalizationOpr(eps=epsilon, output_idx=self.output_idx)
         self.add_tensors(mge_opr)
 
     def add_tensors(self, mge_opr):
-        # set inp var
+        # set inp var: input, scale, bias, mean, var
         for x in mge_opr.inputs:
             self.op.add_inp_tensors(self.resolver.get_ir_tensor(x, user_opr=self.op))
         # set out var

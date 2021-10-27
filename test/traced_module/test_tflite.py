@@ -7,6 +7,7 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 # pylint:disable=import-outside-toplevel, no-name-in-module,import-error
+from test.traced_module.tm_utils import get_traced_module
 from test.utils import (
     ConvOpr,
     ElemwiseOpr,
@@ -26,14 +27,13 @@ from typing import Sequence
 
 import megengine as mge
 import megengine.functional as F
+import megengine.hub
 import megengine.module as M
 import numpy as np
 import pytest
 from megengine.traced_module import trace_module
 from mgeconvert.converters.tm_to_tflite import tracedmodule_to_tflite
 from tensorflow.lite.python import interpreter  # pylint: disable=import-error
-
-from .tm_utils import get_traced_module
 
 max_error = 1e-6
 tmp_file = "test_model"
@@ -238,3 +238,20 @@ def test_float_func_conv():
     traced_module = trace_module(net, data, weight)
     tm_result = traced_module(data, weight)
     _test_convert_result([data, weight], traced_module, tm_result, max_err=1e-4)
+
+
+@pytest.mark.parametrize(
+    "model", ["resnet18",],
+)
+def test_model(model):
+    data = np.ones((1, 3, 224, 224)).astype(np.float32)
+    if megengine.__version__ < "1.1.0":
+        commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
+    else:
+        commit_id = None
+    net = megengine.hub.load(
+        "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
+    )
+    net.eval()
+    traced_module, tm_result = get_traced_module(net, mge.tensor(data))
+    _test_convert_result(mge.tensor(data), traced_module, tm_result, 1e-4)

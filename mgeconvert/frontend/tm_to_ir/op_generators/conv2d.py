@@ -17,7 +17,7 @@ from megengine.traced_module.expr import CallFunction, CallMethod
 
 from ....converter_ir.ir_op import Conv2dOpr
 from ....converter_ir.ir_tensor import AxisOrder
-from ..tm_utils import get_logger
+from ..tm_utils import _unexpand, get_logger
 from .base import OpGenBase, _register_op
 
 logger = get_logger(__name__)
@@ -30,15 +30,15 @@ class GenConvBase(OpGenBase, ABC):
             conv_module = expr.inputs[0].expr.value
             self.weight = conv_module.weight
             self.bias = conv_module.bias
-            self.stride = conv_module.stride
-            self.padding = conv_module.padding
-            self.dilation = conv_module.dilation
+            self.stride = _unexpand(conv_module.stride)
+            self.padding = _unexpand(conv_module.padding)
+            self.dilation = _unexpand(conv_module.dilation)
             self.groups = conv_module.groups
         elif isinstance(expr, CallFunction):
             self.weight = None
-            self.stride = self.expr.args[3]
-            self.padding = self.expr.args[4]
-            self.dilation = self.expr.args[5]
+            self.stride = _unexpand(self.expr.args[3])
+            self.padding = _unexpand(self.expr.args[4])
+            self.dilation = _unexpand(self.expr.args[5])
             self.groups = self.expr.args[6]
             if len(expr.args) > 7:
                 assert self.expr.args[7] == "cross_correlation"
