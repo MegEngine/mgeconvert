@@ -18,6 +18,7 @@ from test.utils import (
     LinearOpr,
     PoolOpr,
     ReduceOpr,
+    RepeatOpr,
     ReshapeOpr,
     SqueezeOpr,
     SubtensorOpr,
@@ -161,7 +162,18 @@ def test_elemwise_broadcast(mode):
 
 
 @pytest.mark.parametrize(
-    "mode", ["relu", "sigmoid", "tanh", "leaky_relu", "softmax", "silu",],
+    "mode",
+    [
+        "relu",
+        "sigmoid",
+        "tanh",
+        "leaky_relu",
+        "softmax",
+        "silu",
+        "relu6",
+        "hsigmoid",
+        "hswish",
+    ],
 )
 def test_active(mode):
     if megengine.__version__ < "1.5.0" and mode == "silu":
@@ -180,6 +192,12 @@ def test_reduce(mode):
 
 def test_broadcast():
     net = BroadcastOpr()
+    tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, tm_module, mge_result, max_error)
+
+
+def test_repeat():
+    net = RepeatOpr()
     tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(net.data, tm_module, mge_result, max_error)
 
