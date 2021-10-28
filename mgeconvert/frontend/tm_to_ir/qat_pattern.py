@@ -56,6 +56,8 @@ def gen_qat_conv_opr(module, conv_function_expr, qat_expr, irgraph, is_deconv=Fa
 
     op.inp_tensors[1].scale = float(weight_qparams.scale)
     op.inp_tensors[1].zero_point = int(weight_qparams.zero_point)
+    op.inp_tensors[1].qmin = weight_qparams.dtype_meta.qmin
+    op.inp_tensors[1].qmax = weight_qparams.dtype_meta.qmax
     op.inp_tensors[1].q_dtype = weight_qparams.dtype_meta.np_dtype_str
     if len(op.inp_tensors) == 3:
         op.inp_tensors[2].scale = op.inp_tensors[0].scale * op.inp_tensors[1].scale
@@ -64,6 +66,8 @@ def gen_qat_conv_opr(module, conv_function_expr, qat_expr, irgraph, is_deconv=Fa
 
     op.out_tensors[0].scale = act_qparams.scale.numpy()[0]
     op.out_tensors[0].zero_point = act_qparams.zero_point.numpy()[0]
+    op.out_tensors[0].qmin = act_qparams.dtype_meta.qmin
+    op.out_tensors[0].qmax = act_qparams.dtype_meta.qmax
     op.out_tensors[0].q_dtype = act_qparams.dtype_meta.np_dtype_str
     return op
 
@@ -158,6 +162,8 @@ def qat_deconv_relu_bias(
     relu_op.out_tensors[0].q_dtype = relu_op.inp_tensors[0].q_dtype
     relu_op.out_tensors[0].scale = relu_op.inp_tensors[0].scale
     relu_op.out_tensors[0].zero_point = relu_op.inp_tensors[0].zero_point
+    relu_op.out_tensors[0].qmin = relu_op.inp_tensors[0].qmin
+    relu_op.out_tensors[0].qmax = relu_op.inp_tensors[0].qmax
     irgraph.all_tensors[
         irgraph._tensor_ids.index(call_expr.outputs[0]._id)
     ] = relu_op.out_tensors[0]

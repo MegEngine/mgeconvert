@@ -94,6 +94,8 @@ class IRTensor:
         dtype,
         scale=None,
         zero_point=None,
+        qmin=None,
+        qmax=None,
         q_type=None,
         np_data=None,
         owner_opr=None,
@@ -110,6 +112,8 @@ class IRTensor:
 
         self.scale = scale
         self.zero_point = zero_point
+        self.qmin = qmin
+        self.qmax = qmax
         self.q_dtype = q_type
 
     @property
@@ -124,7 +128,12 @@ class IRTensor:
         self.dtype = target_type
 
     def set_qparams(
-        self, scale: Union[float, List[float]], zero_point=None, q_dtype=None
+        self,
+        scale: Union[float, List[float]],
+        zero_point=None,
+        qmin=None,
+        qmax=None,
+        q_dtype=None,
     ):
         if not isinstance(scale, Sequence):  # per tensor
             self.scale = float(scale)
@@ -139,3 +148,7 @@ class IRTensor:
 
         if self.q_dtype is not None:
             self.q_dtype = q_dtype
+        if qmin is not None:
+            self.qmin = qmin
+        if qmax is not None:
+            self.qmax = qmax

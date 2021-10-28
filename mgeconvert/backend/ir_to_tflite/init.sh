@@ -33,7 +33,8 @@ fi
 export PATH=$PATH:$HOME/.local/bin
 # build tflite interface from schema.fbs
 echo "building tflite schema..."
-cd /tmp
+mkdir -p /tmp/converter
+cd /tmp/converter
 rm -f schema.fbs
 tf_version=$1
 if [ ! -n "$1" ] ;then
@@ -42,8 +43,8 @@ fi
 echo "Use TFLite $tf_version!"
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/$tf_version/tensorflow/lite/schema/schema.fbs
 flatc --python schema.fbs
-chmod 755 /tmp/tflite
-cp -r /tmp/tflite $basepath
+chmod 755 /tmp/converter/tflite
+cp -r /tmp/converter/tflite $basepath
 
 # build pyflatbuffers
 if [[ "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then

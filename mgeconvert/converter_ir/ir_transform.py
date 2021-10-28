@@ -245,6 +245,8 @@ def _make_padding(net: IRGraph):
             ):
                 pad_out_tensor.scale = op.inp_tensors[0].scale
                 pad_out_tensor.q_dtype = op.inp_tensors[0].q_dtype
+                pad_out_tensor.qmin = op.inp_tensors[0].qmin
+                pad_out_tensor.qmax = op.inp_tensors[0].qmax
             if hasattr(op.inp_tensors[0], "zero_point"):
                 pad_out_tensor.zero_point = op.inp_tensors[0].zero_point
             net.add_tensor(new_tensor_id, pad_out_tensor)

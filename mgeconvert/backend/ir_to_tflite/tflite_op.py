@@ -286,7 +286,7 @@ def _conv2d(mge_opr, builder):
             builder, mge_opr.stride[1]
         )
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddDepthMultiplier(
-            builder, mge_opr.inp_tensors[1].shape[0]
+            builder, mge_opr.inp_tensors[1].shape[1] // mge_opr.inp_tensors[0].shape[0]
         )
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddFusedActivationFunction(
             builder, mge2tflite_activation_type[mge_opr.activation]

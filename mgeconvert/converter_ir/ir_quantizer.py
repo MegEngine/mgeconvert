@@ -36,10 +36,13 @@ class IRQuantizer:
             if isinstance(tensor.q_dtype, str)
             else tensor.q_dtype
         )
-        if np.issubdtype(dt, np.integer):
+        if tensor.qmin is not None and tensor.qmax is not None:
+            v_min = tensor.qmin
+            v_max = tensor.qmax
+        elif np.issubdtype(dt, np.integer):
             v_min = np.iinfo(dt).min
             v_max = np.iinfo(dt).max
-            value = np.clip(value, v_min, v_max)
+        value = np.clip(value, v_min, v_max)
         value = value.astype(tensor.q_dtype)
         return value
 
@@ -53,7 +56,10 @@ class IRQuantizer:
             dt = np.dtype(t.q_dtype)
             v_max, v_min = None, None
             is_weight = bool(t.np_data is not None)
-            if np.issubdtype(dt, np.integer):
+            if t.qmin is not None and t.qmax is not None:
+                v_min = t.qmin
+                v_max = t.qmax
+            elif np.issubdtype(dt, np.integer):
                 v_min = np.iinfo(dt).min
                 v_max = np.iinfo(dt).max
             if self.param_fake_quant and is_weight:

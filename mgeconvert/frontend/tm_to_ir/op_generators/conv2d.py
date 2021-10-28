@@ -121,7 +121,9 @@ class GenQConvBase(GenConvBase):
             out_tensor.set_qparams(
                 *self.resolver.resolve_qparams(
                     self.act_qparams.scale, self.act_qparams.zero_point
-                )
+                ),
+                self.act_qparams.dtype_meta.qmin,
+                self.act_qparams.dtype_meta.qmax,
             )
             out_tensor.q_dtype = self.act_dtype
             self.op.add_out_tensors(out_tensor)
@@ -137,7 +139,9 @@ class GenQConvBase(GenConvBase):
             weight_tensor.set_qparams(
                 *self.resolver.resolve_qparams(
                     self.weight_qparams.scale, self.weight_qparams.zero_point
-                )
+                ),
+                self.weight_qparams.dtype_meta.qmin,
+                self.weight_qparams.dtype_meta.qmax,
             )
             weight_tensor.q_dtype = self.weight_dtype
             self.op.add_inp_tensors(weight_tensor)

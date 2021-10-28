@@ -74,7 +74,9 @@ class GenQConcatOpr(GenConcatOpr):
             t.set_qparams(
                 *self.resolver.resolve_qparams(
                     self.act_qparams.scale, self.act_qparams.zero_point
-                )
+                ),
+                self.act_qparams.dtype_meta.qmin,
+                self.act_qparams.dtype_meta.qmax,
             )
             t.q_dtype = self.act_dtype
             self.op.add_out_tensors(t)

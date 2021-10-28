@@ -99,6 +99,8 @@ class GenElemwiseOpr(OpGenBase, ABC):
                 o.scale = self.op.inp_tensors[0].scale
                 o.zero_point = self.op.inp_tensors[0].zero_point
                 o.dtype = self.op.inp_tensors[0].dtype
+                o.qmin = self.op.inp_tensors[0].qmin
+                o.qmax = self.op.inp_tensors[0].qmax
             # set dtype for const value
 
 
@@ -284,5 +286,7 @@ def get_elemwise_op(expr, net):
             o.zero_point = (
                 int(qparams.zero_point) if qparams.zero_point is not None else None
             )
+            o.qmin = qparams.dtype_meta.qmin
+            o.qmax = qparams.dtype_meta.qmax
             o.q_dtype = qparams.dtype_meta.np_dtype_str
     return op_gen

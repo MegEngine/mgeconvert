@@ -47,4 +47,6 @@ class OpGenBase(ABC):
                 t.scale = self.op.inp_tensors[0].scale
                 t.zero_point = self.op.inp_tensors[0].zero_point
                 t.q_dtype = self.op.inp_tensors[0].q_dtype
+                t.qmin = self.op.inp_tensors[0].qmin
+                t.qmax = self.op.inp_tensors[0].qmax
             self.op.add_out_tensors(t)

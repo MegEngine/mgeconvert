@@ -15,6 +15,8 @@ from megengine.quantization.utils import create_qparams
 from megengine.traced_module import TracedModule
 
 from ..backend.ir_to_tflite import TFLiteConverter, set_platform
+from ..backend.ir_to_tflite.tflite.TensorType import TensorType
+from ..backend.ir_to_tflite.tflite_op import mge2tflite_dtype_mapping
 from ..converter_ir.ir_quantizer import IRQuantizer
 from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.tm_to_ir import TM_FrontEnd
@@ -32,6 +34,7 @@ def tracedmodule_to_tflite(
     quantize_file_path="quant_params.json",
     graph_name="graph",
     mtk=False,
+    npu=False,
 ):
     """
     Convert traced model to TFLite,
@@ -94,6 +97,9 @@ def tracedmodule_to_tflite(
         # MTK devices only support batch_size 1
         set_platform("mtk")
         transformer_options.append(TransformerRule.DECONV_ADD_ZERO_BIAS,)
+    if npu:
+        assert not mtk
+        mge2tflite_dtype_mapping["uint16"] = TensorType.INT16
 
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
