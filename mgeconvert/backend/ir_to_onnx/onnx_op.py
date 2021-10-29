@@ -47,6 +47,7 @@ from ...converter_ir.ir_op import (
     ReluOpr,
     RepeatOpr,
     ReshapeOpr,
+    ResizeOpr,
     SharedDeviceTensorOpr,
     SigmoidOpr,
     SiLUOpr,
@@ -1242,4 +1243,42 @@ class RepeatConverter(OperatorBaseConverter):
             "Reshape", [repeat_name, shape_tensor_name_after], outputs
         )
         nodes.append(reshape_out)
+        return nodes, self._net_sources, self._parameters
+
+
+@_register_op(ResizeOpr)
+class ResizeConverter(OperatorBaseConverter):
+    def convert(self):
+        opr = self._opr
+        assert opr.mode == "nearest", "Resize mode should be NEAREST."
+        inputs = self._get_inputs()
+        outputs = self._get_outputs()
+        nodes = []
+        _, _, h, w = opr.inp_tensors[0].shape
+        if opr.out_size is not None:
+            s_h, s_w = opr.out_size
+            s_h = s_h / h
+            s_w = s_w / w
+        else:
+            if isinstance(opr.scale_factor, tuple):
+                s_h, s_w = opr.scale_factor
+            else:
+                s_h, s_w = opr.scale_factor, opr.scale_factor
+        s = [1.0, 1.0, s_h, s_w]
+
+        scales = inputs[0] + "_scales"
+        scales_tensor = onnx.helper.make_tensor_value_info(
+            scales, mge2onnx_dtype_mapping[np.float32], (4,)
+        )
+        scales_param = onnx.numpy_helper.from_array(
+            np.array(s, dtype=np.float32), scales
+        )
+
+        self._net_sources.append(scales_tensor)
+        self._parameters.append(scales_param)
+
+        resize = onnx.helper.make_node(
+            "Resize", inputs=[inputs[0], scales], outputs=outputs, mode="nearest",
+        )
+        nodes.append(resize)
         return nodes, self._net_sources, self._parameters

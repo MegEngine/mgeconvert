@@ -43,16 +43,36 @@ max_error = 1e-6
 tmp_file = "test_module"
 
 
-def _test_convert_result(inputs, trace_module, mge_results, max_err, input_name="x"):
-
+def _test_convert_result(
+    inputs,
+    trace_module,
+    mge_results,
+    max_err,
+    input_data_type=None,
+    input_scales=None,
+    input_zero_points=None,
+    require_quantize=False,
+    param_fake_quant=False,
+    split_conv_relu=False,
+    input_name="x",
+):
     tracedmodule_to_caffe(
-        trace_module, prototxt=tmp_file + ".txt", caffemodel=tmp_file + ".caffemodel"
+        trace_module,
+        prototxt=tmp_file + ".txt",
+        caffemodel=tmp_file + ".caffemodel",
+        input_data_type=input_data_type,
+        input_scales=input_scales,
+        input_zero_points=input_zero_points,
+        require_quantize=require_quantize,
+        param_fake_quant=param_fake_quant,
+        split_conv_relu=split_conv_relu,
     )
+
     caffe_net = caffe.Net(tmp_file + ".txt", tmp_file + ".caffemodel", caffe.TEST)
     for i in caffe_net.blobs.keys():
         if isinstance(input_name, list):
             for idx, name in enumerate(input_name):
-                if name in i:
+                if name.strip() == i.strip():
                     caffe_net.blobs[i].data[...] = inputs[idx]
                     break
         else:
