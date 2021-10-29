@@ -8,6 +8,7 @@
 # pylint: disable=import-error
 import collections
 import os
+from enum import IntEnum
 from math import ceil
 from typing import Sequence
 
@@ -73,6 +74,12 @@ logger = get_logger(__name__)
 MGE2CAFFE = {}
 
 
+class BackEnd(IntEnum):
+    CAFFE = 1
+    SNPE = 2
+    TRT = 3
+
+
 def isconst(x):
     return x.np_data is not None
 
@@ -98,7 +105,7 @@ def _add_input_layer(tensor, context):
         cp.LayerParameter(
             bottom=[],
             top=[context.set_blob_name(tensor, tensor.name)],
-            name="data_input",
+            name=tensor.name,
             type="Input",
             input_param=param,
         )
@@ -676,11 +683,11 @@ def _convolution(opr, context):
 @_register_op(AvgPool2dOpr, MaxPool2dOpr, AdaptiveAvgPool2dOpr)
 def _pooling2d(opr, context):
     # assert opr.mode in [
-    #     "MAX",
-    #     "AVERAGE",
-    #     "AVERAGE_COUNT_EXCLUDE_PADDING",
+    # 	  "MAX",
+    # 	  "AVERAGE",
+    # 	  "AVERAGE_COUNT_EXCLUDE_PADDING",
     # ], "Pooling op doesn't support mode {}, you can implement it in _pooling2d".format(
-    #     opr.mode
+    # 	  opr.mode
     # )
     def _unexpand(x):
         if isinstance(x, Sequence):
@@ -942,24 +949,23 @@ def _reshape(opr, context):
         tmp_shape = out_shape + (1,) * d
         bottom = [context.get_blob_name(opr.inp_tensors[0])]
         top = [context.set_blob_name(opr.out_tensors[0], opr.out_tensors[0].name)]
-        if inp_shape != tmp_shape:
-            param = cp.ReshapeParameter(shape=cp.BlobShape(dim=tmp_shape))
-            tmp = [bottom[0] + "tmp"]
-            context.add_layer(
-                cp.LayerParameter(
-                    bottom=bottom,
-                    top=tmp,
-                    name=opr.out_tensors[0].name + "tmp",
-                    type="Reshape",
-                    reshape_param=param,
+        if context.convert_backend == BackEnd.CAFFE:
+            if inp_shape != tmp_shape:
+                logger.warning(
+                    "trt don't support flatten after reshape, but caffe support! please use BackEnd.TRT in tracedmodule_to_caffe by pass convert_backend:BackEnd=BackEnd.TRT"
                 )
-            )
-            bottom = tmp
-
-        logger.warning(
-            "trt don't support flatten after reshape, but caffe support! please do `export SUPPORT_CAFFE_TRT=True` or `SUPPORT_CAFFE_TRT=True your_command_line_xxxx` and do `unset SUPPORT_CAFFE_TRT` when running with caffe"
-        )
-        if "SUPPORT_CAFFE_TRT" not in os.environ:
+                param = cp.ReshapeParameter(shape=cp.BlobShape(dim=tmp_shape))
+                tmp = [bottom[0] + "tmp"]
+                context.add_layer(
+                    cp.LayerParameter(
+                        bottom=bottom,
+                        top=tmp,
+                        name=opr.out_tensors[0].name + "tmp",
+                        type="Reshape",
+                        reshape_param=param,
+                    )
+                )
+                bottom = tmp
             param = cp.FlattenParameter(axis=len(out_shape) - 1, end_axis=-1)
             context.add_layer(
                 cp.LayerParameter(
@@ -970,6 +976,18 @@ def _reshape(opr, context):
                     flatten_param=param,
                 )
             )
+        elif context.convert_backend == BackEnd.TRT:
+            if inp_shape != tmp_shape:
+                param = cp.ReshapeParameter(shape=cp.BlobShape(dim=tmp_shape))
+                context.add_layer(
+                    cp.LayerParameter(
+                        bottom=bottom,
+                        top=top,
+                        name=opr.out_tensors[0].name,
+                        type="Reshape",
+                        reshape_param=param,
+                    )
+                )
     else:
         logger.warning(
             "NNIE doesn't support this reshape Opr %s, inp_shape %s, out_shape %s, NNIE reshape only support C/H/W, not N!",
@@ -1124,7 +1142,15 @@ def silu(opr, context):
     inp = opr.inp_tensors[0]
     sigmoid_op = SigmoidOpr()
     sigmoid_op.add_inp_tensors(inp)
-    fake_sigmoid_out = IRTensor(inp.name + "_sigmoid_out", inp.shape, inp.dtype,)
+    fake_sigmoid_out = IRTensor(
+        inp.name + "_sigmoid_out",
+        inp.shape,
+        inp.dtype,
+        scale=inp.scale,
+        zero_point=inp.zero_point,
+        q_type=inp.q_dtype,
+    )
+    context.update_quantize_dict(fake_sigmoid_out)
     sigmoid_op.add_out_tensors(fake_sigmoid_out)
     context.add_layer(_gen_layer(sigmoid_op, sigmoid_op.name, context))
     mul_op = MulOpr()
@@ -1237,7 +1263,11 @@ def _fake_repeat(opr, context):
         opr.inp_tensors[0].name + "_unsqueeze",
         unsqueeze_shape,
         opr.inp_tensors[0].dtype,
+        q_type=opr.inp_tensors[0].q_dtype,
+        scale=opr.inp_tensors[0].scale,
+        zero_point=opr.inp_tensors[0].zero_point,
     )
+    context.update_quantize_dict(fake_unsqueeze_out)
     param = cp.ReshapeParameter(shape=cp.BlobShape(dim=unsqueeze_shape))
     bottom = [context.get_blob_name(opr.inp_tensors[0])]
     top = [context.set_blob_name(fake_unsqueeze_out, fake_unsqueeze_out.name)]
@@ -1256,7 +1286,11 @@ def _fake_repeat(opr, context):
         opr.inp_tensors[0].name + "_unsqueeze_tile",
         unsqueeze_shape,
         opr.inp_tensors[0].dtype,
+        q_type=opr.inp_tensors[0].q_dtype,
+        scale=opr.inp_tensors[0].scale,
+        zero_point=opr.inp_tensors[0].zero_point,
     )
+    context.update_quantize_dict(fake_tile)
     bottom = top
     top = [context.set_blob_name(fake_tile, fake_tile.name)]
     context.add_layer(

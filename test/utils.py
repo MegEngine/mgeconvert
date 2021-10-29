@@ -365,15 +365,16 @@ class ReduceOpr(M.Module):
 
 
 class ResizeOpr(M.Module):
-    def __init__(self):
+    def __init__(self, mode="bilinear"):
         super().__init__()
         self.data = np.random.random((1, 2, 3, 4)).astype(np.float32)
-        self.out_shape = [8, 8]
+        self.out_shape = [6, 8]
         self.out_shape2 = [3, 4]
+        self.mode = mode
 
     def forward(self, x):
-        x = F.vision.interpolate(x, size=self.out_shape, mode="bilinear")
-        x = F.vision.interpolate(x, size=self.out_shape2, mode="bilinear")
+        x = F.vision.interpolate(x, size=self.out_shape, mode=self.mode)
+        x = F.vision.interpolate(x, size=self.out_shape2, mode=self.mode)
         return x
 
 

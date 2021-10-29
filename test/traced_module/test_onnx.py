@@ -23,6 +23,7 @@ from test.utils import (
     ReduceOpr,
     RepeatOpr,
     ReshapeOpr,
+    ResizeOpr,
     SqueezeOpr,
     SubtensorOpr,
     TransposeOpr,
@@ -156,6 +157,14 @@ def test_reshape():
     net = ReshapeOpr()
     tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(net.data, tm_module, mge_result, max_error)
+
+
+def test_resize():
+    net = ResizeOpr(mode="nearest")
+    tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(
+        net.data, tm_module, mge_result, max_error, min_version=10, max_version=10
+    )
 
 
 @pytest.mark.parametrize(

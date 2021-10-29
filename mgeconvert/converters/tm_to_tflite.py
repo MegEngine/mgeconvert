@@ -7,12 +7,9 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 # pylint: disable=import-error,no-name-in-module,no-member
-from typing import List, Sequence, Union
+from typing import List, Union
 
 import megengine as mge
-import numpy as np
-from megengine.core.tensor import dtype
-from megengine.quantization.utils import create_qparams
 from megengine.traced_module import TracedModule
 
 from ..backend.ir_to_tflite import TFLiteConverter, set_platform
@@ -36,57 +33,24 @@ def tracedmodule_to_tflite(
     outspec=None,
 ):
     """
-    Convert traced model to TFLite,
-    and save the TFLite model to file `output`.
+	Convert traced model to TFLite,
+	and save the TFLite model to file `output`.
 
-    :param traced_module: a traced module or the file path of a traced module.
-    :param output: the filename used for the saved model.
-    :param data_type: data type of input
-
-    :param graph_name: the name of the TFLite graph.
-    :param mtk: if this TFLite will be run on mtk.
-    :param outspec: specify the end points of the model, expect the full names of nodes.
-    """
+	:param traced_module: a traced module or the file path of a traced module.
+	:param output: the filename used for the saved model.
+	:param data_type: data type of input
+	:param graph_name: the name of the TFLite graph.
+	:param mtk: if this TFLite will be run on mtk.
+	:type mtk: bool
+	"""
     if isinstance(traced_module, str):
         traced_module = mge.load(traced_module)
     assert isinstance(
         traced_module, TracedModule
     ), "Input should be a traced module or a path of traced module."
 
-    if input_data_type is not None:
-        for i in range(len(traced_module.graph.inputs[1:])):
-            if traced_module.graph.inputs[i + 1].qparams is None:
-                traced_module.graph.inputs[i + 1].qparams = create_qparams()
-            if input_data_type in dtype._builtin_quant_dtypes:
-                q_dtype_meta = dtype._builtin_quant_dtypes[input_data_type]
-            elif isinstance(input_data_type, dtype.QuantDtypeMeta):
-                q_dtype_meta = input_data_type
-            else:
-                assert isinstance(input_data_type, str)
-                dt = np.dtype(input_data_type)
-                assert np.issubdtype(dt, np.integer)
-                v_min = np.iinfo(dt).min
-                v_max = np.iinfo(dt).max
-                q_dtype_meta = dtype.QuantDtypeMeta(
-                    input_data_type, "", input_data_type, v_min, v_max
-                )
-            traced_module.graph.inputs[i + 1].qparams.dtype_meta = q_dtype_meta
-    if input_scales is not None:
-        if not isinstance(input_scales, Sequence):
-            scales = (input_scales,)
-        for i in range(len(traced_module.graph.inputs[1:])):
-            scale = scales[i] if i < len(scales) else scales[-1]
-            traced_module.graph.inputs[i + 1].qparams.scale = mge.tensor(float(scale))
-    if input_zero_points is not None:
-        if not isinstance(input_zero_points, Sequence):
-            zero_points = (input_zero_points,)
-        for i in range(len(traced_module.graph.inputs[1:])):
-            zero_point = zero_points[i] if i < len(zero_points) else zero_points[-1]
-            traced_module.graph.inputs[i + 1].qparams.zero_point = mge.tensor(
-                int(zero_point)
-            )
-
     irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
+    irgraph.update_inputs_qparams(input_data_type, input_scales, input_zero_points)
 
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,
@@ -117,7 +81,8 @@ def tracedmodule_to_tflite(
     )
 
     if not require_quantize:
-        quantizer.save_quantize_params(transformed_irgraph, path=quantize_file_path)
+        quantizer.save_quantize_params(transformed_irgraph)
+        quantizer.dump_quant_param(path=quantize_file_path)
 
     converter = TFLiteConverter(transformed_irgraph, graph_name, quantizer=quantizer)
     model = converter.convert()

@@ -149,7 +149,7 @@ convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --input_data_typ
 | relu                     | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | relu6                    | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | reshape                  | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
-| resize                   | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
+| resize                   | ✓<br/>✓ | ×<br/>× | ✓<br/>✓ |
 | sigmoid(logistic)        | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | softmax                  | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | leaky_relu               | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
