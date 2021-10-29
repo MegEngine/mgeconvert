@@ -8,10 +8,13 @@
 
 # pylint: disable=import-error,no-name-in-module,no-member
 
+from typing import List, Union
+
 import megengine as mge
 from megengine.traced_module import TracedModule
 
-from ..backend.ir_to_caffe.caffe_converter import CaffeConverter
+from ..backend.ir_to_caffe.caffe_converter import BackEnd, CaffeConverter
+from ..converter_ir.ir_quantizer import IRQuantizer
 from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.tm_to_ir import TM_FrontEnd
 
@@ -22,6 +25,14 @@ def tracedmodule_to_caffe(
     caffemodel="out.caffemodel",
     outspec=None,
     use_empty_blobs=False,
+    input_data_type: str = None,
+    input_scales: Union[float, List[float]] = None,
+    input_zero_points: Union[int, List[int]] = None,
+    require_quantize=False,
+    param_fake_quant=False,
+    split_conv_relu=False,
+    quantize_file_path="quant_params.json",
+    convert_backend: BackEnd = BackEnd.CAFFE,
 ):
     """
     Convert TracedModule model to Caffe,
@@ -43,6 +54,8 @@ def tracedmodule_to_caffe(
     ), "Input should be a traced module or a path of traced module."
 
     irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
+    irgraph.update_inputs_qparams(input_data_type, input_scales, input_zero_points)
+
     transformer_options = [
         TransformerRule.REMOVE_DROPOUT,
         TransformerRule.REMOVE_RESHAPE_REALTED_OP,
@@ -50,10 +63,25 @@ def tracedmodule_to_caffe(
         TransformerRule.ADD_FAKE_HSIGMOID_OUT,
         TransformerRule.EXPAND_CONVRELU,
     ]
+    if split_conv_relu:
+        transformer_options += [TransformerRule.REMOVE_RELU]
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
-    converter = CaffeConverter(transformed_irgraph, use_empty_blobs)
+
+    quantizer = IRQuantizer(
+        require_quantize=require_quantize, param_fake_quant=param_fake_quant
+    )
+
+    if require_quantize:
+        quantizer.save_quantize_params(transformed_irgraph)
+
+    converter = CaffeConverter(
+        transformed_irgraph, quantizer, use_empty_blobs, convert_backend
+    )
     converter.convert()
+
+    if require_quantize:
+        quantizer.dump_quant_param(path=quantize_file_path)
 
     assert isinstance(prototxt, str) and isinstance(
         caffemodel, str

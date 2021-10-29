@@ -20,6 +20,7 @@ class IRQuantizer:
         super().__init__()
         self.require_quantize = require_quantize
         self.param_fake_quant = param_fake_quant
+        self.quant_params = {}
 
     def quantize(self, tensor: IRTensor):
         assert self.require_quantize, "This net do not require true quantize."
@@ -43,44 +44,47 @@ class IRQuantizer:
         value = value.astype(tensor.q_dtype)
         return value
 
-    def save_quantize_params(self, irgraph, path="quant_params.json"):
-        quant_params = {}
+    def save_quantize_params(self, irgraph):
         all_tensors = set()
         for opr in irgraph.all_oprs:
             for t in opr.inp_tensors + opr.out_tensors:
                 all_tensors.add(t)
         for t in all_tensors:
-            dt = np.dtype(t.q_dtype)
-            v_max, v_min = None, None
-            is_weight = bool(t.np_data is not None)
-            if np.issubdtype(dt, np.integer):
-                v_min = np.iinfo(dt).min
-                v_max = np.iinfo(dt).max
-            if self.param_fake_quant and is_weight:
-                if t.scale is not None:
-                    inp = megengine.tensor(t.np_data)
-                    scale = megengine.tensor(t.scale)
-                    zp = float(t.zero_point) if t.zero_point else 0.0
-                    zero_point = megengine.tensor(zp)
-                    from megengine.core._imperative_rt.core2 import (  # pylint:disable=import-error
-                        apply,
-                    )
-                    from megengine.core.ops.builtin import FakeQuant
+            self.parse_quant_info(t)
 
-                    t.np_data = apply(
-                        FakeQuant(qmin=v_min, qmax=v_max), inp, scale, zero_point
-                    )[0].numpy()
-            else:
-                param = {
-                    "dtype": str(dt),
-                    "qmin": str(v_min),
-                    "qmax": str(v_max),
-                    "scale": str(t.scale),
-                    "zero_point": str(t.zero_point),
-                    "is_weight": is_weight,
-                }
-                quant_params[t.name] = param
+    def parse_quant_info(self, t: IRTensor):
+        dt = np.dtype(t.q_dtype)
+        v_max, v_min = None, None
+        is_weight = bool(t.np_data is not None)
+        if np.issubdtype(dt, np.integer):
+            v_min = np.iinfo(dt).min
+            v_max = np.iinfo(dt).max
+        if self.param_fake_quant and is_weight:
+            if t.scale is not None:
+                inp = megengine.tensor(t.np_data)
+                scale = megengine.tensor(t.scale)
+                zp = float(t.zero_point) if t.zero_point else 0.0
+                zero_point = megengine.tensor(zp)
+                from megengine.core._imperative_rt.core2 import (  # pylint:disable=import-error
+                    apply,
+                )
+                from megengine.core.ops.builtin import FakeQuant
 
-        params = json.dumps(quant_params, indent=4)
+                t.np_data = apply(
+                    FakeQuant(qmin=v_min, qmax=v_max), inp, scale, zero_point
+                )[0].numpy()
+        else:
+            param = {
+                "dtype": str(dt),
+                "qmin": str(v_min),
+                "qmax": str(v_max),
+                "scale": str(t.scale),
+                "zero_point": str(t.zero_point),
+                "is_weight": is_weight,
+            }
+            self.quant_params[t.name] = param
+
+    def dump_quant_param(self, path="quant_params.json"):
+        params = json.dumps(self.quant_params, indent=4)
         with open(path, "w") as f:
             f.write(params)

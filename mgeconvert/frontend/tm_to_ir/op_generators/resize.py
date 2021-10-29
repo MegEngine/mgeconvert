@@ -23,7 +23,7 @@ class GenResizeOpr(OpGenBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph)
         assert isinstance(expr, CallFunction)
-        self.size = expr.kwargs["size"] if "size" in expr.kwargs else None
+        self.size = expr.kwargs["size"] if "size" in expr.kwargs.keys() else None
         self.scale_factor = (
             expr.kwargs["scale_factor"] if "scale_factor" in expr.kwargs else None
         )

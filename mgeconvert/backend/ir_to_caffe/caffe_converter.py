@@ -7,13 +7,16 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 import os
+from typing import Dict, List, Set
 
 # pylint: disable=import-error
 from google.protobuf import text_format  # type: ignore
 from tqdm import tqdm
 
 from ...converter_ir.ir_graph import IRGraph
-from .caffe_op import MGE2CAFFE, _add_input_layer
+from ...converter_ir.ir_quantizer import IRQuantizer
+from ...converter_ir.ir_tensor import IRTensor  # pylint: disable=unused-import
+from .caffe_op import MGE2CAFFE, BackEnd, _add_input_layer
 
 if "USE_CAFFE_PROTO" not in os.environ:
     from .caffe_pb import caffe_pb2 as cp
@@ -22,14 +25,25 @@ else:
 
 
 class CaffeConverter:
-    def __init__(self, net, use_empty_blobs=False):
+    def __init__(
+        self,
+        net,
+        quantizer: IRQuantizer,
+        use_empty_blobs=False,
+        convert_backend=BackEnd.CAFFE,
+    ):
         assert isinstance(net, IRGraph), "net must be instance of IRGraph"
         self.net = net
-        self.tensor2blob_map = {}
-        self.layers = []
-        self._names = set()
+        self.tensor2blob_map = {}  # type: Dict[IRTensor, str]
+        self.layers = []  # type: List
+        self._names = set()  # type: Set
         self._count = 0
         self.use_empty_blobs = use_empty_blobs
+        self.quantizer = quantizer
+        self.convert_backend = convert_backend
+
+    def update_quantize_dict(self, tensor):
+        self.quantizer.parse_quant_info(tensor)
 
     def dump(self, proto_file, caffe_file=None):
         CaffeNet = cp.NetParameter(layer=self.layers)

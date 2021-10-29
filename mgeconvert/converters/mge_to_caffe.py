@@ -6,6 +6,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from ..backend.ir_to_caffe import CaffeConverter
+from ..backend.ir_to_caffe.caffe_converter import BackEnd
 from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.mge_to_ir import MGE_FrontEnd
 
@@ -16,6 +17,7 @@ def mge_to_caffe(
     caffemodel="out.caffemodel",
     outspec=None,
     use_empty_blobs=False,
+    convert_backend: BackEnd = BackEnd.CAFFE,
 ):
     """
     Convert megengine model to Caffe,
@@ -39,7 +41,9 @@ def mge_to_caffe(
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
 
-    converter = CaffeConverter(transformed_irgraph, use_empty_blobs)
+    converter = CaffeConverter(
+        transformed_irgraph, use_empty_blobs, convert_backend=convert_backend
+    )
     converter.convert()
 
     assert isinstance(prototxt, str) and isinstance(
