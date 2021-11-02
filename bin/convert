@@ -27,9 +27,14 @@ def init(subparsers):
                     "tracedmodule_to_caffe": mgeconvert.tracedmodule_to_caffe,
                     "mge_to_caffe": mgeconvert.mge_to_caffe,
                 }
-                converter_map[target](
-                    args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
-                )
+                if "tracedmodule" in target:
+                    converter_map[target](
+                        args.input, prototxt=args.prototxt, caffemodel=args.caffemodel
+                    )
+                else:
+                    converter_map[target](
+                        args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
+                    )
             def caffe_parser(subparsers):
                 p = subparsers.add_parser(target)
                 p.set_defaults(func=to_caffe)
@@ -63,13 +68,21 @@ def init(subparsers):
                     "tracedmodule_to_onnx": mgeconvert.tracedmodule_to_onnx,
                     "mge_to_onnx": mgeconvert.mge_to_onnx,
                 }
-                converter_map[target](
-                    args.input,
-                    args.output,
-                    graph_name=args.graph,
-                    opset=args.opset,
-                    outspec=outspec,
-                )
+                if "tracedmodule" in target:
+                    converter_map[target](
+                        args.input,
+                        args.output,
+                        graph_name=args.graph,
+                        opset=args.opset,
+                    )
+                else:
+                    converter_map[target](
+                        args.input,
+                        args.output,
+                        graph_name=args.graph,
+                        opset=args.opset,
+                        outspec=outspec,
+                    )
             def onnx_parser(subparsers):
                 p = subparsers.add_parser("onnx")
                 p.set_defaults(func=to_onnx)
