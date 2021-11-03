@@ -101,6 +101,18 @@ class ConvOpr(M.Module):
         return getattr(self, self.mode + "_conv")(x)
 
 
+class ConvRelu2dOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
+        self.convrelu = M.ConvRelu2d(
+            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1)
+        )
+
+    def forward(self, x):
+        return self.convrelu(x)
+
+
 class LinearOpr(M.Module):
     def __init__(self):
         super().__init__()
@@ -140,6 +152,30 @@ class BnOpr(M.Module):
 
     def forward(self, x):
         return getattr(self, self.mode)(x)
+
+
+class ConvBn2dOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
+        self.convbn = M.ConvBn2d(
+            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1)
+        )
+
+    def forward(self, x):
+        return self.convbn(x)
+
+
+class ConvBnRelu2dOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
+        self.convbnrelu = M.ConvBnRelu2d(
+            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1)
+        )
+
+    def forward(self, x):
+        return self.convbnrelu(x)
 
 
 class SubtensorOpr(M.Module):

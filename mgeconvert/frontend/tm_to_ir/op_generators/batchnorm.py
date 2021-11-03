@@ -24,7 +24,7 @@ class GenBatchNormalizationOpr(OpGenBase):
     def __init__(self, expr, ir_graph):
         super().__init__(expr, ir_graph)
         if isinstance(self.expr, CallMethod):
-            bn_module = expr.inputs[0].expr.value
+            bn_module = expr.inputs[0].owner
             state_dict = bn_module.state_dict()
             self.running_mean = state_dict["running_mean"].squeeze()
             self.running_var = state_dict["running_var"].squeeze()
@@ -32,9 +32,7 @@ class GenBatchNormalizationOpr(OpGenBase):
             self.bias = state_dict["bias"].squeeze()
         elif isinstance(self.expr, CallFunction):
             assert False, "not inplement function batchnorm"
-        self.op = BatchNormalizationOpr(
-            eps=bn_module.eps
-        )  # 'num_features', 'eps', 'momentum'
+        self.op = BatchNormalizationOpr(eps=bn_module.eps, momentum=bn_module.momentum,)
         self.add_opr_vars()
 
     def add_opr_vars(self):

@@ -57,7 +57,7 @@ class GenConcatOpr(OpGenBase):
 class GenQConcatOpr(GenConcatOpr):
     def __init__(self, expr, irgraph) -> None:
         if isinstance(expr, CallMethod):
-            self.module = expr.inputs[0].expr.value
+            self.module = expr.inputs[0].owner
         if hasattr(self.module.act_fake_quant, "get_qparams"):
             self.act_qparams = self.module.act_fake_quant.get_qparams()
             self.act_dtype = self.act_qparams.dtype_meta.np_dtype_str

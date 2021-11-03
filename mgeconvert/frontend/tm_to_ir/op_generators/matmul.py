@@ -46,7 +46,7 @@ class GenLinearOpr(OpGenBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph)
         if isinstance(expr, CallMethod):
-            m = expr.inputs[0].expr.value
+            m = expr.inputs[0].owner
             self.weight = m.weight
             self.has_bias = bool(m.bias is not None)
         elif isinstance(expr, CallFunction):
@@ -74,7 +74,7 @@ class GenLinearOpr(OpGenBase):
         self.op.add_inp_tensors(weight_tensor)
         if self.has_bias:
             bias_tensor = self.resolver.get_ir_tensor(
-                self.expr.inputs[0].expr.value.bias,
+                self.expr.inputs[0].owner.bias,
                 user_opr=self.op,
                 name=self.expr.inputs[0]._name + "_bias",
             )
@@ -84,7 +84,7 @@ class GenLinearOpr(OpGenBase):
 @_register_op(QAT.Linear)
 class GenQLinearOpr(GenLinearOpr):
     def __init__(self, expr, irgraph):
-        self.module = expr.inputs[0].expr.value
+        self.module = expr.inputs[0].owner
         if hasattr(self.module.weight_fake_quant, "get_qparams"):
             self.weight_qparams = self.module.weight_fake_quant.get_qparams()
             self.weight_dtype = self.weight_qparams.dtype_meta.np_dtype_str
@@ -112,7 +112,7 @@ class GenQLinearOpr(GenLinearOpr):
         self.op.add_inp_tensors(weight_tensor)
         if self.has_bias:
             bias_tensor = self.resolver.get_ir_tensor(
-                self.expr.inputs[0].expr.value.bias,
+                self.expr.inputs[0].owner.bias,
                 user_opr=self.op,
                 name=self.expr.inputs[0]._name + "_bias",
             )

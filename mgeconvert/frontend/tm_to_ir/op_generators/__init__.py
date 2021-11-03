@@ -12,6 +12,7 @@ from .broadcast import GenBroadcastOpr
 from .concat import GenConcatOpr, GenQConcatOpr
 from .constant import ConstantOpr
 from .conv2d import GenConv2dOpr, GenQConv2dOpr
+from .conv_bn2d import *
 from .deconv import GenDeconv2dOpr, GenQDeconv2dOpr
 from .dropout import GenDropoutOpr
 from .elemwise import *

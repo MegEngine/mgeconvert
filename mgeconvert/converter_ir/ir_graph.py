@@ -28,7 +28,7 @@ class IRGraph:
 
     def add_op(self, op, index=None):
         assert len(self._opr_ids) == len(self.all_oprs)
-        if index:
+        if index is not None:
             self._opr_ids.insert(index, id(op))
             self.all_oprs.insert(index, op)
         else:

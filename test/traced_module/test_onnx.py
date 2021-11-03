@@ -10,7 +10,10 @@ from test.utils import (
     AdaptiveAvgPool2dOpr,
     BnOpr,
     BroadcastOpr,
+    ConvBn2dOpr,
+    ConvBnRelu2dOpr,
     ConvOpr,
+    ConvRelu2dOpr,
     DropoutOpr,
     ElemwiseOpr,
     FConcatOpr,
@@ -68,6 +71,26 @@ def test_conv2d(mode):
     net = ConvOpr(mode)
     tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(net.data, tm_module, mge_result, max_error)
+
+
+def test_convrelu():
+    net = ConvRelu2dOpr()
+    traced_module, tm_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, traced_module, tm_result, max_error)
+
+
+def test_convbn():
+    net = ConvBn2dOpr()
+    net.eval()
+    traced_module, tm_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, traced_module, tm_result, max_error)
+
+
+def test_convbnrelu():
+    net = ConvBnRelu2dOpr()
+    net.eval()
+    traced_module, tm_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, traced_module, tm_result, max_error)
 
 
 def test_linear():

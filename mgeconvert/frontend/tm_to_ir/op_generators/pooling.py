@@ -40,7 +40,7 @@ class GenPool2dOpr(OpGenBase):
         super().__init__(expr, irgraph)
 
         if isinstance(expr, CallMethod):
-            m = expr.inputs[0].expr.value
+            m = expr.inputs[0].owner
             self.kernel_size = _pair_nonzero(m.kernel_size)
             self.stride = _pair_nonzero(m.stride)
             self.padding = _pair(m.padding)
@@ -73,7 +73,7 @@ class GenAdaptiveAvgPool2dOpr(OpGenBase):
         super().__init__(expr, irgraph)
 
         if isinstance(expr, CallMethod):
-            m = expr.inputs[0].expr.value
+            m = expr.inputs[0].owner
             self.op = AdaptiveAvgPool2dOpr(m.oshp)
         elif isinstance(expr, CallFunction):
             self.op = AdaptiveAvgPool2dOpr(expr.func.oshp)

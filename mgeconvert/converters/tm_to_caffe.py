@@ -45,6 +45,7 @@ def tracedmodule_to_caffe(
         TransformerRule.REMOVE_RESHAPE_REALTED_OP,
         TransformerRule.REMOVE_UNRELATED_IROP,
         TransformerRule.ADD_FAKE_HSIGMOID_OUT,
+        TransformerRule.EXPAND_CONVRELU,
     ]
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)

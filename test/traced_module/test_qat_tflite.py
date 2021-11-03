@@ -9,7 +9,7 @@
 # pylint: disable=import-error,no-name-in-module,no-member
 
 from test.traced_module.test_tflite import _test_convert_result
-from test.utils import ConvOpr, LinearOpr
+from test.utils import ConvBn2dOpr, ConvBnRelu2dOpr, ConvOpr, ConvRelu2dOpr, LinearOpr
 
 import megengine as mge
 import megengine.module as M
@@ -67,6 +67,65 @@ def test_qat_conv_qint8():
 
     traced_module, tm_result = get_traced_module(qat_net, inp)
     print(traced_module.flatten().graph)
+    inp = inp.astype(inp_dtype)
+    out_dtype = traced_module.graph.outputs[0].qparams
+    scale = out_dtype.scale.numpy()
+    _test_convert_result(
+        inp, traced_module, tm_result, scale=scale, require_quantize=True
+    )
+
+
+def test_qat_convrelu():
+    net = ConvRelu2dOpr()
+    qat_net = quantize_qat(net)
+    inp_dtype = dtype.qint8(16.0 / 128)
+    data = mge.tensor(np.random.random((1, 3, 224, 224))) * 16
+    data = data.astype(inp_dtype)
+    inp = mge.tensor(dtype.convert_from_qint8(data.numpy()))
+    inp.qparams.scale = mge.tensor(dtype.get_scale(inp_dtype))
+    inp.qparams.dtype_meta = dtype._builtin_quant_dtypes["qint8"]
+
+    traced_module, tm_result = get_traced_module(qat_net, inp)
+    inp = inp.astype(inp_dtype)
+    out_dtype = traced_module.graph.outputs[0].qparams
+    scale = out_dtype.scale.numpy()
+    _test_convert_result(
+        inp, traced_module, tm_result, scale=scale, require_quantize=True
+    )
+
+
+def test_qat_convbn():
+    net = ConvBn2dOpr()
+    net.eval()
+    qat_net = quantize_qat(net)
+    inp_dtype = dtype.qint8(16.0 / 128)
+    data = mge.tensor(np.random.random((1, 3, 224, 224))) * 16
+    data = data.astype(inp_dtype)
+    inp = mge.tensor(dtype.convert_from_qint8(data.numpy()))
+    inp.qparams.scale = mge.tensor(dtype.get_scale(inp_dtype))
+    inp.qparams.dtype_meta = dtype._builtin_quant_dtypes["qint8"]
+
+    traced_module, tm_result = get_traced_module(qat_net, inp)
+    inp = inp.astype(inp_dtype)
+    out_dtype = traced_module.graph.outputs[0].qparams
+    scale = out_dtype.scale.numpy()
+    _test_convert_result(
+        inp, traced_module, tm_result, scale=scale, require_quantize=True
+    )
+
+
+def test_qat_convbnrelu():
+    net = ConvBnRelu2dOpr()
+    net.eval()
+    qat_net = quantize_qat(net)
+    inp_dtype = dtype.qint8(16.0 / 128)
+    data = mge.tensor(np.random.random((1, 3, 224, 224))) * 16
+    data = data.astype(inp_dtype)
+    inp = mge.tensor(dtype.convert_from_qint8(data.numpy()))
+    inp.qparams.scale = mge.tensor(dtype.get_scale(inp_dtype))
+    inp.qparams.dtype_meta = dtype._builtin_quant_dtypes["qint8"]
+
+    traced_module, tm_result = get_traced_module(qat_net, inp)
     inp = inp.astype(inp_dtype)
     out_dtype = traced_module.graph.outputs[0].qparams
     scale = out_dtype.scale.numpy()
