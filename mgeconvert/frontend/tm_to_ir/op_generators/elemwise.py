@@ -270,7 +270,7 @@ method_opr_map = {
 def get_elemwise_op(expr, net):
     assert isinstance(expr, CallMethod)
     assert isinstance(expr.inputs[0].expr, Constant)
-    module = expr.inputs[0].expr.value
+    module = expr.inputs[0].owner
     method = module.method
     op_gen = method_opr_map[method](expr, net)
 

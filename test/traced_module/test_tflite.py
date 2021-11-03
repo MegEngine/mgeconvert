@@ -9,7 +9,10 @@
 # pylint:disable=import-outside-toplevel, no-name-in-module,import-error
 from test.traced_module.tm_utils import get_traced_module
 from test.utils import (
+    ConvBn2dOpr,
+    ConvBnRelu2dOpr,
     ConvOpr,
+    ConvRelu2dOpr,
     ElemwiseOpr,
     FConcatOpr,
     LinearOpr,
@@ -100,6 +103,35 @@ def _test_convert_result(
 def test_conv(mode):
     net = ConvOpr(mode)
     data = mge.tensor(np.random.random((1, 3, 224, 224)).astype(np.float32))
+    traced_module, tm_result = get_traced_module(net, data)
+    print(traced_module.flatten().graph)
+
+    _test_convert_result(data, traced_module, tm_result)
+
+
+def test_convrelu():
+    net = ConvRelu2dOpr()
+    data = mge.tensor(net.data)
+    traced_module, tm_result = get_traced_module(net, data)
+    print(traced_module.flatten().graph)
+
+    _test_convert_result(data, traced_module, tm_result)
+
+
+def test_convbn():
+    net = ConvBn2dOpr()
+    net.eval()
+    data = mge.tensor(net.data)
+    traced_module, tm_result = get_traced_module(net, data)
+    print(traced_module.flatten().graph)
+
+    _test_convert_result(data, traced_module, tm_result)
+
+
+def test_convbnrelu():
+    net = ConvBnRelu2dOpr()
+    net.eval()
+    data = mge.tensor(net.data)
     traced_module, tm_result = get_traced_module(net, data)
     print(traced_module.flatten().graph)
 

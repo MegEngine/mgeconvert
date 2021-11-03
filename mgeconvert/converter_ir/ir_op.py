@@ -44,6 +44,10 @@ class Deconv2dOpr(_ConvOpr):
     name = "Deconv2d"
 
 
+class ConvRelu2dOpr(_ConvOpr):
+    name = "ConvRelu2d"
+
+
 class ConvolutionBackwardFilterOpr(OpBase):
     name = "ConvolutionBackwardFilter"
 
@@ -93,9 +97,23 @@ class PadOpr(OpBase):
 class BatchNormalizationOpr(OpBase):
     name = "BatchNormalization"
 
-    def __init__(self, eps=1e-5, output_idx=-1):
+    def __init__(
+        self,
+        scale=None,
+        bias=None,
+        mean=None,
+        var=None,
+        eps=1e-5,
+        momentum=0.9,
+        output_idx=-1,
+    ):
         super().__init__()
+        self.scale = scale
+        self.bias = bias
+        self.mean = mean
+        self.var = var
         self.eps = eps
+        self.momentum = momentum
         self.output_idx = output_idx
 
 

@@ -78,6 +78,7 @@ def tracedmodule_to_tflite(
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,
         TransformerRule.PADDING_FOR_CONV_AND_POOLING,
+        TransformerRule.EXPAND_CONVRELU,
         TransformerRule.CONV_ADD_ZERO_BIAS,
         TransformerRule.DECONV_SHAPE_AS_INPUT,
         TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,

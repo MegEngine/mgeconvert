@@ -32,7 +32,7 @@ class GenSoftmaxOpr(OpGenBase):
     def __init__(self, expr, irgraph) -> None:
         super().__init__(expr, irgraph)
         if isinstance(self.expr, CallMethod):
-            module = expr.inputs[0].expr.value
+            module = expr.inputs[0].owner
             self.axis = module.axis
         elif isinstance(self.expr, CallFunction):
             if len(expr.const_val) == 1:

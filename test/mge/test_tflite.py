@@ -9,6 +9,7 @@ from test.utils import (
     ActiveOpr,
     BnOpr,
     ConcatOpr,
+    ConvBn2dOpr,
     ConvOpr,
     ElemwiseOpr,
     LinearOpr,
@@ -66,6 +67,12 @@ def _test_convert_result(
 @pytest.mark.parametrize("mode", ["normal", "group", "tflite_transpose"])
 def test_conv2d(mode):
     net = ConvOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
+def test_convbn():
+    net = ConvBn2dOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 

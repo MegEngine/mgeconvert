@@ -19,6 +19,7 @@ from ..converter_ir.ir_graph import IRGraph
 from .ir_op import (
     AddOpr,
     Conv2dOpr,
+    ConvRelu2dOpr,
     Deconv2dOpr,
     DropoutOpr,
     ExpOpr,
@@ -56,7 +57,9 @@ class TransformerRule(Enum):
     REMOVE_RESHAPE_INPUT = 101
     # FUSE_FOR_RELU6 pass should happen before FUSE_ACTIVATION
     FUSE_FOR_RELU6 = 102  ##
+    EXPAND_CONVRELU = 102.1
     CONV_ADD_ZERO_BIAS = 103
+    FUSE_FOR_CONV_BIAS = 103.1
     FUSE_CONV_BN = 104
     DECONV_ADD_ZERO_BIAS = 105
     # DEPTHWISE_CONV_RESHAPE_WEIGHT requirs RESHAPE_BIAS_TO_1DIM
@@ -72,7 +75,6 @@ class TransformerRule(Enum):
     FUSE_FOR_LEAKY_RELU = 113
     EXPAND_MUL_ADD3 = 114
     EXPAND_ADD_SIGMOID = 115  ##
-    FUSE_FOR_CONV_BIAS = 116
     FUSE_FOR_DECONV_BIAS = 117
     FUSE_FOR_FULLY_CONNECTED = 118  ##
     # for TFLite Converter
@@ -110,6 +112,10 @@ class IRTransform:
         if TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT in transformer_options:
             if TransformerRule.RESHAPE_BIAS_TO_1DIM not in transformer_options:
                 transformer_options.append(TransformerRule.RESHAPE_BIAS_TO_1DIM)
+
+        if TransformerRule.FUSE_CONV_BN in transformer_options:
+            if TransformerRule.CONV_ADD_ZERO_BIAS not in transformer_options:
+                transformer_options.append(TransformerRule.CONV_ADD_ZERO_BIAS)
 
         self.trans_options = sorted(transformer_options, key=cmp_to_key(cmp_rules))
 
@@ -718,9 +724,14 @@ def _fuse_for_conv_bias(net: IRGraph):
             if len(opr.inp_tensors) == 2:
                 opr.inp_tensors.append(bias_op.inp_tensors[bias_idx])
             else:
-                opr.inp_tensors[2].np_data += bias_op.inp_tensors[
-                    bias_idx
-                ].np_data.reshape(-1)
+                if (
+                    bias_op.inp_tensors[bias_idx].np_data.shape
+                    != opr.inp_tensors[2].np_data.shape
+                ):
+                    bias_op.inp_tensors[bias_idx].np_data = bias_op.inp_tensors[
+                        bias_idx
+                    ].np_data.reshape(opr.inp_tensors[2].np_data.shape)
+                opr.inp_tensors[2].np_data += bias_op.inp_tensors[bias_idx].np_data
             if bias_op in opr.out_tensors[0].user_opr:
                 opr.out_tensors[0].user_opr.remove(bias_op)
             bias_out_op = net.find_out_oprs(bias_op)
@@ -915,6 +926,29 @@ def _add_fake_hsigmoid_tensor(net: IRGraph):
                 opr.add_inp_tensors(div6_out_tensor)
 
 
+def fold_conv_bn(
+    conv_weight, conv_bias, conv_groups, gamma, beta, bn_mean, bn_var, eps
+):
+    conv_bias = conv_bias.reshape(1, -1, 1, 1)
+    gamma = gamma.reshape(1, -1, 1, 1)
+    beta = beta.reshape(1, -1, 1, 1)
+    bn_mean = bn_mean.reshape(1, -1, 1, 1)
+    bn_var = bn_var.reshape(1, -1, 1, 1)
+
+    # bn_istd = 1 / bn_std
+    bn_istd = 1.0 / sqrt(bn_var + eps)  # type: ignore[attr-defined]
+    # w_fold = gamma / bn_std * W
+    scale_factor = gamma * bn_istd
+    if conv_groups == 1:
+        w_fold = conv_weight * scale_factor.reshape(-1, 1, 1, 1)
+    else:
+        w_fold = conv_weight * scale_factor.reshape(conv_groups, -1, 1, 1, 1)
+    # b_fold = gamma * (b - bn_mean) / bn_std + beta
+    b_fold = beta + gamma * (conv_bias - bn_mean) * bn_istd
+
+    return w_fold, b_fold
+
+
 @_register_tranformation_rule(TransformerRule.FUSE_CONV_BN)
 def _fuse_conv_bn(net: IRGraph):
     for opr in net.all_oprs:
@@ -923,31 +957,44 @@ def _fuse_conv_bn(net: IRGraph):
             and len(net.find_inp_oprs(opr)) == 1
             and net.find_inp_oprs(opr)[0].name == "Conv2d"
         ):
-            # bn_istd = 1 / bn_std
-            # w_fold = gamma / bn_std * W
-            # b_fold = gamma * (b - bn_mean) / bn_std + beta
-            gamma = Tensor(opr.inp_tensors[1].np_data).reshape(1, -1, 1, 1)
-            beta = Tensor(opr.inp_tensors[2].np_data).reshape(1, -1, 1, 1)
-            bn_mean = Tensor(opr.inp_tensors[3].np_data).reshape(1, -1, 1, 1)
-            bn_var = Tensor(opr.inp_tensors[4].np_data).reshape(1, -1, 1, 1)
+            gamma = (
+                Tensor(opr.scale)  # type: ignore[attr-defined]
+                if opr.scale is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[1].np_data)
+            )
+            beta = (
+                Tensor(opr.bias)  # type: ignore[attr-defined]
+                if opr.bias is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[2].np_data)
+            )
+            bn_mean = (
+                Tensor(opr.mean)  # type: ignore[attr-defined]
+                if opr.mean is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[3].np_data)
+            )
+            bn_var = (
+                Tensor(opr.var)  # type: ignore[attr-defined]
+                if opr.var is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[4].np_data)
+            )
+
             conv_op = net.find_inp_oprs(opr)[0]
 
             conv_weight = conv_op.inp_tensors[1].np_data
-            if len(conv_op.inp_tensors) < 3:
-                _add_bias_for_conv(net)
+            assert len(conv_op.inp_tensors) == 3
             conv_bias = conv_op.inp_tensors[2].np_data.reshape(1, -1, 1, 1)
 
-            # bn_istd = 1 / bn_std
-            bn_istd = 1.0 / sqrt(bn_var + opr.eps)  # type: ignore[attr-defined]
-            # w_fold = gamma / bn_std * W
-            scale_factor = gamma * bn_istd
-            if conv_op.groups == 1:
-                w_fold = conv_weight * scale_factor.reshape(-1, 1, 1, 1)
-            else:
-                w_fold = conv_weight * scale_factor.reshape(conv_op.groups, -1, 1, 1, 1)
+            w_fold, b_fold = fold_conv_bn(
+                conv_weight,
+                conv_bias,
+                conv_op.groups,
+                gamma,
+                beta,
+                bn_mean,
+                bn_var,
+                opr.eps,  # type: ignore[attr-defined]
+            )
 
-            # b_fold = gamma * (b - bn_mean) / bn_std + beta
-            b_fold = beta + gamma * (conv_bias - bn_mean) * bn_istd
             conv_op.inp_tensors[1].np_data = w_fold.numpy()
             conv_op.inp_tensors[2].np_data = b_fold.numpy()
 
@@ -975,3 +1022,44 @@ def _remove_identity(net: IRGraph):
 
     for delete_idx in delete_intended[::-1]:
         net.delete_ops(delete_idx)
+
+
+@_register_tranformation_rule(TransformerRule.EXPAND_CONVRELU)
+def _expand_conv_relu(net: IRGraph):
+    for opr in net.all_oprs:
+        if not isinstance(opr, ConvRelu2dOpr):
+            continue
+
+        conv_op = Conv2dOpr(
+            stride=opr.stride,
+            padding=opr.padding,
+            dilation=opr.dilation,
+            groups=opr.groups,
+        )
+        conv_op.inp_tensors = opr.inp_tensors
+        for t in conv_op.inp_tensors:
+            idx = t.user_opr.index(opr)
+            t.user_opr[idx] = conv_op
+        conv_out_tensor = IRTensor(
+            name=opr.inp_tensors[0].name + "_conv_out",
+            shape=opr.out_tensors[0].shape,
+            dtype=opr.out_tensors[0].dtype,
+            scale=opr.out_tensors[0].scale,
+            zero_point=opr.out_tensors[0].zero_point,
+            q_type=opr.out_tensors[0].q_dtype,
+            owner_opr=conv_op,
+        )
+        conv_op.out_tensors = [conv_out_tensor]
+        conv_out_tensor.owner_opr = conv_op
+
+        idx = net.all_oprs.index(opr)
+        net.add_op(conv_op, idx)
+
+        relu_op = ReluOpr()
+        relu_op.inp_tensors = conv_op.out_tensors
+        conv_out_tensor.user_opr.append(relu_op)
+        relu_op.out_tensors = opr.out_tensors
+        for t in relu_op.out_tensors:
+            t.owner_opr = relu_op
+
+        net.replace_op(opr, relu_op)

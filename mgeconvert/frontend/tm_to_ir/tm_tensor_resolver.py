@@ -42,7 +42,11 @@ class TensorNodeResolver:
             np_data = np.array(inp)
             dtype = np_data.dtype.type
             shape = np_data.shape
-            name = "const_val_" + str(TensorNodeResolver.__const_id)
+            name = (
+                param_name
+                if param_name
+                else "const_val_" + str(TensorNodeResolver.__const_id)
+            )
             TensorNodeResolver.__const_id += 1
             ori_id = None
         elif isinstance(inp, mge.Tensor):

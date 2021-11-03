@@ -100,8 +100,6 @@ class TM_FrontEnd:
                             module, end_expr, expr, self.irgraph, self.tensor_resolver,
                         )
                         ops = (ops,) if not isinstance(ops, Sequence) else ops
-                        # if len(ops) >1:
-                        #     import pdb;pdb.set_trace()
                         for op in ops:
                             self.irgraph.all_oprs.append(op)
                             self.irgraph._opr_ids.append(id(op))
