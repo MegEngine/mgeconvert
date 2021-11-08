@@ -27,14 +27,9 @@ def init(subparsers):
                     "tracedmodule_to_caffe": mgeconvert.tracedmodule_to_caffe,
                     "mge_to_caffe": mgeconvert.mge_to_caffe,
                 }
-                if "tracedmodule" in target:
-                    converter_map[target](
-                        args.input, prototxt=args.prototxt, caffemodel=args.caffemodel
-                    )
-                else:
-                    converter_map[target](
-                        args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
-                    )
+                converter_map[target](
+                    args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
+                )
             def caffe_parser(subparsers):
                 p = subparsers.add_parser(target)
                 p.set_defaults(func=to_caffe)
@@ -68,21 +63,13 @@ def init(subparsers):
                     "tracedmodule_to_onnx": mgeconvert.tracedmodule_to_onnx,
                     "mge_to_onnx": mgeconvert.mge_to_onnx,
                 }
-                if "tracedmodule" in target:
-                    converter_map[target](
-                        args.input,
-                        args.output,
-                        graph_name=args.graph,
-                        opset=args.opset,
-                    )
-                else:
-                    converter_map[target](
-                        args.input,
-                        args.output,
-                        graph_name=args.graph,
-                        opset=args.opset,
-                        outspec=outspec,
-                    )
+                converter_map[target](
+                    args.input,
+                    args.output,
+                    graph_name=args.graph,
+                    opset=args.opset,
+                    outspec=outspec,
+                )
             def onnx_parser(subparsers):
                 p = subparsers.add_parser("onnx")
                 p.set_defaults(func=to_onnx)
@@ -115,6 +102,7 @@ def init(subparsers):
                         quantize_file_path=args.quantize_file_path,
                         graph_name=args.graph_name,
                         mtk=args.mtk,
+                        outspec=args.outspec,
                     )
                 else:
                     mgeconvert.mge_to_tflite(
@@ -122,6 +110,7 @@ def init(subparsers):
                         output=args.output,
                         graph_name=args.graph_name,
                         mtk=args.mtk,
+                        outspec=args.outspec,
                     )
             def tflite_parser(subparsers):
                 p = subparsers.add_parser(target)
@@ -175,6 +164,12 @@ def init(subparsers):
                 )
                 p.add_argument(
                     "--mtk", action="store_true", help="If target flatform is MTK(P70, P80)"
+                )
+                p.add_argument(
+                    "--outspec",
+                    default=None,
+                    type=list,
+                    help="the names of end points of the model",
                 )
 
             tflite_parser(subparsers)

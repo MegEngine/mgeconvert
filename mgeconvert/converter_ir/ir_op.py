@@ -99,7 +99,7 @@ class BatchNormalizationOpr(OpBase):
 
     def __init__(
         self,
-        scale=None,
+        weight=None,
         bias=None,
         mean=None,
         var=None,
@@ -108,7 +108,7 @@ class BatchNormalizationOpr(OpBase):
         output_idx=-1,
     ):
         super().__init__()
-        self.scale = scale
+        self.weight = weight
         self.bias = bias
         self.mean = mean
         self.var = var
