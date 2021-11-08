@@ -113,10 +113,6 @@ class IRTransform:
             if TransformerRule.RESHAPE_BIAS_TO_1DIM not in transformer_options:
                 transformer_options.append(TransformerRule.RESHAPE_BIAS_TO_1DIM)
 
-        if TransformerRule.FUSE_CONV_BN in transformer_options:
-            if TransformerRule.CONV_ADD_ZERO_BIAS not in transformer_options:
-                transformer_options.append(TransformerRule.CONV_ADD_ZERO_BIAS)
-
         self.trans_options = sorted(transformer_options, key=cmp_to_key(cmp_rules))
 
     def transform(self, ir_graph):
@@ -724,14 +720,12 @@ def _fuse_for_conv_bias(net: IRGraph):
             if len(opr.inp_tensors) == 2:
                 opr.inp_tensors.append(bias_op.inp_tensors[bias_idx])
             else:
-                if (
-                    bias_op.inp_tensors[bias_idx].np_data.shape
-                    != opr.inp_tensors[2].np_data.shape
-                ):
-                    bias_op.inp_tensors[bias_idx].np_data = bias_op.inp_tensors[
-                        bias_idx
-                    ].np_data.reshape(opr.inp_tensors[2].np_data.shape)
-                opr.inp_tensors[2].np_data += bias_op.inp_tensors[bias_idx].np_data
+                bias_shape = opr.inp_tensors[2].np_data.shape
+                add_tensor = bias_op.inp_tensors[bias_idx].np_data
+                if add_tensor.shape != bias_shape:
+                    add_tensor = add_tensor.reshape(bias_shape)
+                opr.inp_tensors[2].np_data += add_tensor
+
             if bias_op in opr.out_tensors[0].user_opr:
                 opr.out_tensors[0].user_opr.remove(bias_op)
             bias_out_op = net.find_out_oprs(bias_op)
@@ -775,12 +769,15 @@ def _fuse_for_deconv_bias(net: IRGraph):
             ):
                 continue
             bias_idx = 0 if bias_op.inp_tensors[0].np_data is not None else 1
-            if len(opr.inp_tensors) == 3:
+            if len(opr.inp_tensors) == 3:  # shape, weight, input, bias
                 opr.inp_tensors.append(bias_op.inp_tensors[bias_idx])
             else:
-                opr.inp_tensors[2].np_data += bias_op.inp_tensors[
-                    bias_idx
-                ].np_data.reshape(-1)
+                bias_shape = opr.inp_tensors[3].np_data.shape
+                add_tensor = bias_op.inp_tensors[bias_idx].np_data
+                if add_tensor.shape != bias_shape:
+                    add_tensor = add_tensor.reshape(bias_shape)
+                opr.inp_tensors[3].np_data += add_tensor
+
             if bias_op in opr.out_tensors[0].user_opr:
                 opr.out_tensors[0].user_opr.remove(bias_op)
             bias_out_op = net.find_out_oprs(bias_op)
@@ -958,8 +955,8 @@ def _fuse_conv_bn(net: IRGraph):
             and net.find_inp_oprs(opr)[0].name == "Conv2d"
         ):
             gamma = (
-                Tensor(opr.scale)  # type: ignore[attr-defined]
-                if opr.scale is not None  # type: ignore[attr-defined]
+                Tensor(opr.weight)  # type: ignore[attr-defined]
+                if opr.weight is not None  # type: ignore[attr-defined]
                 else Tensor(opr.inp_tensors[1].np_data)
             )
             beta = (
@@ -981,7 +978,28 @@ def _fuse_conv_bn(net: IRGraph):
             conv_op = net.find_inp_oprs(opr)[0]
 
             conv_weight = conv_op.inp_tensors[1].np_data
-            assert len(conv_op.inp_tensors) == 3
+            if len(conv_op.inp_tensors) == 2:
+                # add conv bias tensor
+                weight_shape = conv_op.inp_tensors[1].shape
+                bias_shape = (
+                    weight_shape[0]
+                    if len(weight_shape) == 4
+                    else weight_shape[0] * weight_shape[1]
+                )
+                bias_shape = (1, bias_shape, 1, 1)
+                conv_bias = IRTensor(
+                    name=conv_op.inp_tensors[0].name + "_bias",
+                    shape=bias_shape,
+                    dtype=np.float32,
+                    np_data=np.zeros(bias_shape, dtype=np.float32),
+                    owner_opr=conv_op,
+                )
+                if conv_op.inp_tensors[0].scale and conv_op.inp_tensors[1].scale:
+                    conv_bias.set_qparams(
+                        conv_op.inp_tensors[0].scale * conv_op.inp_tensors[1].scale, 0
+                    )
+                    conv_bias.q_dtype = "int32"
+                conv_op.inp_tensors.append(conv_bias)
             conv_bias = conv_op.inp_tensors[2].np_data.reshape(1, -1, 1, 1)
 
             w_fold, b_fold = fold_conv_bn(

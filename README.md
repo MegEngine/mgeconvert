@@ -15,7 +15,9 @@ MgeConvert转换器的结构包含前端、中间表示（IR）、后端三个�
 
 MgeConvert 基于 MegEngine 工作，因此确保您的电脑已经安装 MegEngine(>=1.0)。
 
-以 caffe 为例，下面这条指令将安装开发版本的 caffe 转换器并处理相关依赖。
+### pip 包管理器安装
+
+以 caffe 为例，下面这条指令将通过``pip``包管理器安装开发版本的 caffe 转换器并处理相关依赖：
 
 ```bash
 python3 -m pip install git+https://github.com/MegEngine/mgeconvert.git --user --install-option="--targets=caffe"
@@ -37,6 +39,15 @@ python3 -m pip install git+https://github.com/MegEngine/mgeconvert.git --user --
 python3 -m pip install git+https://github.com/MegEngine/mgeconvert.git@v0.4.2 --user --install-option="--targets=caffe"
 ```
 > :warning: 如果需要转换``TracedModule``模型，请安装v0.5.0以上版本
+
+### 源代码安装
+
+安装选项说明同上，以 caffe 为例，下面的命令将安装0.4.2版本的caffe转换器：
+
+```bash
+git clone https://github.com/MegEngine/mgeconvert.git@v0.4.2
+python3 setup.py install --user --install-option="--targets=caffe"
+```
 
 ## 使用方式
 

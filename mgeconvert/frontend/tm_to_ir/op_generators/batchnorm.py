@@ -28,7 +28,7 @@ class GenBatchNormalizationOpr(OpGenBase):
             state_dict = bn_module.state_dict()
             self.running_mean = state_dict["running_mean"].squeeze()
             self.running_var = state_dict["running_var"].squeeze()
-            self.scale = state_dict["weight"].squeeze()
+            self.weight = state_dict["weight"].squeeze()
             self.bias = state_dict["bias"].squeeze()
         elif isinstance(self.expr, CallFunction):
             assert False, "not inplement function batchnorm"
@@ -52,14 +52,14 @@ class GenBatchNormalizationOpr(OpGenBase):
             self.op.add_out_tensors(out_tensor)
 
     def add_const_inputs(self):
-        if self.scale is not None:
-            scale_tensor = self.resolver.get_ir_tensor(
-                self.scale,
+        if self.weight is not None:
+            weight_tensor = self.resolver.get_ir_tensor(
+                self.weight,
                 owner_opr=None,
-                name=self.expr.inputs[0]._name + "_scale",
+                name=self.expr.inputs[0]._name + "_weight",
                 user_opr=self.op,
             )
-            self.op.add_inp_tensors(scale_tensor)
+            self.op.add_inp_tensors(weight_tensor)
         if self.bias is not None:
             bias_tensor = self.resolver.get_ir_tensor(
                 self.bias,

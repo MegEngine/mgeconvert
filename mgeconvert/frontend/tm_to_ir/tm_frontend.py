@@ -35,11 +35,28 @@ logger = get_logger(__name__)
 
 
 class TM_FrontEnd:
-    def __init__(self, traced_module):
+    def __init__(self, traced_module, outspec=None):
         if isinstance(traced_module, TracedModule):
             self.module = traced_module.flatten()
         elif isinstance(traced_module, str):
             self.module = megengine.load(traced_module)
+
+        if outspec is not None:
+            target_nodes = set()
+            g = self.module.graph
+            for name in outspec:
+                nodes = g.get_node_by_name(name).as_list()
+                if len(nodes) == 0:
+                    print("{:p}".format(g))  # type: ignore
+                    raise ValueError(
+                        "Only allow reset outputs in top graph , cannot find node by the full-name({})".format(
+                            name
+                        )
+                    )
+                target_nodes = target_nodes.union(set(nodes))
+            g.reset_outputs(list(target_nodes))
+            g.compile()
+
         self.inputs: List[TensorNode] = self.module.graph.inputs[1:]
         self.outputs: List[TensorNode] = self.module.graph.outputs
 

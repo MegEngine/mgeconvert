@@ -37,14 +37,14 @@ class GenConvBnBase(GenConvBase):
         bn_module = expr.inputs[0].owner.bn
         self.running_mean = bn_module.running_mean
         self.running_var = bn_module.running_var
-        self.scale = bn_module.weight
+        self.bn_weight = bn_module.weight
         self.bn_bias = bn_module.bias
 
         self.weight, self.bias = fold_conv_bn(
             self.weight,
             self.bias,
             self.groups,
-            self.scale,
+            self.bn_weight,
             self.bn_bias,
             self.running_mean,
             self.running_var,

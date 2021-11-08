@@ -32,6 +32,20 @@ def remove_initializer_from_input(model):
 def mge_to_onnx(
     mge_fpath, output="out.onnx", *, graph_name="graph", opset=8, outspec=None
 ):
+    """
+    Convert megengine model to ONNX,
+    and save the ONNX model to file `output`.
+    :param mge_fpath: the file path of megengine model.
+    :type fpath: str
+    :param output: the filename used for the saved model.
+    :type output: str
+    :param graph_name: the name of the ONNX graph.
+    :type graph_name: str
+    :param opset: opset version of ONNX model.
+    :type opset: int
+    :param outspec: the names of end points of the model.
+    :type outspec: list
+    """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     irgraph = MGE_FrontEnd(mge_fpath, outspec=outspec).resolve()
     transformer_options = [

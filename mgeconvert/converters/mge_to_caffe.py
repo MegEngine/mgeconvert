@@ -17,6 +17,18 @@ def mge_to_caffe(
     outspec=None,
     use_empty_blobs=False,
 ):
+    """
+    Convert megengine model to Caffe,
+    and save caffe model to `prototxt` and `caffemodel`.
+    :param mge_fpath: the file path of megengine model.
+    :type mge_fpath: str
+    :param prototxt: the filename used for saved model definition.
+    :type prototxt: str
+    :param caffemodel: the filename used for saved model weights.
+    :type caffemodel: str
+    :param outspec: the names of end points of the model.
+    :type outspec: list
+    """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     irgraph = MGE_FrontEnd(mge_fpath, outspec=outspec).resolve()
 
