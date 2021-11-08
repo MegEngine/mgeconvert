@@ -17,20 +17,22 @@ from ..frontend.tm_to_ir import TM_FrontEnd
 
 
 def tracedmodule_to_onnx(
-    traced_module, output="out.onnx", *, graph_name="graph", opset=8
+    traced_module, output="out.onnx", *, graph_name="graph", opset=8, outspec=None
 ):
     """
-    Convert megengine model to ONNX,
+    Convert TracedModule model to ONNX,
     and save the ONNX model to file `output`.
 
-    :param mge_fpath: the file path of megengine model.
-    :type fpath: str
+   :param traced_module: the file path of TracedModule model.
+    :type traced_module: str
     :param output: the filename used for the saved model.
     :type output: str
     :param graph_name: the name of the ONNX graph.
     :type graph_name: str
     :param opset: opset version of ONNX model.
     :type opset: int
+    :param outspec: specify the end points of the model, expect the full names of nodes.
+    :type outspec: list
     """
     if isinstance(traced_module, str):
         traced_module = mge.load(traced_module)
@@ -38,7 +40,7 @@ def tracedmodule_to_onnx(
         traced_module, TracedModule
     ), "Input should be a traced module or a path of traced module."
 
-    irgraph = TM_FrontEnd(traced_module).resolve()
+    irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
     transformer_options = [
         TransformerRule.REMOVE_RESHAPE_REALTED_OP,
         TransformerRule.REMOVE_UNRELATED_IROP,

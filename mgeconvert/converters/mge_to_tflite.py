@@ -18,9 +18,25 @@ def mge_to_tflite(
     graph_name="graph",
     mtk=False,
     disable_nhwc=False,
+    outspec=None,
 ):
+    """
+    Convert megengine model to TFLite,
+    and save the TFLite model to file `output`.
+
+    :param mge_fpath: the file path of megengine model.
+    :type fpath: str
+    :param output: the filename used for the saved model.
+    :type output: str
+    :param graph_name: the name of the TFLite graph.
+    :type graph_name: str
+    :param mtk: if this TFLite will be run on mtk.
+    :type mtk: bool
+    :param outspec: the names of end points of the model.
+    :type outspec: list
+    """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
-    irgraph = MGE_FrontEnd(mge_fpath).resolve()
+    irgraph = MGE_FrontEnd(mge_fpath, outspec=outspec).resolve()
 
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,

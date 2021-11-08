@@ -32,6 +32,7 @@ def tracedmodule_to_tflite(
     quantize_file_path="quant_params.json",
     graph_name="graph",
     mtk=False,
+    outspec=None,
 ):
     """
     Convert traced model to TFLite,
@@ -43,7 +44,7 @@ def tracedmodule_to_tflite(
 
     :param graph_name: the name of the TFLite graph.
     :param mtk: if this TFLite will be run on mtk.
-    :type mtk: bool
+    :param outspec: specify the end points of the model, expect the full names of nodes.
     """
     if isinstance(traced_module, str):
         traced_module = mge.load(traced_module)
@@ -73,7 +74,7 @@ def tracedmodule_to_tflite(
                 int(zero_point)
             )
 
-    irgraph = TM_FrontEnd(traced_module).resolve()
+    irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
 
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,

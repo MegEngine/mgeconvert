@@ -20,18 +20,21 @@ def tracedmodule_to_caffe(
     traced_module,
     prototxt="out.prototxt",
     caffemodel="out.caffemodel",
+    outspec=None,
     use_empty_blobs=False,
 ):
     """
-    Convert megengine model to Caffe,
+    Convert TracedModule model to Caffe,
     and save caffe model to `prototxt` and `caffemodel`.
 
-    :param mge_fpath: the file path of megengine model.
-    :type mge_fpath: str
+    :param traced_module: the file path of TracedModule model.
+    :type traced_module: str
     :param prototxt: the filename used for saved model definition.
     :type prototxt: str
     :param caffemodel: the filename used for saved model weights.
     :type caffemodel: str
+    :param outspec: specify the end points of the model, expect the full names of nodes.
+    :type outspec: list
     """
     if isinstance(traced_module, str):
         traced_module = mge.load(traced_module)
@@ -39,7 +42,7 @@ def tracedmodule_to_caffe(
         traced_module, TracedModule
     ), "Input should be a traced module or a path of traced module."
 
-    irgraph = TM_FrontEnd(traced_module).resolve()
+    irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
     transformer_options = [
         TransformerRule.REMOVE_DROPOUT,
         TransformerRule.REMOVE_RESHAPE_REALTED_OP,
