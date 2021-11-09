@@ -84,6 +84,7 @@ def tracedmodule_to_tflite(
         TransformerRule.DECONV_SHAPE_AS_INPUT,
         TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT,
         TransformerRule.RESHAPE_BIAS_TO_1DIM,
+        TransformerRule.REMOVE_RELU,
         TransformerRule.FUSE_ACTIVATION,
         TransformerRule.SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE,
         TransformerRule.RESIZE_PARAMS_AS_INPUT,
