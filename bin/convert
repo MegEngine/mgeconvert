@@ -111,327 +111,326 @@ complete -o bashdefault -F _mgeconvert convert""" % complete_targets
 
 
 def init(subparsers):
-    targets = get_targets(mgeconvert)
+    target = sys.argv[1]
 
-    for target in targets:
-        if "caffe" in target:
+    if "caffe" in target:
 
-            def to_caffe(args):
-                outspec = None
-                if args.end_point is not None:
-                    outspec = args.end_point.split(";")
-                converter_map = {
-                    "tracedmodule_to_caffe": mgeconvert.tracedmodule_to_caffe,
-                    "mge_to_caffe": mgeconvert.mge_to_caffe,
-                }
-                if "tracedmodule" in target:
-                    converter_map[target](
-                        args.input,
-                        prototxt=args.prototxt,
-                        caffemodel=args.caffemodel,
-                        use_empty_blobs=args.use_empty_blobs,
-                        input_data_type=args.input_data_type,
-                        input_scales=args.input_scales,
-                        input_zero_points=args.input_zero_points,
-                        require_quantize=args.require_quantize,
-                        param_fake_quant=args.param_fake_quant,
-                        split_conv_relu=args.split_conv_relu,
-                        quantize_file_path=args.quantize_file_path,
-                        convert_backend=args.convert_backend,
-                    )
-                else:
-                    converter_map[target](
-                        args.input,
-                        prototxt=args.prototxt,
-                        caffemodel=args.caffemodel,
-                        outspec=outspec,
-                        convert_backend=args.convert_backend,
-                    )
-
-            def caffe_parser(subparsers):
-                p = subparsers.add_parser(target)
-                p.set_defaults(func=to_caffe)
-                p.add_argument(
-                    "-i",
-                    "--input",
-                    required=True,
-                    type=str,
-                    help="Input megengine dump model file",
+        def to_caffe(args):
+            outspec = None
+            if args.end_point is not None:
+                outspec = args.end_point.split(";")
+            converter_map = {
+                "tracedmodule_to_caffe": mgeconvert.tracedmodule_to_caffe,
+                "mge_to_caffe": mgeconvert.mge_to_caffe,
+            }
+            if "tracedmodule" in target:
+                converter_map[target](
+                    args.input,
+                    prototxt=args.prototxt,
+                    caffemodel=args.caffemodel,
+                    use_empty_blobs=args.use_empty_blobs,
+                    input_data_type=args.input_data_type,
+                    input_scales=args.input_scales,
+                    input_zero_points=args.input_zero_points,
+                    require_quantize=args.require_quantize,
+                    param_fake_quant=args.param_fake_quant,
+                    split_conv_relu=args.split_conv_relu,
+                    quantize_file_path=args.quantize_file_path,
+                    convert_backend=args.convert_backend,
                 )
-                p.add_argument(
-                    "-c",
-                    "--prototxt",
-                    required=True,
-                    type=str,
-                    help="Output caffe .prototxt file",
-                )
-                p.add_argument(
-                    "-b",
-                    "--caffemodel",
-                    required=True,
-                    type=str,
-                    help="Output caffe .caffemodel file",
+            else:
+                converter_map[target](
+                    args.input,
+                    prototxt=args.prototxt,
+                    caffemodel=args.caffemodel,
+                    outspec=outspec,
+                    convert_backend=args.convert_backend,
                 )
 
+        def caffe_parser(subparsers):
+            p = subparsers.add_parser(target)
+            p.set_defaults(func=to_caffe)
+            p.add_argument(
+                "-i",
+                "--input",
+                required=True,
+                type=str,
+                help="Input megengine dump model file",
+            )
+            p.add_argument(
+                "-c",
+                "--prototxt",
+                required=True,
+                type=str,
+                help="Output caffe .prototxt file",
+            )
+            p.add_argument(
+                "-b",
+                "--caffemodel",
+                required=True,
+                type=str,
+                help="Output caffe .caffemodel file",
+            )
+
+            p.add_argument(
+                "--end_point",
+                default=None,
+                type=str,
+                help="end_point is used to specify which part of the mge model should be converted",
+            )
+
+            p.add_argument(
+                "--use_empty_blobs",
+                default=False,
+                action="store_true",
+                help="use empty blobs when using caffe",
+            )
+
+            if "tracedmodule" in target:
                 p.add_argument(
-                    "--end_point",
-                    default=None,
+                    "--input_data_type",
+                    default="float32",
                     type=str,
-                    help="end_point is used to specify which part of the mge model should be converted",
+                    help="input dtype of caffe",
                 )
 
                 p.add_argument(
-                    "--use_empty_blobs",
+                    "--input_scales", default=None, nargs="+", type=float,
+                )
+
+                p.add_argument(
+                    "--input_zero_points", default=None, nargs="+", type=int,
+                )
+
+                p.add_argument(
+                    "--require_quantize",
                     default=False,
                     action="store_true",
-                    help="use empty blobs when using caffe",
+                    help="require quantize json",
                 )
 
-                if "tracedmodule" in target:
-                    p.add_argument(
-                        "--input_data_type",
-                        default="float32",
-                        type=str,
-                        help="input dtype of caffe",
-                    )
-
-                    p.add_argument(
-                        "--input_scales", default=None, nargs="+", type=float,
-                    )
-
-                    p.add_argument(
-                        "--input_zero_points", default=None, nargs="+", type=int,
-                    )
-
-                    p.add_argument(
-                        "--require_quantize",
-                        default=False,
-                        action="store_true",
-                        help="require quantize json",
-                    )
-
-                    p.add_argument(
-                        "--param_fake_quant",
-                        default=False,
-                        action="store_true",
-                        help="require quantize weight and bias do not dump json",
-                    )
-
-                    p.add_argument(
-                        "--split_conv_relu",
-                        default=False,
-                        action="store_true",
-                        help="do not use relu for snpe",
-                    )
-
-                    p.add_argument(
-                        "--quantize_file_path",
-                        default="quant_params.json",
-                        type=str,
-                        help="the output path for quantize file",
-                    )
-
                 p.add_argument(
-                    "--convert_backend",
-                    default=1,
-                    type=int,
-                    help="backend  1 for caffe, 2 for snpe, 3 for trt",
-                )
-
-            caffe_parser(subparsers)
-        if "onnx" in target:
-
-            def to_onnx(args):
-                outspec = None
-                if args.end_point is not None:
-                    outspec = args.end_point.split(";")
-                converter_map = {
-                    "tracedmodule_to_onnx": mgeconvert.tracedmodule_to_onnx,
-                    "mge_to_onnx": mgeconvert.mge_to_onnx,
-                }
-
-                if "tracedmodule" in target:
-                    converter_map[target](
-                        args.input,
-                        args.output,
-                        graph_name=args.graph,
-                        opset=args.opset,
-                    )
-                else:
-                    converter_map[target](
-                        args.input,
-                        args.output,
-                        graph_name=args.graph,
-                        opset=args.opset,
-                        outspec=outspec,
-                    )
-
-            def onnx_parser(subparsers):
-                p = subparsers.add_parser(target)
-                p.set_defaults(func=to_onnx)
-                p.add_argument(
-                    "-i",
-                    "--input",
-                    required=True,
-                    type=str,
-                    help="Input megengine dump model file",
-                )
-                p.add_argument(
-                    "-o",
-                    "--output",
-                    required=True,
-                    type=str,
-                    help="Output onnx .onnx file",
-                )
-                p.add_argument(
-                    "--opset", default=8, type=int, help="Onnx opset version"
-                )
-                p.add_argument(
-                    "--graph_name", default="graph", type=str, help="Onnx graph name"
-                )
-                p.add_argument(
-                    "--end_point",
-                    default=None,
-                    type=str,
-                    help="end_point is used to specify which part of the mge model should be converted",
-                )
-
-                if "tracedmodule" in target:
-
-                    p.add_argument(
-                        "--input_data_type",
-                        default="float32",
-                        type=str,
-                        help="input dtype of onnx",
-                    )
-
-                    p.add_argument(
-                        "--input_scales", default=None, nargs="+", type=float,
-                    )
-
-                    p.add_argument(
-                        "--input_zero_points", default=None, nargs="+", type=int,
-                    )
-
-                    p.add_argument(
-                        "--require_quantize",
-                        default=False,
-                        action="store_true",
-                        help="require quantize json",
-                    )
-
-                    p.add_argument(
-                        "--param_fake_quant",
-                        default=False,
-                        action="store_true",
-                        help="require quantize weight and bias do not dump json",
-                    )
-
-                    p.add_argument(
-                        "--quantize_file_path",
-                        default="quant_params.json",
-                        type=str,
-                        help="the output path for quantize file",
-                    )
-
-            onnx_parser(subparsers)
-        if "tflite" in target:
-
-            def to_tflite(args):
-                if "tracedmodule" in target:
-                    mgeconvert.tracedmodule_to_tflite(
-                        mge_fpath=args.input,
-                        output=args.output,
-                        input_data_type=args.input_data_type,
-                        input_scales=args.input_scales,
-                        input_zero_points=args.input_zero_points,
-                        require_quantize=args.require_quantize,
-                        param_fake_quant=args.param_fake_quant,
-                        quantize_file_path=args.quantize_file_path,
-                        graph_name=args.graph_name,
-                        mtk=args.mtk,
-                        outspec=args.outspec,
-                    )
-                else:
-                    mgeconvert.mge_to_tflite(
-                        mge_fpath=args.input,
-                        output=args.output,
-                        graph_name=args.graph_name,
-                        mtk=args.mtk,
-                        outspec=args.outspec,
-                    )
-
-            def tflite_parser(subparsers):
-                p = subparsers.add_parser(target)
-                p.set_defaults(func=to_tflite)
-                p.add_argument(
-                    "-i",
-                    "--input",
-                    required=True,
-                    type=str,
-                    help="megengine dumped model file",
-                )
-                p.add_argument(
-                    "-o",
-                    "--output",
-                    required=True,
-                    type=str,
-                    help="converted TFLite model file",
-                )
-                if "tracedmodule" in target:
-                    p.add_argument(
-                        "--input_data_type",
-                        default=None,
-                        type=str,
-                        help="the dtype of input data used for quantize model input",
-                    )
-                    p.add_argument(
-                        "--input_scales",
-                        default=None,
-                        type=Union[float, List[float]],
-                        help="the scale of input data used for quantize model input",
-                    )
-                    p.add_argument(
-                        "--input_zero_points",
-                        default=None,
-                        type=Union[int, List[int]],
-                        help="the zero point of input data used for quantize model input",
-                    )
-                    p.add_argument(
-                        "--require_quantize",
-                        action="store_false",
-                        help="whether to do quantize if the model has quantization parameters",
-                    )
-                    p.add_argument(
-                        "--param_fake_quant",
-                        action="store_false",
-                        help="whether to do fake quantize for parameters if the model has quantization parameters",
-                    )
-                    p.add_argument(
-                        "--quantize_file_path",
-                        default="quant_params.json",
-                        type=str,
-                        help="",
-                    )
-                p.add_argument(
-                    "--graph-name",
-                    default="graph0",
-                    type=str,
-                    help="default subgraph name in TFLite model",
-                )
-                p.add_argument(
-                    "--mtk",
+                    "--param_fake_quant",
+                    default=False,
                     action="store_true",
-                    help="If target flatform is MTK(P70, P80)",
-                )
-                p.add_argument(
-                    "--outspec",
-                    default=None,
-                    type=list,
-                    help="the names of end points of the model",
+                    help="require quantize weight and bias do not dump json",
                 )
 
-            tflite_parser(subparsers)
+                p.add_argument(
+                    "--split_conv_relu",
+                    default=False,
+                    action="store_true",
+                    help="do not use relu for snpe",
+                )
+
+                p.add_argument(
+                    "--quantize_file_path",
+                    default="quant_params.json",
+                    type=str,
+                    help="the output path for quantize file",
+                )
+
+            p.add_argument(
+                "--convert_backend",
+                default=1,
+                type=int,
+                help="backend  1 for caffe, 2 for snpe, 3 for trt",
+            )
+
+        caffe_parser(subparsers)
+    if "onnx" in target:
+
+        def to_onnx(args):
+            outspec = None
+            if args.end_point is not None:
+                outspec = args.end_point.split(";")
+            converter_map = {
+                "tracedmodule_to_onnx": mgeconvert.tracedmodule_to_onnx,
+                "mge_to_onnx": mgeconvert.mge_to_onnx,
+            }
+
+            if "tracedmodule" in target:
+                converter_map[target](
+                    args.input,
+                    args.output,
+                    graph_name=args.graph_name,
+                    opset=args.opset,
+                )
+            else:
+                converter_map[target](
+                    args.input,
+                    args.output,
+                    graph_name=args.graph_name,
+                    opset=args.opset,
+                    outspec=outspec,
+                )
+
+        def onnx_parser(subparsers):
+            p = subparsers.add_parser(target)
+            p.set_defaults(func=to_onnx)
+            p.add_argument(
+                "-i",
+                "--input",
+                required=True,
+                type=str,
+                help="Input megengine dump model file",
+            )
+            p.add_argument(
+                "-o",
+                "--output",
+                required=True,
+                type=str,
+                help="Output onnx .onnx file",
+            )
+            p.add_argument(
+                "--opset", default=8, type=int, help="Onnx opset version"
+            )
+            p.add_argument(
+                "--graph_name", default="graph", type=str, help="Onnx graph name"
+            )
+            p.add_argument(
+                "--end_point",
+                default=None,
+                type=str,
+                help="end_point is used to specify which part of the mge model should be converted",
+            )
+
+            if "tracedmodule" in target:
+
+                p.add_argument(
+                    "--input_data_type",
+                    default="float32",
+                    type=str,
+                    help="input dtype of onnx",
+                )
+
+                p.add_argument(
+                    "--input_scales", default=None, nargs="+", type=float,
+                )
+
+                p.add_argument(
+                    "--input_zero_points", default=None, nargs="+", type=int,
+                )
+
+                p.add_argument(
+                    "--require_quantize",
+                    default=False,
+                    action="store_true",
+                    help="require quantize json",
+                )
+
+                p.add_argument(
+                    "--param_fake_quant",
+                    default=False,
+                    action="store_true",
+                    help="require quantize weight and bias do not dump json",
+                )
+
+                p.add_argument(
+                    "--quantize_file_path",
+                    default="quant_params.json",
+                    type=str,
+                    help="the output path for quantize file",
+                )
+
+        onnx_parser(subparsers)
+    if "tflite" in target:
+
+        def to_tflite(args):
+            if "tracedmodule" in target:
+                mgeconvert.tracedmodule_to_tflite(
+                    mge_fpath=args.input,
+                    output=args.output,
+                    input_data_type=args.input_data_type,
+                    input_scales=args.input_scales,
+                    input_zero_points=args.input_zero_points,
+                    require_quantize=args.require_quantize,
+                    param_fake_quant=args.param_fake_quant,
+                    quantize_file_path=args.quantize_file_path,
+                    graph_name=args.graph_name,
+                    mtk=args.mtk,
+                    outspec=args.outspec,
+                )
+            else:
+                mgeconvert.mge_to_tflite(
+                    mge_fpath=args.input,
+                    output=args.output,
+                    graph_name=args.graph_name,
+                    mtk=args.mtk,
+                    outspec=args.outspec,
+                )
+
+        def tflite_parser(subparsers):
+            p = subparsers.add_parser(target)
+            p.set_defaults(func=to_tflite)
+            p.add_argument(
+                "-i",
+                "--input",
+                required=True,
+                type=str,
+                help="megengine dumped model file",
+            )
+            p.add_argument(
+                "-o",
+                "--output",
+                required=True,
+                type=str,
+                help="converted TFLite model file",
+            )
+            if "tracedmodule" in target:
+                p.add_argument(
+                    "--input_data_type",
+                    default=None,
+                    type=str,
+                    help="the dtype of input data used for quantize model input",
+                )
+                p.add_argument(
+                    "--input_scales",
+                    default=None,
+                    type=Union[float, List[float]],
+                    help="the scale of input data used for quantize model input",
+                )
+                p.add_argument(
+                    "--input_zero_points",
+                    default=None,
+                    type=Union[int, List[int]],
+                    help="the zero point of input data used for quantize model input",
+                )
+                p.add_argument(
+                    "--require_quantize",
+                    action="store_false",
+                    help="whether to do quantize if the model has quantization parameters",
+                )
+                p.add_argument(
+                    "--param_fake_quant",
+                    action="store_false",
+                    help="whether to do fake quantize for parameters if the model has quantization parameters",
+                )
+                p.add_argument(
+                    "--quantize_file_path",
+                    default="quant_params.json",
+                    type=str,
+                    help="",
+                )
+            p.add_argument(
+                "--graph-name",
+                default="graph0",
+                type=str,
+                help="default subgraph name in TFLite model",
+            )
+            p.add_argument(
+                "--mtk",
+                action="store_true",
+                help="If target flatform is MTK(P70, P80)",
+            )
+            p.add_argument(
+                "--outspec",
+                default=None,
+                type=list,
+                help="the names of end points of the model",
+            )
+
+        tflite_parser(subparsers)
 
 
 def add_completion(path):

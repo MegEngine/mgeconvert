@@ -978,6 +978,8 @@ def _fuse_conv_bn(net: IRGraph):
             opr.name == "BatchNormalization"
             and len(net.find_inp_oprs(opr)) == 1
             and net.find_inp_oprs(opr)[0].name == "Conv2d"
+            and len(net.find_out_oprs(net.find_inp_oprs(opr)[0])) == 1
+            and net.find_out_oprs(net.find_inp_oprs(opr)[0])[0] == opr
         ):
             gamma = (
                 Tensor(opr.weight)  # type: ignore[attr-defined]

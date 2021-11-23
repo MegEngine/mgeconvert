@@ -23,7 +23,7 @@ from megengine.traced_module.fake_quant import FakeQuantize
 
 from .tm_utils import get_traced_module
 
-max_error = 1e-6
+max_error = 1e-4
 tmp_file = "test_model"
 
 
