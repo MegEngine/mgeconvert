@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 
 import argparse
+import os
+import platform
 from typing import List, Union
 
 import mgeconvert
@@ -14,11 +16,94 @@ def get_targets(module):
     return targets
 
 
+complete_str = """_mgeconvert(){
+    local script word
+    COMPREPLY=()
+    script="${COMP_WORDS[COMP_CWORD-1]}"
+    word="${COMP_WORDS[COMP_CWORD]}"
+    case ${script} in
+        convert)
+            words="tracemodule_to_caffe mge_to_caffe tracemodule_to_onnx mge_to_onnx tracemodule_to_tflite mge_to_tflite"
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        tracemodule_to_caffe)
+            words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend "
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        mge_to_caffe)
+            words="-i --input -c --prototxt -b --caffemodel --end_point"
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        tracemodule_to_onnx)
+            words="-i --input -o --output --opset --graph_name --end_point --require_quantize --param_fake_quant --quantize_file_path "
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        mge_to_onnx)
+            words="-i --input -o --output --opset --graph_name --end_point "
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        tracemodule_to_tflite)
+            words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        mge_to_tflite)
+            words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+            COMPREPLY=( $(compgen -W "$words" -- $word) )
+            return
+            ;;
+        -*)
+            subscript=${COMP_WORDS[1]}
+            case $subscript in
+                tracemodule_to_caffe)
+                    words="-i --input -c --prototxt -b --caffemodel --end_point "
+                    COMPREPLY=( $(compgen -W "$words" -- $word) )
+                    return
+                    ;;
+                mge_to_caffe)
+                    words="-i --input -c --prototxt -b --caffemodel --end_point "
+                    COMPREPLY=( $(compgen -W "$words" -- $word) )
+                    return
+                    ;;
+                tracemodule_to_onnx)
+                    words="-i --input -o --output --opset --graph_name --end_point "
+                    COMPREPLY=( $(compgen -W "$words" -- $word) )
+                    return
+                    ;;
+                mge_to_onnx)
+                    words="-i --input -o --output --opset --graph_name --end_point "
+                    COMPREPLY=( $(compgen -W "$words" -- $word) )
+                    return
+                    ;;
+                tracemodule_to_tflite)
+                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+                    COMPREPLY=( $(compgen -W "$words" -- $word) )
+                    return
+                    ;;
+                mge_to_tflite)
+                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+                    COMPREPLY=( $(compgen -W "$words" -- $word) )
+                    return
+                    ;;
+            esac
+            return
+            ;;
+    esac
+}
+complete -o bashdefault -F _mgeconvert convert"""
+
+
 def init(subparsers):
     targets = get_targets(mgeconvert)
 
     for target in targets:
         if "caffe" in target:
+
             def to_caffe(args):
                 outspec = None
                 if args.end_point is not None:
@@ -27,17 +112,46 @@ def init(subparsers):
                     "tracedmodule_to_caffe": mgeconvert.tracedmodule_to_caffe,
                     "mge_to_caffe": mgeconvert.mge_to_caffe,
                 }
-                converter_map[target](
-                    args.input, prototxt=args.prototxt, caffemodel=args.caffemodel, outspec=outspec
-                )
+                if "tracedmodule" in target:
+                    converter_map[target](
+                        args.input,
+                        prototxt=args.prototxt,
+                        caffemodel=args.caffemodel,
+                        use_empty_blobs=args.use_empty_blobs,
+                        input_data_type=args.input_data_type,
+                        input_scales=args.input_scales,
+                        input_zero_points=args.input_zero_points,
+                        require_quantize=args.require_quantize,
+                        param_fake_quant=args.param_fake_quant,
+                        split_conv_relu=args.split_conv_relu,
+                        quantize_file_path=args.quantize_file_path,
+                        convert_backend=args.convert_backend,
+                    )
+                else:
+                    converter_map[target](
+                        args.input,
+                        prototxt=args.prototxt,
+                        caffemodel=args.caffemodel,
+                        outspec=outspec,
+                        convert_backend=args.convert_backend,
+                    )
+
             def caffe_parser(subparsers):
                 p = subparsers.add_parser(target)
                 p.set_defaults(func=to_caffe)
                 p.add_argument(
-                    "-i", "--input", required=True, type=str, help="Input megengine dump model file"
+                    "-i",
+                    "--input",
+                    required=True,
+                    type=str,
+                    help="Input megengine dump model file",
                 )
                 p.add_argument(
-                    "-c", "--prototxt", required=True, type=str, help="Output caffe .prototxt file"
+                    "-c",
+                    "--prototxt",
+                    required=True,
+                    type=str,
+                    help="Output caffe .prototxt file",
                 )
                 p.add_argument(
                     "-b",
@@ -53,8 +167,67 @@ def init(subparsers):
                     type=str,
                     help="end_point is used to specify which part of the mge model should be converted",
                 )
+
+                p.add_argument(
+                    "--use_empty_blobs",
+                    default=False,
+                    action="store_true",
+                    help="use empty blobs when using caffe",
+                )
+
+                p.add_argument(
+                    "--input_data_type",
+                    default="float32",
+                    type=str,
+                    help="input dtype of caffe",
+                )
+
+                p.add_argument(
+                    "--input_scales", default=None, nargs="+", type=float,
+                )
+
+                p.add_argument(
+                    "--input_zero_points", default=None, nargs="+", type=int,
+                )
+
+                p.add_argument(
+                    "--require_quantize",
+                    default=False,
+                    action="store_true",
+                    help="require quantize json",
+                )
+
+                p.add_argument(
+                    "--param_fake_quant",
+                    default=False,
+                    action="store_true",
+                    help="require quantize weight and bias do not dump json",
+                )
+
+                p.add_argument(
+                    "--split_conv_relu",
+                    default=False,
+                    action="store_true",
+                    help="do not use relu for snpe",
+                )
+
+                p.add_argument(
+                    "--quantize_file_path",
+                    default="quant_params.json",
+                    type=str,
+                    help="the output path for quantize file",
+                )
+
+                p.add_argument(
+                    "--convert_backend",
+                    default=1,
+                    type=int,
+                    help="backend  1 for caffe, 2 for snpe, 3 for trt",
+                )
+
             caffe_parser(subparsers)
         if "onnx" in target:
+
             def to_onnx(args):
                 outspec = None
                 if args.end_point is not None:
@@ -63,40 +236,85 @@ def init(subparsers):
                     "tracedmodule_to_onnx": mgeconvert.tracedmodule_to_onnx,
                     "mge_to_onnx": mgeconvert.mge_to_onnx,
                 }
-                converter_map[target](
-                    args.input,
-                    args.output,
-                    graph_name=args.graph,
-                    opset=args.opset,
-                    outspec=outspec,
-                )
+
+                if "tracedmodule" in target:
+                    converter_map[target](
+                        args.input,
+                        args.output,
+                        graph_name=args.graph,
+                        opset=args.opset,
+                    )
+                else:
+                    converter_map[target](
+                        args.input,
+                        args.output,
+                        graph_name=args.graph,
+                        opset=args.opset,
+                        outspec=outspec,
+                    )
+
             def onnx_parser(subparsers):
                 p = subparsers.add_parser("onnx")
                 p.set_defaults(func=to_onnx)
                 p.add_argument(
-                    "-i", "--input", required=True, type=str, help="Input megengine dump model file"
+                    "-i",
+                    "--input",
+                    required=True,
+                    type=str,
+                    help="Input megengine dump model file",
                 )
                 p.add_argument(
-                    "-o", "--output", required=True, type=str, help="Output onnx .onnx file"
+                    "-o",
+                    "--output",
+                    required=True,
+                    type=str,
+                    help="Output onnx .onnx file",
                 )
-                p.add_argument("--opset", default=8, type=int, help="Onnx opset version")
-                p.add_argument("--graph_name", default="graph", type=str, help="Onnx graph name")
+                p.add_argument(
+                    "--opset", default=8, type=int, help="Onnx opset version"
+                )
+                p.add_argument(
+                    "--graph_name", default="graph", type=str, help="Onnx graph name"
+                )
                 p.add_argument(
                     "--end_point",
                     default=None,
                     type=str,
                     help="end_point is used to specify which part of the mge model should be converted",
                 )
+
+                p.add_argument(
+                    "--require_quantize",
+                    default=False,
+                    action="store_true",
+                    help="require quantize json",
+                )
+
+                p.add_argument(
+                    "--param_fake_quant",
+                    default=False,
+                    action="store_true",
+                    help="require quantize weight and bias do not dump json",
+                )
+
+                p.add_argument(
+                    "--quantize_file_path",
+                    default="quant_params.json",
+                    type=str,
+                    help="the output path for quantize file",
+                )
+
             onnx_parser(subparsers)
         if "tflite" in target:
+
             def to_tflite(args):
                 if "tracedmodule" in target:
                     mgeconvert.tracedmodule_to_tflite(
                         mge_fpath=args.input,
                         output=args.output,
-                        input_data_type = args.input_data_type,
-                        input_scales = args.input_scales,
-                        input_zero_points = args.input_zero_points,
+                        input_data_type=args.input_data_type,
+                        input_scales=args.input_scales,
+                        input_zero_points=args.input_zero_points,
                         require_quantize=args.require_quantize,
                         param_fake_quant=args.param_fake_quant,
                         quantize_file_path=args.quantize_file_path,
@@ -112,14 +330,23 @@ def init(subparsers):
                         mtk=args.mtk,
                         outspec=args.outspec,
                     )
+
             def tflite_parser(subparsers):
                 p = subparsers.add_parser(target)
                 p.set_defaults(func=to_tflite)
                 p.add_argument(
-                    "-i", "--input", required=True, type=str, help="megengine dumped model file"
+                    "-i",
+                    "--input",
+                    required=True,
+                    type=str,
+                    help="megengine dumped model file",
                 )
                 p.add_argument(
-                    "-o", "--output", required=True, type=str, help="converted TFLite model file"
+                    "-o",
+                    "--output",
+                    required=True,
+                    type=str,
+                    help="converted TFLite model file",
                 )
                 if "tracedmodule" in target:
                     p.add_argument(
@@ -163,7 +390,9 @@ def init(subparsers):
                     help="default subgraph name in TFLite model",
                 )
                 p.add_argument(
-                    "--mtk", action="store_true", help="If target flatform is MTK(P70, P80)"
+                    "--mtk",
+                    action="store_true",
+                    help="If target flatform is MTK(P70, P80)",
                 )
                 p.add_argument(
                     "--outspec",
@@ -179,16 +408,44 @@ def main():
     targets = get_targets(mgeconvert)
     msg = targets[0] if len(targets) == 1 else "{" + ", ".join(targets) + "}"
     parser = argparse.ArgumentParser(
-        description="use \"convert %s -h\" for more details" % msg
+        description='use "convert %s -h" for more details' % msg
     )
+    parser.add_argument("--init", default=False, help="init the bash completion")
     subparsers = parser.add_subparsers()
     init(subparsers)
     args = parser.parse_args()
+    if args.init:
+        sysstr = platform.system()
+        if sysstr == "Windows":
+            print("WARNING: windows doesn't support hinting")
+        else:
+            path = "{}/.local/share/bash-completion/completions/mgeconvert".format(
+                os.environ.get(HOME)
+            )
+            shell = os.environ.get("SHELL")
+            if shell.find("zsh") != -1:
+                print(
+                    " if you don't have zsh completion init, please excute command: 'autoload -Uz compinit &&  compinit'"
+                )
+                print(
+                    "Guess you are using zsh, please add `source %s` to your ~/.zshrc"
+                    % path
+                )
+            elif shell.find("bash") != -1:
+                print(
+                    "Guess you are using bash, please relogin or do `source %s`" % path
+                )
+            else:
+                print(
+                    "Current {} doesn't support hinting shell completion".format(shell)
+                )
+        sys.exit(0)
+
     if hasattr(args, "func"):
         args.func(args)
     else:
         print("[error] please point out which framework you want to convert")
-        print("use \"convert -h\" for help")
+        print('use "convert -h" for help')
 
 
 if __name__ == "__main__":

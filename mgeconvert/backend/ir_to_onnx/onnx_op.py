@@ -59,6 +59,7 @@ from ...converter_ir.ir_op import (
     TrueDivOpr,
     TypeCvtOpr,
 )
+from ...converter_ir.ir_tensor import IRTensor
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
 
 mge2onnx_dtype_mapping = {
@@ -129,7 +130,7 @@ class OperatorBaseConverter:
 
     __opr_type__ = "OperatorBaseConverter"
 
-    def __init__(self, opr):
+    def __init__(self, opr, quantizer=None):
         """
         :param opr: the operator that converter converts.
         :type opr: subclass of :class:`.MgeOpr`
@@ -137,6 +138,27 @@ class OperatorBaseConverter:
         self._opr = opr
         self._net_sources = []
         self._parameters = []
+        self.quantizer = quantizer
+        self._parse_out_tensor_quant_info()
+
+    def _parse_out_tensor_quant_info(self):
+        if self.quantizer is not None:
+            for inp in self._opr.inp_tensors:
+                self.quantizer.parse_quant_info(inp)
+
+            for out in self._opr.out_tensors:
+                self.quantizer.parse_quant_info(out)
+
+    def _parse_fake_tensor_info(self, fake_name, relate_tenosr, shape=None, dtype=None):
+        fake_tensor = IRTensor(
+            name=fake_name,
+            shape=shape if shape is not None else relate_tenosr.shape,
+            dtype=dtype if dtype is not None else relate_tenosr.dtype,
+            scale=relate_tenosr.scale,
+            zero_point=relate_tenosr.zero_point,
+            q_type=relate_tenosr.q_dtype,
+        )
+        self.quantizer.parse_quant_info(fake_tensor)
 
     def _get_inputs(self, exclude_idx=None):
         """
@@ -230,8 +252,8 @@ class ElemwiseConverter(OperatorBaseConverter):
         IdentityOpr: "Identity",
     }
 
-    def __init__(self, opr):
-        super().__init__(opr)
+    def __init__(self, opr, quantizer=None):
+        super().__init__(opr, quantizer)
         assert isinstance(
             opr, tuple(self.support_op_map.keys())
         ), "Elemwise op doesn't support mode {}, you can implement it in ElemwiseConverter".format(
@@ -248,9 +270,11 @@ class ElemwiseConverter(OperatorBaseConverter):
             nodes = []
             neg_x = inputs[0] + "_negtive"
             neg_node = onnx.helper.make_node("Neg", [inputs[0]], [neg_x])
+            self._parse_fake_tensor_info(neg_x, opr.inp_tensors[0])
             nodes.append(neg_node)
             exp = neg_x + "_exp"
             exp_node = onnx.helper.make_node("Exp", [neg_x], [exp])
+            self._parse_fake_tensor_info(exp, opr.inp_tensors[0])
             nodes.append(exp_node)
             const_1 = inputs[0] + "_const_1"
             const_1_node = onnx.helper.make_node(
@@ -261,9 +285,11 @@ class ElemwiseConverter(OperatorBaseConverter):
                     const_1, mge2onnx_dtype_mapping[opr.inp_tensors[0].dtype], [], [1.0]
                 ),
             )
+            self._parse_fake_tensor_info(const_1, opr.inp_tensors[0], shape=())
             nodes.append(const_1_node)
             add = exp + "_add_const_1"
             add_node = onnx.helper.make_node("Add", [exp, const_1], [add])
+            self._parse_fake_tensor_info(add, opr.inp_tensors[0])
             nodes.append(add_node)
             div_node = onnx.helper.make_node("Div", [inputs[0], add], outputs)
             nodes.append(div_node)
@@ -313,11 +339,15 @@ class SoftmaxConverter(OperatorBaseConverter):
             axes=[opr.axis],
             keepdims=True,
         )
+        shape = list(opr.inp_tensors[0].shape)
+        shape[opr.axis] = 1
+        self._parse_fake_tensor_info(offset_name, opr.inp_tensors[0], shape=shape)
         nodes.append(offset)
         sub_name = inputs[0] + "_sub_offset"
         sub = onnx.helper.make_node(
             "Sub", inputs=[inputs[0], offset_name], outputs=[sub_name],
         )
+        self._parse_fake_tensor_info(sub_name, opr.inp_tensors[0])
         nodes.append(sub)
         softmax = onnx.helper.make_node(
             "Softmax", inputs=[sub_name], outputs=[outputs[0]], **self._get_attrs(),
@@ -395,6 +425,9 @@ class SubtensorConverter(OperatorBaseConverter):
         self._net_sources.extend(slice_net_sources)
         nodes.append(slice_op)
         if len(squeeze_axis) > 0:
+            self._parse_fake_tensor_info(
+                slice_outputs, opr.inp_tensors[0], opr.out_tensors[0].shape
+            )
             Squeeze = onnx.helper.make_node(
                 "Squeeze", slice_outputs, outputs, axes=squeeze_axis
             )
@@ -438,6 +471,9 @@ class MatrixMulConvert(OperatorBaseConverter):
                 beta=0.0,
                 transA=opr.transpose_a,
                 transB=opr.transpose_b,
+            )
+            self._parse_fake_tensor_info(
+                temp_out, opr.inp_tensors[0], shape=opr.out_tensors[0].shape
             )
             nodes.append(gemm)
             add_bias = onnx.helper.make_node(
@@ -616,6 +652,7 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         grad_out_tile_param = onnx.numpy_helper.from_array(
             np.array([1, opr.src_shape[1] // opr.group, 1, 1]), grad_out_tile_in
         )
+
         self._net_sources.append(grad_out_tile_source)
         self._parameters.append(grad_out_tile_param)
         grad_out_tile_out = outputs[0] + "_grad_out_tile_out"
@@ -762,6 +799,9 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         self._net_sources.append(grad_weight_reshape2_source)
         self._parameters.append(grad_weight_reshape2_param)
         grad_weight_reshape2_out = outputs[0] + "_grad_weight_reshape2_out"
+        self._parse_fake_tensor_info(
+            grad_weight_reshape2_out, opr.out_tensors[0], shape=opr.out_tensors[0].shape
+        )
         reshape = onnx.helper.make_node(
             "Reshape",
             [grad_weight_reduce_out, grad_weight_reshape2_in],
@@ -832,6 +872,7 @@ class BatchnormConverter(OperatorBaseConverter):
         inputs[2] = self._opr.inp_tensors[0].name + "_bias_onnx"
         inputs[3] = self._opr.inp_tensors[0].name + "_mean_onnx"
         inputs[4] = self._opr.inp_tensors[0].name + "_var_onnx"
+
         scale = onnx.helper.make_tensor_value_info(
             inputs[1],
             mge2onnx_dtype_mapping[self._opr.inp_tensors[1].dtype],
@@ -927,6 +968,7 @@ class ReduceConverter(OperatorBaseConverter):
             )
             out_nodes.append(nodes)
             if len(inputs) > 1:
+                self._parse_fake_tensor_info(temp_node, opr.inp_tensors[0], shape=())
                 shape = inputs[1] + "_shape"
                 shape_tensor = onnx.helper.make_tensor_value_info(
                     shape,
@@ -1208,6 +1250,9 @@ class RepeatConverter(OperatorBaseConverter):
             axes=[opr.axis + 1],
         )
         nodes.append(unsqueeze)
+
+        shape = list(opr.inp_tensors[0].shape)
+        shape.insert(opr.axis, 1)
 
         repeat_shape = [1] * (opr.inp_tensors[0].ndim + 1)
         repeat_shape[opr.axis + 1] *= opr.repeats

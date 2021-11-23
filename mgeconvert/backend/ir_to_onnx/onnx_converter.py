@@ -11,6 +11,7 @@ import onnx.helper
 import onnx.numpy_helper
 from onnx import optimizer
 
+from ...converter_ir.ir_quantizer import IRQuantizer
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
 from .onnx_op import (
     MGE2ONNX,
@@ -21,13 +22,16 @@ from .onnx_op import (
 
 
 class OnnxConverter:
-    def __init__(self, net, opset_version=8, graph_name="graph"):
+    def __init__(
+        self, net, opset_version=8, graph_name="graph", quantizer: IRQuantizer = None
+    ):
         self.net = net
         assert 7 <= opset_version <= 12, "opset {} are not supported yet".format(
             opset_version
         )
         self.graph_name = graph_name
         self.opset_version = opset_version
+        self.quantizer = quantizer
 
     def convert(self):
         inputs = []
@@ -59,7 +63,7 @@ class OnnxConverter:
                     if hasattr(tensor, "_var"):
                         tensor.np_data = get_symvar_value(tensor._var)
                 continue
-            converter_cls = MGE2ONNX.get(type(opr), None)
+            converter_cls = MGE2ONNX.get(type(opr, self.quantizer), None)
             if converter_cls is None:
                 unsupported_oprs.append(opr)
                 continue
