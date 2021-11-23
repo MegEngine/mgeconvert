@@ -5,12 +5,14 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+from typing import Union
+
 import megengine as mge
 import onnx.checker
 import onnx.helper
 import onnx.numpy_helper
-from onnx import optimizer
 
+from ...converter_ir.ir_quantizer import IRQuantizer
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
 from .onnx_op import (
     MGE2ONNX,
@@ -21,13 +23,20 @@ from .onnx_op import (
 
 
 class OnnxConverter:
-    def __init__(self, net, opset_version=8, graph_name="graph"):
+    def __init__(
+        self,
+        net,
+        opset_version=8,
+        graph_name="graph",
+        quantizer: Union[IRQuantizer, None] = None,
+    ):
         self.net = net
         assert 7 <= opset_version <= 12, "opset {} are not supported yet".format(
             opset_version
         )
         self.graph_name = graph_name
         self.opset_version = opset_version
+        self.quantizer = quantizer
 
     def convert(self):
         inputs = []
@@ -63,7 +72,7 @@ class OnnxConverter:
             if converter_cls is None:
                 unsupported_oprs.append(opr)
                 continue
-            converter = converter_cls(opr)
+            converter = converter_cls(opr, self.quantizer)
             nodes, inps, params = converter.convert()
             onnx_nodes.extend(nodes)
             inputs.extend(inps)
@@ -98,10 +107,4 @@ class OnnxConverter:
             opset_imports=[opset],
         )
         onnx.checker.check_model(model)
-        passes = [
-            "eliminate_deadend",
-            "extract_constant_to_initializer",
-            "eliminate_unused_initializer",
-        ]
-        model = optimizer.optimize(model, passes)
         return model

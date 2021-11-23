@@ -10,7 +10,7 @@ apt install -y protobuf-compiler
 
 ./mgeconvert/backend/ir_to_caffe/init.sh
 
-pip3 install scikit-image==0.17.2 onnx==1.7.0 onnxruntime==1.4.0
+pip3 install scikit-image==0.17.2 onnx onnxruntime
 
 export USE_CAFFE_PROTO=1
 sudo -H python3 -m pip install -q megengine==1.6.0 -f https://megengine.org.cn/whl/mge.html
