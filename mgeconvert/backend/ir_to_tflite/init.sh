@@ -11,7 +11,11 @@ else
 fi
 echo ${FLAT_BUFFER_VERSION}
 
-TMP_DIR="/tmp/flatbuffers"
+if [ ! -d /tmp/mgeconvert ]; then
+    mkdir /tmp/mgeconvert
+fi
+
+TMP_DIR="/tmp/mgeconvert/flatbuffers"
 
 if [[ "$FLATC_VERSION" != "flatc version 1.12.0" || "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
     rm -rf $TMP_DIR
@@ -33,7 +37,7 @@ fi
 export PATH=$PATH:$HOME/.local/bin
 # build tflite interface from schema.fbs
 echo "building tflite schema..."
-cd /tmp
+cd /tmp/mgeconvert
 rm -f schema.fbs
 tf_version=$1
 if [ ! -n "$1" ] ;then
@@ -42,8 +46,8 @@ fi
 echo "Use TFLite $tf_version!"
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/$tf_version/tensorflow/lite/schema/schema.fbs
 flatc --python schema.fbs
-chmod 755 /tmp/tflite
-cp -r /tmp/tflite $basepath
+chmod 777 /tmp/mgeconvert/tflite
+cp -r /tmp/mgeconvert/tflite $basepath
 
 # build pyflatbuffers
 if [[ "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
@@ -64,3 +68,5 @@ PYTHON_INCLUDE=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['incl
 PYTHON_STDLIB=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['stdlib'])")
 
 g++ fbconverter.cc --std=c++14 -fPIC --shared -I$HOME/.local/include -I${PYBIND11_HEADER} -I${PYTHON_INCLUDE} -L${PYTHON_STDLIB} -L$HOME/.local/lib  -lflatbuffers -o fbconverter.so
+
+rm -r /tmp/mgeconvert
