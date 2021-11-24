@@ -1,6 +1,6 @@
 #!/bin/bash -e
 
-python3 -m pip install --no-binary=protobuf protobuf==3.8.0 --user
+python3 -m pip install --no-binary=protobuf protobuf>=3.11.1 --user
 
 hash wget || (echo "please install wget package" && exit -1)
 hash protoc || (echo "please install protobuf-compiler package" && exit -1)
