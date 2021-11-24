@@ -17,6 +17,16 @@ def get_targets(module):
             targets.append(attr)
     return targets
 
+sub_targets = get_targets(mgeconvert)
+
+complete_targets = " "
+for targets in sub_targets:
+    if 'tracedmodule_to_caffe'in targets:
+        complete_targets += "tracedmodule_to_caffe mge_to_caffe "
+    elif 'tracedmodule_to_onnx' in targets:
+        complete_targets += "tracedmodule_to_onnx mge_to_onnx "
+    elif 'tracedmodule_to_tflite' in targets:
+        complete_targets += "tracedmodule_to_tflite mge_to_tflite "
 
 complete_str = """_mgeconvert(){
     local script word
@@ -25,11 +35,11 @@ complete_str = """_mgeconvert(){
     word="${COMP_WORDS[COMP_CWORD]}"
     case ${script} in
         convert)
-            words="tracemodule_to_caffe mge_to_caffe tracemodule_to_onnx mge_to_onnx tracemodule_to_tflite mge_to_tflite"
+            words="%s"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
-        tracemodule_to_caffe)
+        tracedmodule_to_caffe)
             words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
@@ -39,7 +49,7 @@ complete_str = """_mgeconvert(){
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
-        tracemodule_to_onnx)
+        tracedmodule_to_onnx)
             words="-i --input -o --output --opset --graph_name --end_point --require_quantize --param_fake_quant --quantize_file_path --input_data_type --input_scales --input_zero_points  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
@@ -49,7 +59,7 @@ complete_str = """_mgeconvert(){
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
-        tracemodule_to_tflite)
+        tracedmodule_to_tflite)
             words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
@@ -62,7 +72,7 @@ complete_str = """_mgeconvert(){
         -*)
             subscript=${COMP_WORDS[1]}
             case $subscript in
-                tracemodule_to_caffe)
+                tracedmodule_to_caffe)
                     words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
@@ -72,7 +82,7 @@ complete_str = """_mgeconvert(){
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
-                tracemodule_to_onnx)
+                tracedmodule_to_onnx)
                     words="-i --input -o --output --opset --graph_name --end_point --require_quantize --param_fake_quant --quantize_file_path --input_data_type --input_scales --input_zero_points --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
@@ -82,7 +92,7 @@ complete_str = """_mgeconvert(){
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
-                tracemodule_to_tflite)
+                tracedmodule_to_tflite)
                     words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
@@ -97,7 +107,7 @@ complete_str = """_mgeconvert(){
             ;;
     esac
 }
-complete -o bashdefault -F _mgeconvert convert"""
+complete -o bashdefault -F _mgeconvert convert""" % complete_targets
 
 
 def init(subparsers):
@@ -257,7 +267,7 @@ def init(subparsers):
                     )
 
             def onnx_parser(subparsers):
-                p = subparsers.add_parser("onnx")
+                p = subparsers.add_parser(target)
                 p.set_defaults(func=to_onnx)
                 p.add_argument(
                     "-i",
