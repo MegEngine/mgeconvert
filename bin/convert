@@ -2,7 +2,9 @@
 
 import argparse
 import os
+import pathlib
 import platform
+import sys
 from typing import List, Union
 
 import mgeconvert
@@ -28,32 +30,32 @@ complete_str = """_mgeconvert(){
             return
             ;;
         tracemodule_to_caffe)
-            words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend "
+            words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
         mge_to_caffe)
-            words="-i --input -c --prototxt -b --caffemodel --end_point"
+            words="-i --input -c --prototxt -b --caffemodel --end_point --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
         tracemodule_to_onnx)
-            words="-i --input -o --output --opset --graph_name --end_point --require_quantize --param_fake_quant --quantize_file_path "
+            words="-i --input -o --output --opset --graph_name --end_point --require_quantize --param_fake_quant --quantize_file_path --input_data_type --input_scales --input_zero_points  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
         mge_to_onnx)
-            words="-i --input -o --output --opset --graph_name --end_point "
+            words="-i --input -o --output --opset --graph_name --end_point  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
         tracemodule_to_tflite)
-            words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+            words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
         mge_to_tflite)
-            words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+            words="-i --input -o --output --graph_name --mtk --end_point  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
@@ -61,32 +63,32 @@ complete_str = """_mgeconvert(){
             subscript=${COMP_WORDS[1]}
             case $subscript in
                 tracemodule_to_caffe)
-                    words="-i --input -c --prototxt -b --caffemodel --end_point "
+                    words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
                 mge_to_caffe)
-                    words="-i --input -c --prototxt -b --caffemodel --end_point "
+                    words="-i --input -c --prototxt -b --caffemodel --end_point --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
                 tracemodule_to_onnx)
-                    words="-i --input -o --output --opset --graph_name --end_point "
+                    words="-i --input -o --output --opset --graph_name --end_point --require_quantize --param_fake_quant --quantize_file_path --input_data_type --input_scales --input_zero_points --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
                 mge_to_onnx)
-                    words="-i --input -o --output --opset --graph_name --end_point "
+                    words="-i --input -o --output --opset --graph_name --end_point  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
                 tracemodule_to_tflite)
-                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
                 mge_to_tflite)
-                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph-name --mtk"
+                    words="-i --input -o --output --graph_name --mtk --end_point  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
@@ -175,48 +177,49 @@ def init(subparsers):
                     help="use empty blobs when using caffe",
                 )
 
-                p.add_argument(
-                    "--input_data_type",
-                    default="float32",
-                    type=str,
-                    help="input dtype of caffe",
-                )
+                if "tracedmodule" in target:
+                    p.add_argument(
+                        "--input_data_type",
+                        default="float32",
+                        type=str,
+                        help="input dtype of caffe",
+                    )
 
-                p.add_argument(
-                    "--input_scales", default=None, nargs="+", type=float,
-                )
+                    p.add_argument(
+                        "--input_scales", default=None, nargs="+", type=float,
+                    )
 
-                p.add_argument(
-                    "--input_zero_points", default=None, nargs="+", type=int,
-                )
+                    p.add_argument(
+                        "--input_zero_points", default=None, nargs="+", type=int,
+                    )
 
-                p.add_argument(
-                    "--require_quantize",
-                    default=False,
-                    action="store_true",
-                    help="require quantize json",
-                )
+                    p.add_argument(
+                        "--require_quantize",
+                        default=False,
+                        action="store_true",
+                        help="require quantize json",
+                    )
 
-                p.add_argument(
-                    "--param_fake_quant",
-                    default=False,
-                    action="store_true",
-                    help="require quantize weight and bias do not dump json",
-                )
+                    p.add_argument(
+                        "--param_fake_quant",
+                        default=False,
+                        action="store_true",
+                        help="require quantize weight and bias do not dump json",
+                    )
 
-                p.add_argument(
-                    "--split_conv_relu",
-                    default=False,
-                    action="store_true",
-                    help="do not use relu for snpe",
-                )
+                    p.add_argument(
+                        "--split_conv_relu",
+                        default=False,
+                        action="store_true",
+                        help="do not use relu for snpe",
+                    )
 
-                p.add_argument(
-                    "--quantize_file_path",
-                    default="quant_params.json",
-                    type=str,
-                    help="the output path for quantize file",
-                )
+                    p.add_argument(
+                        "--quantize_file_path",
+                        default="quant_params.json",
+                        type=str,
+                        help="the output path for quantize file",
+                    )
 
                 p.add_argument(
                     "--convert_backend",
@@ -283,26 +286,43 @@ def init(subparsers):
                     help="end_point is used to specify which part of the mge model should be converted",
                 )
 
-                p.add_argument(
-                    "--require_quantize",
-                    default=False,
-                    action="store_true",
-                    help="require quantize json",
-                )
+                if "tracedmodule" in target:
 
-                p.add_argument(
-                    "--param_fake_quant",
-                    default=False,
-                    action="store_true",
-                    help="require quantize weight and bias do not dump json",
-                )
+                    p.add_argument(
+                        "--input_data_type",
+                        default="float32",
+                        type=str,
+                        help="input dtype of onnx",
+                    )
 
-                p.add_argument(
-                    "--quantize_file_path",
-                    default="quant_params.json",
-                    type=str,
-                    help="the output path for quantize file",
-                )
+                    p.add_argument(
+                        "--input_scales", default=None, nargs="+", type=float,
+                    )
+
+                    p.add_argument(
+                        "--input_zero_points", default=None, nargs="+", type=int,
+                    )
+
+                    p.add_argument(
+                        "--require_quantize",
+                        default=False,
+                        action="store_true",
+                        help="require quantize json",
+                    )
+
+                    p.add_argument(
+                        "--param_fake_quant",
+                        default=False,
+                        action="store_true",
+                        help="require quantize weight and bias do not dump json",
+                    )
+
+                    p.add_argument(
+                        "--quantize_file_path",
+                        default="quant_params.json",
+                        type=str,
+                        help="the output path for quantize file",
+                    )
 
             onnx_parser(subparsers)
         if "tflite" in target:
@@ -404,13 +424,22 @@ def init(subparsers):
             tflite_parser(subparsers)
 
 
+def add_completion(path):
+    wp = pathlib.Path(path)
+    wp.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w+") as f:
+        f.write(complete_str)
+
+
 def main():
     targets = get_targets(mgeconvert)
     msg = targets[0] if len(targets) == 1 else "{" + ", ".join(targets) + "}"
     parser = argparse.ArgumentParser(
         description='use "convert %s -h" for more details' % msg
     )
-    parser.add_argument("--init", default=False, help="init the bash completion")
+    parser.add_argument(
+        "--init", default=False, action="store_true", help="init the bash completion"
+    )
     subparsers = parser.add_subparsers()
     init(subparsers)
     args = parser.parse_args()
@@ -420,9 +449,10 @@ def main():
             print("WARNING: windows doesn't support hinting")
         else:
             path = "{}/.local/share/bash-completion/completions/mgeconvert".format(
-                os.environ.get(HOME)
+                os.environ.get("HOME")
             )
-            shell = os.environ.get("SHELL")
+            add_completion(path)
+            shell = os.environ.get("SHELL", "/usr/bash")
             if shell.find("zsh") != -1:
                 print(
                     " if you don't have zsh completion init, please excute command: 'autoload -Uz compinit &&  compinit'"
