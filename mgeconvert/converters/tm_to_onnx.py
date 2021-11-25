@@ -63,14 +63,15 @@ def tracedmodule_to_onnx(
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
 
-    quantizer = IRQuantizer(
-        require_quantize=require_quantize, param_fake_quant=param_fake_quant
-    )
-
     if require_quantize:
+        quantizer = IRQuantizer(
+            require_quantize=require_quantize, param_fake_quant=param_fake_quant
+        )
         quantizer.save_quantize_params(transformed_irgraph)
+        converter = OnnxConverter(transformed_irgraph, opset, graph_name, quantizer)
+    else:
+        converter = OnnxConverter(transformed_irgraph, opset, graph_name)
 
-    converter = OnnxConverter(transformed_irgraph, opset, graph_name)
     model = converter.convert()
 
     if require_quantize:
