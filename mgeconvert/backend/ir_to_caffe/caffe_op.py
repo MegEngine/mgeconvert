@@ -1217,10 +1217,11 @@ def _batchnorm(opr, context):
     bottom = [
         context.get_blob_name(inp),
     ]
-    tmp = [bottom[0] + context.gen_name]
+    tmp = [bottom[0] + "_bn"]
     top = [
         context.set_blob_name(
-            opr.out_tensors[opr.output_idx], opr.out_tensors[opr.output_idx].name
+            opr.out_tensors[opr.output_idx],
+            opr.out_tensors[opr.output_idx].name + "_scale",
         )
     ]
     bn_param = cp.BatchNormParameter(use_global_stats=True)
@@ -1233,7 +1234,7 @@ def _batchnorm(opr, context):
         cp.LayerParameter(
             bottom=bottom,
             top=tmp,
-            name=opr.out_tensors[opr.output_idx].name + "_bn",
+            name=tmp[0],
             type="BatchNorm",
             batch_norm_param=bn_param,
             blobs=bn_blobs,
@@ -1247,7 +1248,7 @@ def _batchnorm(opr, context):
         cp.LayerParameter(
             bottom=tmp,
             top=top,
-            name=opr.out_tensors[opr.output_idx].name + "_scale",
+            name=top[0],
             type="Scale",
             scale_param=scale_param,
             blobs=scale_blobs,
