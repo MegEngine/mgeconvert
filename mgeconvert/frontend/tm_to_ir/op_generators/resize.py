@@ -23,19 +23,15 @@ class GenResizeOpr(OpGenBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph)
         assert isinstance(expr, CallFunction)
-        self.size = expr.kwargs["size"] if "size" in expr.kwargs.keys() else None
-        self.scale_factor = (
-            expr.kwargs["scale_factor"] if "scale_factor" in expr.kwargs else None
-        )
-        self.mode = expr.kwargs["mode"] if "mode" in expr.kwargs else None
-        self.align_corners = (
-            expr.kwargs["align_corners"] if "align_corners" in expr.kwargs else False
-        )
+        self.size = self.args[1]
+        self.scale_factor = self.args[2]
+        self.mode = self.args[3]
+        self.align_corners = self.args[4]
         self.op = ResizeOpr(self.size, self.scale_factor, self.mode, self.align_corners)
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()

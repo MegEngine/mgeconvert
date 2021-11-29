@@ -46,22 +46,22 @@ class GenPool2dOpr(OpGenBase):
             self.padding = _pair(m.padding)
             op_cls = mode_map[type(m)]
         elif isinstance(expr, CallFunction):
-            self.kernel_size = _pair_nonzero(self.expr.args[1])
+            self.kernel_size = _pair_nonzero(self.args[1])
             self.stride = self.kernel_size
             self.padding = (0, 0)
-            if len(self.expr.args) > 2:
-                self.stride = _pair_nonzero(self.expr.args[2])
-            if len(self.expr.args) > 3:
-                self.padding = _pair(self.expr.args[3])
+            if self.args[2] is not None:
+                self.stride = _pair_nonzero(self.args[2])
+            if self.args[3] is not None:
+                self.padding = _pair(self.args[3])
             op_cls = mode_map[expr.func]
         self.op = op_cls(self.kernel_size, self.stride, self.padding)
         self.add_opr_vars()
 
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
-            inp = self.expr.args[1]
+            inp = self.args[1]
         elif isinstance(self.expr, CallFunction):
-            inp = self.expr.args[0]
+            inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()
@@ -76,14 +76,14 @@ class GenAdaptiveAvgPool2dOpr(OpGenBase):
             m = expr.inputs[0].owner
             self.op = AdaptiveAvgPool2dOpr(m.oshp)
         elif isinstance(expr, CallFunction):
-            self.op = AdaptiveAvgPool2dOpr(expr.func.oshp)
+            self.op = AdaptiveAvgPool2dOpr(self.args[1])
         self.add_opr_vars()
 
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
-            inp = self.expr.args[1]
+            inp = self.args[1]
         elif isinstance(self.expr, CallFunction):
-            inp = self.expr.args[0]
+            inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()

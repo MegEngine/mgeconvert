@@ -37,7 +37,7 @@ class GenBatchNormalizationOpr(OpGenBase):
 
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
-            for i in self.expr.args[1:]:
+            for i in self.args[1:]:
                 t = self.resolver.get_ir_tensor(i, user_opr=self.op)
                 self.op.add_inp_tensors(t)
             self.add_const_inputs()

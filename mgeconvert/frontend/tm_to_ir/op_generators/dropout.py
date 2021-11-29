@@ -24,8 +24,8 @@ class GenDropoutOpr(OpGenBase):
     def __init__(self, expr, irgraph) -> None:
         super().__init__(expr, irgraph)
         if isinstance(expr, CallMethod):
-            if hasattr(expr.kwargs, "drop_prob"):
-                self.drop_prob = expr.kwargs["drop_prob"]
+            if hasattr(expr.args[0].owner, "drop_prob"):
+                self.drop_prob = expr.args[0].owner.drop_prob
             else:
                 self.drop_prob = 0
             self.training = False
@@ -38,7 +38,7 @@ class GenDropoutOpr(OpGenBase):
 
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
-            for i in self.expr.args[1:]:
+            for i in self.args[1:]:
                 t = self.resolver.get_ir_tensor(i, user_opr=self.op)
                 self.op.add_inp_tensors(t)
         self.add_opr_out_tensors()

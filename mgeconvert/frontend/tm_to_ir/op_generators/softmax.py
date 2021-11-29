@@ -35,10 +35,7 @@ class GenSoftmaxOpr(OpGenBase):
             module = expr.inputs[0].owner
             self.axis = module.axis
         elif isinstance(self.expr, CallFunction):
-            if len(expr.const_val) == 1:
-                self.axis = expr.const_val
-            else:
-                self.axis = None
+            self.axis = self.args[1]
 
         self.op = SoftmaxOpr(self.axis)
         self.add_opr_vars()
@@ -55,15 +52,11 @@ class GenSoftmaxOpr(OpGenBase):
 
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
-            inp_tensor = self.resolver.get_ir_tensor(
-                self.expr.args[1], user_opr=self.op
-            )
+            inp_tensor = self.resolver.get_ir_tensor(self.args[1], user_opr=self.op)
             self.op.add_inp_tensors(inp_tensor)
 
         elif isinstance(self.expr, CallFunction):
-            inp_tensor = self.resolver.get_ir_tensor(
-                self.expr.args[0], user_opr=self.op
-            )
+            inp_tensor = self.resolver.get_ir_tensor(self.args[0], user_opr=self.op)
             self.op.add_inp_tensors(inp_tensor)
 
         # self.add_axis()

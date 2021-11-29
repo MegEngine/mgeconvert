@@ -22,12 +22,12 @@ class GenTypeCvtOpr(OpGenBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph)
         assert isinstance(self.expr, CallMethod)
-        out_dtype = expr.args[1]
+        out_dtype = self.args[1]
         self.op = TypeCvtOpr(out_dtype)
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()
