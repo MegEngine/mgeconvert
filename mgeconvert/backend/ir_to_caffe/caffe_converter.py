@@ -15,7 +15,7 @@ from megengine import get_logger
 from tabulate import tabulate
 from tqdm import tqdm
 
-from ...converter_ir.ir_graph import IRGraph
+from ...converter_ir.ir_graph import IRGraph, OpBase
 from ...converter_ir.ir_quantizer import IRQuantizer
 from ...converter_ir.ir_tensor import IRTensor  # pylint: disable=unused-import
 from .caffe_op import MGE2CAFFE, BackEnd, _add_input_layer

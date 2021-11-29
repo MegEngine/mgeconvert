@@ -1019,12 +1019,15 @@ def fold_conv_bn(
 @_register_tranformation_rule(TransformerRule.FUSE_CONV_BN)
 def _fuse_conv_bn(net: IRGraph):
     for opr in net.all_oprs:
+        inp_oprs = net.find_inp_oprs(opr)
+        if opr.name != "BatchNormalization":
+            continue
         if (
-            opr.name == "BatchNormalization"
-            and len(net.find_inp_oprs(opr)) == 1
-            and net.find_inp_oprs(opr)[0].name == "Conv2d"
-            and len(net.find_out_oprs(net.find_inp_oprs(opr)[0])) == 1
-            and net.find_out_oprs(net.find_inp_oprs(opr)[0])[0] == opr
+            len(inp_oprs) == 1
+            and isinstance(inp_oprs[0], OpBase)
+            and inp_oprs[0].name == "Conv2d"
+            and len(net.find_out_oprs(inp_oprs[0])) == 1
+            and net.find_out_oprs(inp_oprs[0])[0] == opr
         ):
             gamma = (
                 Tensor(opr.weight)  # type: ignore[attr-defined]
