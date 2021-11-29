@@ -6,7 +6,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from typing import List  # pylint: disable=unused-import
-from typing import Sequence, Union
+from typing import Sequence
 
 from megengine.logger import get_logger
 

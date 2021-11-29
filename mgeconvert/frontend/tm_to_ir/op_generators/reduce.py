@@ -30,13 +30,13 @@ class GenReduceOpr(OpGenBase):
     def __init__(self, expr, irgraph) -> None:
         super().__init__(expr, irgraph)
         assert isinstance(self.expr, CallFunction)
-        self.axis = expr.kwargs["axis"]
+        self.axis = self.args[1]
         self.mode = func_mode_map[expr.func]
         self.op = ReduceOpr(self.axis, self.mode, False)
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()

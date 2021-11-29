@@ -27,25 +27,17 @@ class GenConcatOpr(OpGenBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph)
         if isinstance(self.expr, CallMethod):
-            self.axis = (
-                self.expr.kwargs["axis"]
-                if "axis" in self.expr.kwargs
-                else self.expr.args[2]
-            )
+            self.axis = self.args[2]
         elif isinstance(self.expr, CallFunction):
-            self.axis = (
-                self.expr.kwargs["axis"]
-                if "axis" in self.expr.kwargs
-                else self.expr.args[1]
-            )
+            self.axis = self.args[1]
         self.op = ConcatOpr(self.axis)
         self.add_opr_vars()
 
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
-            inp_data = self.expr.args[1]
+            inp_data = self.args[1]
         elif isinstance(self.expr, CallFunction):
-            inp_data = self.expr.args[0]
+            inp_data = self.args[0]
         assert isinstance(inp_data, Iterable), "Concat inputs must be Iterable."
         for i in inp_data:
             t = self.resolver.get_ir_tensor(i, user_opr=self.op)

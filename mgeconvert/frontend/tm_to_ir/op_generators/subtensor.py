@@ -31,9 +31,9 @@ class GenGetSubtensorOpr(OpGenBase):
         self.end_params = []  # type: List[int]
         self.step_params = []  # type: List[int]
         self.squeeze_axis = []  # type: List[int]
-        if isinstance(expr.args[1], Sequence):
-            for i in range(len(expr.args[1])):
-                slice = expr.args[1][i]
+        if isinstance(self.args[1], Sequence):
+            for i in range(len(self.args[1])):
+                slice = self.args[1][i]
                 if isinstance(slice, int):
                     start = slice
                     stop = slice + 1
@@ -51,9 +51,9 @@ class GenGetSubtensorOpr(OpGenBase):
                 self.end_params.append(stop)
                 self.step_params.append(step)
                 self.axis.append(i)
-        elif isinstance(expr.args[1], int):
-            start = expr.args[1]
-            stop = expr.args[1] + 1
+        elif isinstance(self.args[1], int):
+            start = self.args[1]
+            stop = self.args[1] + 1
             step = 1
             self.squeeze_axis.append(0)
             self.begin_params.append(start)
@@ -71,7 +71,7 @@ class GenGetSubtensorOpr(OpGenBase):
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()

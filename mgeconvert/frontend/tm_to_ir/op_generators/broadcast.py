@@ -28,9 +28,9 @@ class GenBroadcastOpr(OpGenBase):
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
-        shape = self.expr.args[1]
+        shape = self.args[1]
         if isinstance(shape, (list, tuple)):
             shape = np.array(shape)
         shape_tensor = self.resolver.get_ir_tensor(shape, user_opr=self.op)

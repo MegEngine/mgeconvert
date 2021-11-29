@@ -14,7 +14,7 @@ import megengine.functional as F
 import megengine.module as M
 import megengine.module.qat as QAT
 import numpy as np
-from megengine.traced_module.expr import CallFunction, CallMethod, Constant
+from megengine.traced_module.expr import CallFunction, CallMethod
 from megengine.traced_module.node import ModuleNode, TensorNode
 
 from ....converter_ir.ir_op import (
@@ -52,15 +52,12 @@ class GenLeakyReluOpr(OpGenBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph)
         assert isinstance(self.expr, CallFunction)
-        if len(expr.const_val) == 0:
-            self.op = LeakyReluOpr()
-        else:
-            self.negative_slope = expr.args[1]
-            self.op = LeakyReluOpr(self.negative_slope)
+        self.negative_slope = self.args[1]
+        self.op = LeakyReluOpr(self.negative_slope)
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()
@@ -73,7 +70,7 @@ class GenElemwiseOpr(OpGenBase, ABC):
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        for inp in self.expr.args:
+        for inp in self.args:
             if isinstance(inp, ModuleNode):
                 continue
             assert isinstance(
@@ -269,7 +266,6 @@ method_opr_map = {
 @_register_op(QAT.Elemwise, M.Elemwise)
 def get_elemwise_op(expr, net):
     assert isinstance(expr, CallMethod)
-    assert isinstance(expr.inputs[0].expr, Constant)
     module = expr.inputs[0].owner
     method = module.method
     op_gen = method_opr_map[method](expr, net)

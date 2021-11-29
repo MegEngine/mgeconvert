@@ -36,14 +36,12 @@ class GenConvBase(OpGenBase, ABC):
             self.groups = conv_module.groups
         elif isinstance(expr, CallFunction):
             self.weight = None
-            self.stride = _unexpand(self.expr.args[3])
-            self.padding = _unexpand(self.expr.args[4])
-            self.dilation = _unexpand(self.expr.args[5])
-            self.groups = self.expr.args[6]
-            if len(expr.args) > 7:
-                assert self.expr.args[7] == "cross_correlation"
-            if len(expr.args) > 8:
-                assert self.expr.args[8] == "default"
+            self.stride = _unexpand(self.args[3])
+            self.padding = _unexpand(self.args[4])
+            self.dilation = _unexpand(self.args[5])
+            self.groups = self.args[6]
+            assert self.args[7] == "cross_correlation"
+            assert self.args[8] == "default"
         self.op = op_cls(self.stride, self.padding, self.dilation, self.groups,)
 
     def add_opr_vars(self, weight_format):
@@ -52,25 +50,23 @@ class GenConvBase(OpGenBase, ABC):
 
     def add_weight_bias_tensors(self, weight_format):
         if isinstance(self.expr, CallMethod):
-            for i in self.expr.args[1:]:
+            for i in self.args[1:]:
                 t = self.resolver.get_ir_tensor(i, user_opr=self.op)
                 self.op.add_inp_tensors(t)
             self.add_const_inputs(weight_format)
         elif isinstance(self.expr, CallFunction):
-            inp_tensor = self.resolver.get_ir_tensor(
-                self.expr.args[0], user_opr=self.op
-            )
+            inp_tensor = self.resolver.get_ir_tensor(self.args[0], user_opr=self.op)
             self.op.add_inp_tensors(inp_tensor)
             weight_tensor = self.resolver.get_ir_tensor(
-                self.expr.args[1], user_opr=self.op, axis_order=weight_format,
+                self.args[1], user_opr=self.op, axis_order=weight_format,
             )
             weight_tensor.axis_order = weight_format
             self.op.add_inp_tensors(weight_tensor)
-            if self.expr.args[2]:
-                bias = self.expr.args[2]
+            if self.args[2] is not None:
+                bias = self.args[2]
                 bias.shape = bias.shape[1]
                 bias_tensor = self.resolver.get_ir_tensor(
-                    bias, name=self.expr.args[0]._name + "_bias", user_opr=self.op
+                    bias, name=self.args[0]._name + "_bias", user_opr=self.op
                 )
                 self.op.add_inp_tensors(bias_tensor)
 

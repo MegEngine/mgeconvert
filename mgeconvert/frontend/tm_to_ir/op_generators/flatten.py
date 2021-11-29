@@ -25,15 +25,13 @@ class GenFlattenOpr(OpGenBase):
         assert isinstance(self.expr, CallFunction)
         self.start_axis = 0
         self.end_axis = -1
-        if len(expr.args) >= 2:
-            self.start_axis = int(expr.args[1])
-        if len(expr.args) >= 3:
-            self.end_axis = int(expr.args[2])
+        self.start_axis = int(self.args[1])
+        self.end_axis = int(self.args[2])
         self.op = FlattenOpr(self.start_axis, self.end_axis)
         self.add_opr_vars()
 
     def add_opr_vars(self):
-        inp = self.expr.args[0]
+        inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()

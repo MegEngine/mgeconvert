@@ -106,9 +106,8 @@ class TM_FrontEnd:
                 elif expr.method == "__call__":
                     m = expr.inputs[0]
                     assert isinstance(m, ModuleNode)
-                    assert isinstance(m.expr, Constant)
-                    if isinstance(m.expr.value, TracedModule):
-                        module = m.expr.value
+                    if isinstance(m.owner, TracedModule):
+                        module = m.owner
                         assert module.is_qat
                         pats = find_match_pattern(module.graph)
                         pat, end_expr = pats[0]
@@ -120,8 +119,8 @@ class TM_FrontEnd:
                         for op in ops:
                             self.irgraph.all_oprs.append(op)
                             self.irgraph._opr_ids.append(id(op))
-                    elif isinstance(m.expr.value, QuantStub):
-                        module = m.expr.value
+                    elif isinstance(m.owner, QuantStub):
+                        module = m.owner
                         inp_tensor = self.tensor_resolver.get_ir_tensor(expr.inputs[1])
                         out_tensor = self.irgraph.get_tensor(
                             expr.outputs[0]._id, None, origin_tensor=inp_tensor
@@ -139,7 +138,7 @@ class TM_FrontEnd:
                         out_tensor.zero_point = int(zero_point) if zero_point else None
 
                     else:
-                        op_gen_cls = EXPR2OP.get(type(m.expr.value), None)
+                        op_gen_cls = EXPR2OP.get(type(m.owner), None)
                         assert op_gen_cls, "Module {} is not supported.".format(
                             type(m.expr.value)
                         )
