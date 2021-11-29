@@ -17,6 +17,7 @@ from ..backend.ir_to_onnx.onnx_converter import OnnxConverter
 from ..converter_ir.ir_quantizer import IRQuantizer
 from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.tm_to_ir import TM_FrontEnd
+from ..frontend.tm_to_ir.tm_utils import _update_inputs_qparams
 
 
 def tracedmodule_to_onnx(
@@ -51,9 +52,10 @@ def tracedmodule_to_onnx(
     assert isinstance(
         traced_module, TracedModule
     ), "Input should be a traced module or a path of traced module."
-
+    _update_inputs_qparams(
+        traced_module, input_data_type, input_scales, input_zero_points
+    )
     irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
-    irgraph.update_inputs_qparams(input_data_type, input_scales, input_zero_points)
 
     transformer_options = [
         TransformerRule.REMOVE_RESHAPE_REALTED_OP,

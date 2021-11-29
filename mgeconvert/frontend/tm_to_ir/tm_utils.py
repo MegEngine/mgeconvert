@@ -6,9 +6,14 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import inspect
-from typing import Sequence
+from typing import Sequence, Union
 
+import numpy as np
+from megengine import Tensor
 from megengine import get_logger as mge_get_logger
+from megengine.core.tensor import dtype
+from megengine.core.tensor.dtype import QuantDtypeMeta
+from megengine.quantization.utils import create_qparams
 
 
 def get_logger(*args):
@@ -68,3 +73,43 @@ def _convert_kwargs_to_args(func, args, kwargs, is_bounded=False):
                 )
             new_kwargs[k] = v
     return tuple(new_args), new_kwargs
+
+
+def _update_inputs_qparams(
+    traced_module,
+    input_data_type: Union[str, QuantDtypeMeta],
+    input_scales,
+    input_zero_points,
+):
+    if input_data_type is not None:
+        for i in range(len(traced_module.graph.inputs[1:])):
+            if traced_module.graph.inputs[i + 1].qparams is None:
+                traced_module.graph.inputs[i + 1].qparams = create_qparams()
+            if input_data_type in dtype._builtin_quant_dtypes:
+                q_dtype_meta = dtype._builtin_quant_dtypes[input_data_type]
+            elif isinstance(input_data_type, dtype.QuantDtypeMeta):
+                q_dtype_meta = input_data_type
+            else:
+                assert isinstance(input_data_type, str)
+                dt = np.dtype(input_data_type)
+                assert np.issubdtype(dt, np.integer)
+                v_min = np.iinfo(dt).min
+                v_max = np.iinfo(dt).max
+                q_dtype_meta = dtype.QuantDtypeMeta(
+                    input_data_type, "", input_data_type, v_min, v_max
+                )
+            traced_module.graph.inputs[i + 1].qparams.dtype_meta = q_dtype_meta
+    if input_scales is not None:
+        if not isinstance(input_scales, Sequence):
+            scales = (input_scales,)
+        for i in range(len(traced_module.graph.inputs[1:])):
+            scale = scales[i] if i < len(scales) else scales[-1]
+            traced_module.graph.inputs[i + 1].qparams.scale = Tensor(float(scale))
+    if input_zero_points is not None:
+        if not isinstance(input_zero_points, Sequence):
+            zero_points = (input_zero_points,)
+        for i in range(len(traced_module.graph.inputs[1:])):
+            zero_point = zero_points[i] if i < len(zero_points) else zero_points[-1]
+            traced_module.graph.inputs[i + 1].qparams.zero_point = Tensor(
+                int(zero_point)
+            )

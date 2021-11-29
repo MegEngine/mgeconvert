@@ -17,6 +17,7 @@ from ..backend.ir_to_caffe.caffe_converter import BackEnd, CaffeConverter
 from ..converter_ir.ir_quantizer import IRQuantizer
 from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.tm_to_ir import TM_FrontEnd
+from ..frontend.tm_to_ir.tm_utils import _update_inputs_qparams
 
 
 def tracedmodule_to_caffe(
@@ -53,8 +54,10 @@ def tracedmodule_to_caffe(
         traced_module, TracedModule
     ), "Input should be a traced module or a path of traced module."
 
+    _update_inputs_qparams(
+        traced_module, input_data_type, input_scales, input_zero_points
+    )
     irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
-    irgraph.update_inputs_qparams(input_data_type, input_scales, input_zero_points)
 
     transformer_options = [
         TransformerRule.REMOVE_DROPOUT,
