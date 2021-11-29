@@ -7,10 +7,12 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 import os
-from typing import Dict, List, Set
+from typing import Dict, List, Sequence, Set, Union
 
 # pylint: disable=import-error
 from google.protobuf import text_format  # type: ignore
+from megengine import get_logger
+from tabulate import tabulate
 from tqdm import tqdm
 
 from ...converter_ir.ir_graph import IRGraph
@@ -18,10 +20,97 @@ from ...converter_ir.ir_quantizer import IRQuantizer
 from ...converter_ir.ir_tensor import IRTensor  # pylint: disable=unused-import
 from .caffe_op import MGE2CAFFE, BackEnd, _add_input_layer
 
+logger = get_logger(__name__)
+
 if "USE_CAFFE_PROTO" not in os.environ:
     from .caffe_pb import caffe_pb2 as cp
 else:
     from caffe.proto import caffe_pb2 as cp
+
+
+class ReorderError(Exception):
+    pass
+
+
+def _get_dep_opr(tensors: Union[Sequence[IRTensor], IRTensor]) -> List[OpBase]:
+    if not isinstance(tensors, Sequence):
+        tensors = (tensors,)
+    ret = []  # type: List[OpBase]
+    queue = list(tensors)  # type: List[IRTensor]
+    visited_queue = []  # type: List[IRTensor]
+    while queue:
+        tensor = queue.pop()
+        visited_queue.append(tensor)
+
+        opr = tensor.owner_opr
+
+        if not isinstance(opr, OpBase):
+            continue
+
+        if opr not in ret:
+            ret.append(opr)
+
+        for i in opr.inp_tensors:
+            if i not in queue and i not in visited_queue:
+                queue.append(i)
+    return ret
+
+
+def _check_dependency(outputs: List[IRTensor]):
+    """
+    Check whether there exist one output depend on another output
+    """
+    output_oprs = {var.owner_opr for var in outputs}
+    output_input_oprs = {
+        i.owner_opr for opr in _get_dep_opr(outputs) for i in opr.inp_tensors
+    }
+    if len(output_oprs) != len(outputs) or (output_oprs & output_input_oprs):
+        raise ReorderError("Bad order due to dependency between two outputs.")
+
+
+def _reorder_outputs(context: "CaffeConverter"):
+    """
+    Try to keep same order with original network, but sometimes it is impossible,
+    raise a ReorderError if it can't order output layers correctly.
+    """
+    output_tensor = context.net.graph_outputs
+    _check_dependency(output_tensor)
+
+    blob2index = {}
+    ordered_layers = []
+    output_layers = [None] * len(output_tensor)
+
+    for i, oup in enumerate(output_tensor):
+        blob = context.get_blob_name(oup)
+        blob2index[blob] = i
+
+    for l in context.layers:
+        is_output = False
+        for blob in l.top:
+            idx = blob2index.get(blob, None)
+            if idx is not None:
+                if not is_output:
+                    is_output = True
+                else:
+                    raise ReorderError(
+                        "layer {} has more than one network outputs".format(l)
+                    )
+                if output_layers[idx] is not None:
+                    raise ReorderError(
+                        "duplicated blob name of layer {} and {}".format(
+                            output_layers[idx], l
+                        )
+                    )
+                output_layers[idx] = l
+
+        if not is_output:
+            ordered_layers.append(l)
+
+    if output_layers.count(None) > 0:
+        raise ReorderError("failure to replace all output vars.")
+
+    ordered_layers += output_layers
+    return ordered_layers
 
 
 class CaffeConverter:
@@ -135,3 +224,19 @@ class CaffeConverter:
             if not need_convert(opr):
                 continue
             MGE2CAFFE[type(opr)](opr, self)
+
+        try:
+            layers = _reorder_outputs(self)
+            self.layers = layers
+        except ReorderError as e:
+            logger.error(str(e))
+            logger.error(
+                "Can not keep the same order with original network, "
+                "ignore reorder error and fallback to unordered caffe network."
+            )
+            header = ["megskull output varnode", "caffe blob name"]
+            outputs = []
+            for var in self.net.graph_outputs:
+                blob = self.get_blob_name(var)
+                outputs.append([var, blob])
+            logger.info(tabulate(outputs, header))
