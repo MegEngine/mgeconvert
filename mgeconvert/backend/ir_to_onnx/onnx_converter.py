@@ -11,6 +11,7 @@ import megengine as mge
 import onnx.checker
 import onnx.helper
 import onnx.numpy_helper
+import onnxoptimizer  # pylint: disable=import-error,no-name-in-module
 
 from ...converter_ir.ir_quantizer import IRQuantizer
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
@@ -107,4 +108,10 @@ class OnnxConverter:
             opset_imports=[opset],
         )
         onnx.checker.check_model(model)
+        passes = [
+            "eliminate_deadend",
+            "extract_constant_to_initializer",
+            "eliminate_unused_initializer",
+        ]
+        model = onnxoptimizer.optimize(model, passes=passes)
         return model
