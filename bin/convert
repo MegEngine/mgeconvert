@@ -206,14 +206,14 @@ def init(subparsers):
                     "--require_quantize",
                     default=False,
                     action="store_true",
-                    help="require quantize json",
+                    help="whether to do quantize for QAT model, if not then save qparams to the specified json file",
                 )
 
                 p.add_argument(
                     "--param_fake_quant",
                     default=False,
                     action="store_true",
-                    help="require quantize weight and bias do not dump json",
+                    help="whether to do fake quantize for params",
                 )
 
                 p.add_argument(
@@ -316,14 +316,14 @@ def init(subparsers):
                     "--require_quantize",
                     default=False,
                     action="store_true",
-                    help="require quantize json",
+                    help="whether to do quantize for QAT model, if not then save qparams to the specified json file",
                 )
 
                 p.add_argument(
                     "--param_fake_quant",
                     default=False,
                     action="store_true",
-                    help="require quantize weight and bias do not dump json",
+                    help="whether to do fake quantize for params",
                 )
 
                 p.add_argument(
@@ -399,12 +399,12 @@ def init(subparsers):
                 p.add_argument(
                     "--require_quantize",
                     action="store_false",
-                    help="whether to do quantize if the model has quantization parameters",
+                    help="whether to do quantize for QAT model, if not then save qparams to the specified json file",
                 )
                 p.add_argument(
                     "--param_fake_quant",
                     action="store_false",
-                    help="whether to do fake quantize for parameters if the model has quantization parameters",
+                    help="whether to do fake quantize for params",
                 )
                 p.add_argument(
                     "--quantize_file_path",

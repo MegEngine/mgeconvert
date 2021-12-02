@@ -42,7 +42,7 @@ MgeConvert 基于 MegEngine 工作，因此确保您的电脑已经安装 MegEng
 
 2. onnx
 
- - Python packages: protobuf, onnx>=1.7.0
+ - Python packages: protobuf, onnx>=1.7.0, onnxoptimizer
 
 3. tflite
 

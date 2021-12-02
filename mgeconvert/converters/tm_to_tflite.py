@@ -52,7 +52,8 @@ def tracedmodule_to_tflite(
     _update_inputs_qparams(
         traced_module, input_data_type, input_scales, input_zero_points
     )
-    irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
+    tm_resolver = TM_FrontEnd(traced_module, outspec=outspec)
+    irgraph = tm_resolver.resolve()
 
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,
@@ -82,7 +83,7 @@ def tracedmodule_to_tflite(
         require_quantize=require_quantize, param_fake_quant=param_fake_quant
     )
 
-    if not require_quantize:
+    if not require_quantize and tm_resolver.has_qat:
         quantizer.save_quantize_params(transformed_irgraph)
         quantizer.dump_quant_param(path=quantize_file_path)
 

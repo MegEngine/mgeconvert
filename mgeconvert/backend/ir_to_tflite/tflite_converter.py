@@ -94,11 +94,13 @@ class TFLiteConverter:
                 zero_point = 0
 
                 if self.quantizer.require_quantize:
-                    if hasattr(tensor, "scale"):
+                    has_qparams = False
+                    if hasattr(tensor, "scale") and tensor.scale is not None:
                         scale = tensor.scale
+                        has_qparams = True
                     if hasattr(tensor, "zero_point") and tensor.zero_point is not None:
                         zero_point = int(tensor.zero_point)
-                    dtype = tensor.q_dtype
+                    dtype = tensor.q_dtype if has_qparams else tensor.dtype
                     from megengine.core.tensor.dtype import (  # pylint: disable=import-outside-toplevel,no-name-in-module
                         QuantDtypeMeta,
                     )

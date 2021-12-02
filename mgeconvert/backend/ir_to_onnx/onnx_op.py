@@ -433,7 +433,7 @@ class SubtensorConverter(OperatorBaseConverter):
         nodes.append(slice_op)
         if len(squeeze_axis) > 0:
             self._parse_fake_tensor_info(
-                slice_outputs, opr.inp_tensors[0], opr.out_tensors[0].shape
+                slice_outputs[0], opr.inp_tensors[0], opr.out_tensors[0].shape
             )
             Squeeze = onnx.helper.make_node(
                 "Squeeze", slice_outputs, outputs, axes=squeeze_axis

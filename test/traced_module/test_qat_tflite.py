@@ -71,7 +71,12 @@ def test_qat_conv_qint8():
     out_dtype = traced_module.graph.outputs[0].qparams
     scale = out_dtype.scale.numpy()
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
 
 
@@ -90,7 +95,12 @@ def test_qat_convrelu():
     out_dtype = traced_module.graph.outputs[0].qparams
     scale = out_dtype.scale.numpy()
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
 
 
@@ -110,7 +120,12 @@ def test_qat_convbn():
     out_dtype = traced_module.graph.outputs[0].qparams
     scale = out_dtype.scale.numpy()
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
 
 
@@ -130,7 +145,12 @@ def test_qat_convbnrelu():
     out_dtype = traced_module.graph.outputs[0].qparams
     scale = out_dtype.scale.numpy()
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
 
 
@@ -151,7 +171,12 @@ def test_deconv_qint8():
     out_dtype = traced_module.graph.outputs[0].qparams
     scale = out_dtype.scale.numpy()
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
 
 
@@ -165,7 +190,12 @@ def test_linear():
     scale = out_dtype.scale.numpy()
     inp = inps[0].astype(inp_dtype)
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
 
 
@@ -220,5 +250,10 @@ def test_add():
     scale = out_dtype.scale.numpy()
     inp = inps[0].astype(inp_dtype)
     _test_convert_result(
-        inp, traced_module, tm_result, scale=scale, require_quantize=True
+        inp,
+        traced_module,
+        tm_result,
+        scale=scale,
+        require_quantize=True,
+        max_err=max_error,
     )
