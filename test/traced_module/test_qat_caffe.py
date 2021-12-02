@@ -58,7 +58,7 @@ def test_linear():
     qat_net, inps = get_qat_net(inp_dtype, net, shape=(10, 100))
     traced_module, tm_result = get_traced_module(qat_net, inps[0])
     inp = inps[0].astype(inp_dtype)
-    _test_convert_result(inp, traced_module, tm_result, max_err, require_quantize=True)
+    _test_convert_result(inp, traced_module, tm_result, max_err, require_quantize=False)
 
 
 def test_add():
@@ -114,7 +114,7 @@ def test_add():
         traced_module,
         tm_result,
         max_err,
-        require_quantize=True,
+        require_quantize=False,
         split_conv_relu=True,
     )
 
@@ -125,7 +125,7 @@ def test_det_model():
     qat_net, inps = get_qat_net(inp_dtype, net, shape=(1, 3, 512, 512))
     traced_module, tm_result = get_traced_module(qat_net, inps[0])
     inp = inps[0].astype(inp_dtype)
-    _test_convert_result(inp, traced_module, tm_result, max_err, require_quantize=True)
+    _test_convert_result(inp, traced_module, tm_result, max_err, require_quantize=False)
 
 
 def test_snpe_model_8f():
@@ -143,7 +143,7 @@ def test_snpe_model_8f():
         input_data_type="quint8",
         input_scales=inps[0].qparams.scale,
         input_zero_points=inps[0].qparams.zero_point,
-        require_quantize=True,
+        require_quantize=False,
         param_fake_quant=True,
         split_conv_relu=True,
         input_name=["inp", "prev"],

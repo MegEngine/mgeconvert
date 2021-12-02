@@ -27,6 +27,9 @@ class IRQuantizer:
         value = tensor.np_data
         if isinstance(value, megengine.tensor):
             value = value.numpy()
+        if tensor.q_dtype is None:
+            return value
+
         if tensor.scale:
             value = value / tensor.scale
             value = np.round(value)
@@ -85,6 +88,8 @@ class IRQuantizer:
             self.quant_params[t.name] = param
 
     def dump_quant_param(self, path="quant_params.json"):
+        if len(self.quant_params) == 0:
+            return
         params = json.dumps(self.quant_params, indent=4)
         with open(path, "w") as f:
             f.write(params)

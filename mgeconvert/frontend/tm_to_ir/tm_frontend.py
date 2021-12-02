@@ -11,7 +11,7 @@ from typing import List, Sequence
 
 import megengine
 from megengine.core._imperative_rt.core2 import Tensor as RawTensor
-from megengine.module.qat import QuantStub
+from megengine.module.qat import QATModule, QuantStub
 from megengine.traced_module import TracedModule
 from megengine.traced_module.expr import (
     Apply,
@@ -62,6 +62,7 @@ class TM_FrontEnd:
 
         self.irgraph = IRGraph()
         self.tensor_resolver = TensorNodeResolver(self.irgraph)
+        self.has_qat = False
 
     def resolve(self):
         self.add_net_inputs()
@@ -107,6 +108,7 @@ class TM_FrontEnd:
                     m = expr.inputs[0]
                     assert isinstance(m, ModuleNode)
                     if isinstance(m.owner, TracedModule):
+                        self.has_qat = self.has_qat or m.owner.is_qat
                         module = m.owner
                         assert module.is_qat
                         pats = find_match_pattern(module.graph)
@@ -136,11 +138,11 @@ class TM_FrontEnd:
                         out_tensor.q_dtype = qdtype
                         out_tensor.scale = float(scale)
                         out_tensor.zero_point = int(zero_point) if zero_point else None
-
                     else:
+                        self.has_qat = self.has_qat or isinstance(m.owner, QATModule)
                         op_gen_cls = EXPR2OP.get(type(m.owner), None)
                         assert op_gen_cls, "Module {} is not supported.".format(
-                            type(m.expr.value)
+                            type(m.owner)
                         )
                         op = op_gen_cls(expr, self.irgraph).get_opr()
                         self.irgraph.add_op(op)

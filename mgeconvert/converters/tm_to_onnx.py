@@ -55,7 +55,10 @@ def tracedmodule_to_onnx(
     _update_inputs_qparams(
         traced_module, input_data_type, input_scales, input_zero_points
     )
-    irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
+    assert not require_quantize, "Caffe do not support quantize model."
+
+    tm_resolver = TM_FrontEnd(traced_module, outspec=outspec)
+    irgraph = tm_resolver.resolve()
 
     transformer_options = [
         TransformerRule.REMOVE_RESHAPE_REALTED_OP,
@@ -65,18 +68,17 @@ def tracedmodule_to_onnx(
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
 
-    if require_quantize:
-        quantizer = IRQuantizer(
-            require_quantize=require_quantize, param_fake_quant=param_fake_quant
-        )
-        quantizer.save_quantize_params(transformed_irgraph)
-        converter = OnnxConverter(transformed_irgraph, opset, graph_name, quantizer)
-    else:
-        converter = OnnxConverter(transformed_irgraph, opset, graph_name)
+    quantizer = IRQuantizer(
+        require_quantize=require_quantize, param_fake_quant=param_fake_quant
+    )
 
+    if tm_resolver.has_qat:
+        quantizer.save_quantize_params(transformed_irgraph)
+
+    converter = OnnxConverter(transformed_irgraph, opset, graph_name, quantizer)
     model = converter.convert()
 
-    if require_quantize:
+    if tm_resolver.has_qat:
         quantizer.dump_quant_param(path=quantize_file_path)
 
     assert isinstance(output, str), "onnx_fpath must be string"

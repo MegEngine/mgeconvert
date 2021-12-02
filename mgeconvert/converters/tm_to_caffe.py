@@ -53,11 +53,13 @@ def tracedmodule_to_caffe(
     assert isinstance(
         traced_module, TracedModule
     ), "Input should be a traced module or a path of traced module."
+    assert not require_quantize, "Caffe do not support quantize model."
 
     _update_inputs_qparams(
         traced_module, input_data_type, input_scales, input_zero_points
     )
-    irgraph = TM_FrontEnd(traced_module, outspec=outspec).resolve()
+    tm_resolver = TM_FrontEnd(traced_module, outspec=outspec)
+    irgraph = tm_resolver.resolve()
 
     transformer_options = [
         TransformerRule.REMOVE_DROPOUT,
@@ -75,7 +77,7 @@ def tracedmodule_to_caffe(
         require_quantize=require_quantize, param_fake_quant=param_fake_quant
     )
 
-    if require_quantize:
+    if tm_resolver.has_qat:
         quantizer.save_quantize_params(transformed_irgraph)
 
     converter = CaffeConverter(
@@ -83,7 +85,7 @@ def tracedmodule_to_caffe(
     )
     converter.convert()
 
-    if require_quantize:
+    if tm_resolver.has_qat:
         quantizer.dump_quant_param(path=quantize_file_path)
 
     assert isinstance(prototxt, str) and isinstance(
