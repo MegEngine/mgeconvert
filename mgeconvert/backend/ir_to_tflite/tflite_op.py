@@ -285,8 +285,13 @@ def _conv2d(mge_opr, builder):
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddStrideW(
             builder, mge_opr.stride[1]
         )
+        assert isinstance(mge_opr.inp_tensors[1].axis_order, OIHWFormat)
+        assert isinstance(mge_opr.inp_tensors[0].axis_order, NCHWFormat)
+        num_filter_channels = mge_opr.inp_tensors[1].shape[0]
+        num_input_channels = mge_opr.inp_tensors[0].shape[1]
+        assert num_filter_channels % num_input_channels == 0
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddDepthMultiplier(
-            builder, mge_opr.inp_tensors[1].shape[0]
+            builder, num_filter_channels // num_input_channels
         )
         DepthwiseConv2DOptions.DepthwiseConv2DOptionsAddFusedActivationFunction(
             builder, mge2tflite_activation_type[mge_opr.activation]
