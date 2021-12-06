@@ -66,6 +66,12 @@ class ConvOpr(M.Module):
             3, 30, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1), groups=3
         )
 
+        self.valid_pad_conv = M.Conv2d(3, 30, 4, padding=(1, 1))
+        self.valid_pad_1_conv = M.Conv2d(3, 30, 3, stride=2, padding=(1, 1))
+        self.same_pad_conv = M.Conv2d(3, 30, 3, padding=(1, 1))
+        self.same_pad_1_conv = M.Conv2d(3, 30, 4, stride=2, padding=(1, 1))
+        self.same_pad_2_conv = M.Conv2d(3, 30, 2, dilation=3, stride=2, padding=(1, 1))
+
         self.normal_conv.bias = mge.Parameter(
             np.random.random(self.normal_conv.bias.shape).astype(np.float32)
         )

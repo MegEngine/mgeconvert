@@ -16,6 +16,7 @@ from megengine import Tensor
 from megengine.functional import sqrt
 
 from ..converter_ir.ir_graph import IRGraph
+from ..converter_ir.ir_tensor import IOHWFormat, NCHWFormat, OIHWFormat
 from .ir_op import (
     AddOpr,
     Conv2dOpr,
@@ -133,10 +134,54 @@ def _register_tranformation_rule(transformer_option):
     return callback
 
 
+def _use_same_pad_mode(input_size, filter_size, out_size, stride, dilation, padding):
+    for i in range(2):
+        output_size = (input_size[i] + stride[i] - 1) // stride[i]
+        if out_size[i] != output_size:
+            return False
+        effective_filter_size = (filter_size[i] - 1) * dilation[i] + 1
+        padding_needed = max(
+            0, (out_size[i] - 1) * stride[i] + effective_filter_size - input_size[i],
+        )
+        padding_before = padding_needed // 2
+        padding_after = padding_needed - padding_needed // 2
+        if padding_after != padding_before or padding_before != padding[i]:
+            return False
+    return True
+
+
 def cal_pad_mode(tm_opr):
-    out_shape = tm_opr.out_tensors[0].shape
-    inp_shape = tm_opr.inp_tensors[0].shape
-    if out_shape[2:] == inp_shape[2:]:
+    assert isinstance(tm_opr.out_tensors[0].axis_order, NCHWFormat)
+    assert isinstance(tm_opr.inp_tensors[1].axis_order, (OIHWFormat, IOHWFormat))
+    kernel_shape = tm_opr.inp_tensors[1].shape[2:]
+    out_shape = tm_opr.out_tensors[0].shape[2:]
+    inp_shape = tm_opr.inp_tensors[0].shape[2:]
+    stride = (
+        tm_opr.stride if isinstance(tm_opr.stride, Sequence) else (tm_opr.stride,) * 2
+    )
+    padding = (
+        tm_opr.padding
+        if isinstance(tm_opr.padding, Sequence)
+        else (tm_opr.padding,) * 2
+    )
+    dilation = (
+        tm_opr.dilation
+        if isinstance(tm_opr.dilation, Sequence)
+        else (tm_opr.dilation,) * 2
+    )
+
+    assert (
+        len(inp_shape)
+        == len(out_shape)
+        == len(stride)
+        == len(padding)
+        == len(dilation)
+        == 2
+    )
+
+    if _use_same_pad_mode(
+        inp_shape, kernel_shape, out_shape, stride, dilation, padding
+    ):
         return "SAME"
     else:
         return "VALID"
