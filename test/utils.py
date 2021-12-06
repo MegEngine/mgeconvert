@@ -290,6 +290,7 @@ class ElemwiseOpr(M.Module):
             x = a + mge.tensor(np.float32(10))
             y = a + mge.tensor(self.data1)
             z = x + y
+            return z
         # sub
         elif self.mode == "sub":
             x = a - mge.tensor(np.float32(10))

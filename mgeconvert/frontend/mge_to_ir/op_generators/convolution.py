@@ -12,6 +12,7 @@ from ....converter_ir.ir_op import (
     ConvolutionBackwardFilterOpr,
     Deconv2dOpr,
     MaxPool2dOpr,
+    AdaptiveAvgPool2dOpr,
 )
 from ....converter_ir.ir_tensor import AxisOrder
 from ..mge_utils import get_shape
@@ -118,6 +119,17 @@ class GenPool2dOpr(OpGenBase):
         self.kernel_shape = [self.params["window_h"], self.params["window_w"]]
 
         self.op = mode_map[self.mode](self.kernel_shape, self.stride, self.padding)
+        self.add_tensors(mge_opr)
+
+@_register_op("AdaptivePoolingForward")
+class GenAdaptivePool2dOpr(OpGenBase):
+    def __init__(self, mge_opr, irgraph):
+        super().__init__(mge_opr, irgraph)
+        self.data_format = self.params["format"]
+        self.mode = self.params["mode"]
+        self.output_shape = get_shape(mge_opr.outputs[0])
+
+        self.op = AdaptiveAvgPool2dOpr(self.output_shape)
         self.add_tensors(mge_opr)
 
 

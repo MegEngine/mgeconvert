@@ -22,6 +22,7 @@ from ....converter_ir.ir_op import (
     SubOpr,
     TanHOpr,
     TrueDivOpr,
+    HardSwishOpr,
 )
 from .base import OpGenBase, _register_op
 
@@ -51,6 +52,7 @@ mode_opr_map = {
     "tanh": TanHOpr,
     "true_div": TrueDivOpr,
     "fuse_mul_add3": GenFuseMulAdd3Oprs,
+    "h_swish": HardSwishOpr,
 }
 
 

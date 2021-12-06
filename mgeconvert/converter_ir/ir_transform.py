@@ -16,8 +16,10 @@ from megengine import Tensor
 from megengine.functional import sqrt
 
 from ..converter_ir.ir_graph import IRGraph
+from ..frontend.mge_to_ir.mge_utils import get_symvar_value
 from .ir_op import (
     AddOpr,
+    AxisAddRemoveOpr,
     Conv2dOpr,
     ConvRelu2dOpr,
     Deconv2dOpr,
@@ -26,6 +28,7 @@ from .ir_op import (
     FlattenOpr,
     FuseMulAdd3Opr,
     GetSubTensorOpr,
+    GetVarShapeOpr,
     HardSigmoidOpr,
     HardSwishOpr,
     IdentityOpr,
@@ -89,6 +92,8 @@ class TransformerRule(Enum):
     FUSE_ACTIVATION = 123
     REMOVE_IDENTITY = 124
     REMOVE_RELU = 125
+    REMOVE_AXISADDREMOVE = 126
+    REMOVE_GETVARSHAPE = 127
 
     REMOVE_UNRELATED_IROP = 130
     ADD_FAKE_HSIGMOID_OUT = 131
@@ -1106,3 +1111,48 @@ def _expand_conv_relu(net: IRGraph):
             t.owner_opr = relu_op
 
         net.replace_op(opr, relu_op)
+
+
+@_register_tranformation_rule(TransformerRule.REMOVE_AXISADDREMOVE)
+def _remove_axisaddremove(net: IRGraph):
+    delete_axisaddremove = []
+    for op_id, opr in zip(net._opr_ids, net.all_oprs):
+        if not isinstance(opr, AxisAddRemoveOpr):
+            continue
+        if isinstance(opr.inp_tensors[0].owner_opr, ReduceOpr):
+            opr.inp_tensors[0].owner_opr.keep_dims = False
+            opr.inp_tensors[0].owner_opr.out_tensors = opr.out_tensors
+        user_ops = net.find_out_oprs(opr)
+        for user in user_ops:
+            idx = user.inp_tensors.index(opr.out_tensors[0])
+            user.inp_tensors[idx] = opr.inp_tensors[0]
+            idx = opr.inp_tensors[0].user_opr.index(opr)
+            opr.inp_tensors[0].user_opr[idx] = user
+        delete_axisaddremove.append(net._opr_ids.index(op_id))
+
+    for delete_idx in delete_axisaddremove[::-1]:
+        net.delete_ops(delete_idx)
+
+@_register_tranformation_rule(TransformerRule.REMOVE_GETVARSHAPE)
+def _remove_getvarshape(net: IRGraph):
+    delete_axisaddremove = []
+    for op_id, opr in zip(net._opr_ids, net.all_oprs):
+        if not isinstance(opr, GetVarShapeOpr):
+            continue
+        if hasattr(opr.out_tensors[0], "_var"):
+            opr.out_tensors[0].np_data = get_symvar_value(opr.out_tensors[0]._var)
+        else:
+            opr.out_tensors[0].np_data = np.array(opr.inp_tensors[0].shape, dtype=np.int64)
+
+        opr.inp_tensors[0].owner_opr.out_tensors = opr.out_tensors
+
+        user_ops = net.find_out_oprs(opr)
+        for user in user_ops:
+            idx = user.inp_tensors.index(opr.out_tensors[0])
+            user.inp_tensors[idx] = opr.inp_tensors[0]
+            idx = opr.inp_tensors[0].user_opr.index(opr)
+            opr.inp_tensors[0].user_opr[idx] = user
+        delete_axisaddremove.append(net._opr_ids.index(op_id))
+
+    for delete_idx in delete_axisaddremove[::-1]:
+        net.delete_ops(delete_idx)
