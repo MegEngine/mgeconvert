@@ -96,10 +96,21 @@ def _test_convert_result(
         assert i.dtype == j.dtype
         atol = max_err if s == 1 else s
         np.testing.assert_allclose(i, j, atol=atol)
-    print("success!")
 
 
-@pytest.mark.parametrize("mode", ["normal", "group", "tflite_transpose"])
+@pytest.mark.parametrize(
+    "mode",
+    [
+        "normal",
+        "group",
+        "tflite_transpose",
+        "same_pad",
+        "same_pad_1",
+        "same_pad_2",
+        "valid_pad",
+        "valid_pad_1",
+    ],
+)
 def test_conv(mode):
     net = ConvOpr(mode)
     data = mge.tensor(np.random.random((1, 3, 224, 224)).astype(np.float32))
