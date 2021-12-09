@@ -189,7 +189,7 @@ def init(subparsers):
             if "tracedmodule" in target:
                 p.add_argument(
                     "--input_data_type",
-                    default="float32",
+                    default=None,
                     type=str,
                     help="input dtype of caffe",
                 )
@@ -299,7 +299,7 @@ def init(subparsers):
 
                 p.add_argument(
                     "--input_data_type",
-                    default="float32",
+                    default=None,
                     type=str,
                     help="input dtype of onnx",
                 )
