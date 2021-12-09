@@ -81,24 +81,25 @@ def _update_inputs_qparams(
     input_scales,
     input_zero_points,
 ):
-    if input_data_type is not None:
-        for i in range(len(traced_module.graph.inputs[1:])):
-            if traced_module.graph.inputs[i + 1].qparams is None:
-                traced_module.graph.inputs[i + 1].qparams = create_qparams()
-            if input_data_type in dtype._builtin_quant_dtypes:
-                q_dtype_meta = dtype._builtin_quant_dtypes[input_data_type]
-            elif isinstance(input_data_type, dtype.QuantDtypeMeta):
-                q_dtype_meta = input_data_type
-            else:
-                assert isinstance(input_data_type, str)
-                dt = np.dtype(input_data_type)
-                assert np.issubdtype(dt, np.integer)
-                v_min = np.iinfo(dt).min
-                v_max = np.iinfo(dt).max
-                q_dtype_meta = dtype.QuantDtypeMeta(
-                    input_data_type, "", input_data_type, v_min, v_max
-                )
-            traced_module.graph.inputs[i + 1].qparams.dtype_meta = q_dtype_meta
+    if input_data_type is None or input_scales is None:
+        return
+    for i in range(len(traced_module.graph.inputs[1:])):
+        if traced_module.graph.inputs[i + 1].qparams is None:
+            traced_module.graph.inputs[i + 1].qparams = create_qparams()
+        if input_data_type in dtype._builtin_quant_dtypes:
+            q_dtype_meta = dtype._builtin_quant_dtypes[input_data_type]
+        elif isinstance(input_data_type, dtype.QuantDtypeMeta):
+            q_dtype_meta = input_data_type
+        else:
+            assert isinstance(input_data_type, str)
+            dt = np.dtype(input_data_type)
+            assert np.issubdtype(dt, np.integer)
+            v_min = np.iinfo(dt).min
+            v_max = np.iinfo(dt).max
+            q_dtype_meta = dtype.QuantDtypeMeta(
+                input_data_type, "", input_data_type, v_min, v_max
+            )
+        traced_module.graph.inputs[i + 1].qparams.dtype_meta = q_dtype_meta
     if input_scales is not None:
         if not isinstance(input_scales, Sequence):
             scales = (input_scales,)
