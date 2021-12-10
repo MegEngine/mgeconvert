@@ -75,7 +75,9 @@ python3 -m pip install git+https://github.com/MegEngine/mgeconvert.git@v0.4.2 --
 > :warning: 如果需要转换``TracedModule``模型，请安装0.5.0以上版本
 
 
-- ``--targets`` 的可选值有 ``caffe``、``onnx``、``tflite``，可选值支持组合传入，比如 ``--targets=caffe,tflite`` 。
+- ``--targets`` 的可选值有 ``caffe``、``onnx``、``tflite`` 和 `all`。
+
+`all` 代表安装全部转换器。可选值支持组合传入，比如 ``--targets=caffe,tflite`` 。
 
 - ``tflite`` 转换器的schema默认使用r2.3版本，支持使用参数 ``tfversion`` 选择tflite schema的版本, 例如：
 
@@ -190,10 +192,10 @@ convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --quantize_file_
 convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --quantize_file_path quant_params.json --param_fake_quant
 ```
 
-- 如果QAT模型中没有QuantStub对输入数据进行量化处理，可以在转换时指定输入数据的量化类型、scale和zero_point量化参数 ：
+- 如果QAT模型中没有QuantStub对输入数据进行量化处理，可以在转换时指定输入数据的量化类型、scale和zero_point量化参数,如果有多个scale、zero point用逗号隔开：
 
 ```bash
-convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --input_data_type quint8 --input_scales 0.125 --input_zero_points 128 --require_quantize
+convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --input_data_type quint8 --input_scales 0.125,0.125 --input_zero_points 128,128 --require_quantize
 ```
 
 #### onnx模型转换
@@ -212,7 +214,7 @@ convert tracedmodule_to_onnx -i tracedmodule.tm -o out.onnx
 
 ### 2. python接口使用
 
-可参考wiki中的例子。
+可参考[wiki](https://github.com/MegEngine/mgeconvert/wiki/Mgeconvert-Python-Api-Doc)中的例子。
 
 ## 常见问题说明
 

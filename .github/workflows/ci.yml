@@ -51,3 +51,15 @@ jobs:
       - uses: actions/checkout@v2
       - name: test tflite
         run: ./ci/pytest_tflite.sh
+
+  test-convert-cmd:
+    runs-on: ubuntu-latest
+    container:
+      image: enginesh233/mgeconvert_ci:v1.1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: test convert cmd
+        run: ./ci/test_convert_cmd.sh
