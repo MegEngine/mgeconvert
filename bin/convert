@@ -196,11 +196,11 @@ def init(subparsers):
                 )
 
                 p.add_argument(
-                    "--input_scales", default=None, nargs="+", type=float,
+                    "--input_scales", default=None, nargs="+", type=str,
                 )
 
                 p.add_argument(
-                    "--input_zero_points", default=None, nargs="+", type=int,
+                    "--input_zero_points", default=None, nargs="+", type=str,
                 )
 
                 p.add_argument(
@@ -313,11 +313,11 @@ def init(subparsers):
                 )
 
                 p.add_argument(
-                    "--input_scales", default=None, nargs="+", type=float,
+                    "--input_scales", default=None, nargs="+", type=str,
                 )
 
                 p.add_argument(
-                    "--input_zero_points", default=None, nargs="+", type=int,
+                    "--input_zero_points", default=None, nargs="+", type=str,
                 )
 
                 p.add_argument(
@@ -347,7 +347,7 @@ def init(subparsers):
         def to_tflite(args):
             if "tracedmodule" in target:
                 mgeconvert.tracedmodule_to_tflite(
-                    mge_fpath=args.input,
+                    args.input,
                     output=args.output,
                     input_data_type=args.input_data_type,
                     input_scales=args.input_scales,
@@ -361,7 +361,7 @@ def init(subparsers):
                 )
             else:
                 mgeconvert.mge_to_tflite(
-                    mge_fpath=args.input,
+                    args.input,
                     output=args.output,
                     graph_name=args.graph_name,
                     mtk=args.mtk,
@@ -395,13 +395,13 @@ def init(subparsers):
                 p.add_argument(
                     "--input_scales",
                     default=None,
-                    type=Union[float, List[float]],
+                    type=str,
                     help="the scale of input data used for quantize model input",
                 )
                 p.add_argument(
                     "--input_zero_points",
                     default=None,
-                    type=Union[int, List[int]],
+                    type=str,
                     help="the zero point of input data used for quantize model input",
                 )
                 p.add_argument(

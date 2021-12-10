@@ -101,12 +101,32 @@ def _update_inputs_qparams(
             )
         traced_module.graph.inputs[i + 1].qparams.dtype_meta = q_dtype_meta
     if input_scales is not None:
+        if isinstance(input_scales, str):
+            str_scales = input_scales.split(",")
+            input_scales = []
+            try:
+                for s in str_scales:
+                    input_scales.append(float(s))
+            except:
+                raise ValueError(
+                    "input scales({}) do not in correct format.".format(str_scales)
+                )
         if not isinstance(input_scales, Sequence):
             input_scales = (input_scales,)
         for i in range(len(traced_module.graph.inputs[1:])):
             scale = input_scales[i] if i < len(input_scales) else input_scales[-1]
             traced_module.graph.inputs[i + 1].qparams.scale = Tensor(float(scale))
     if input_zero_points is not None:
+        if isinstance(input_zero_points, str):
+            str_zp = input_zero_points.split(",")
+            input_zero_points = []
+            try:
+                for zp in str_zp:
+                    input_zero_points.append(float(zp))
+            except:
+                raise ValueError(
+                    "input zero points({}) do not in correct format.".format(str_zp)
+                )
         if not isinstance(input_zero_points, Sequence):
             input_zero_points = (input_zero_points,)
         for i in range(len(traced_module.graph.inputs[1:])):
