@@ -102,15 +102,19 @@ def _update_inputs_qparams(
         traced_module.graph.inputs[i + 1].qparams.dtype_meta = q_dtype_meta
     if input_scales is not None:
         if not isinstance(input_scales, Sequence):
-            scales = (input_scales,)
+            input_scales = (input_scales,)
         for i in range(len(traced_module.graph.inputs[1:])):
-            scale = scales[i] if i < len(scales) else scales[-1]
+            scale = input_scales[i] if i < len(input_scales) else input_scales[-1]
             traced_module.graph.inputs[i + 1].qparams.scale = Tensor(float(scale))
     if input_zero_points is not None:
         if not isinstance(input_zero_points, Sequence):
-            zero_points = (input_zero_points,)
+            input_zero_points = (input_zero_points,)
         for i in range(len(traced_module.graph.inputs[1:])):
-            zero_point = zero_points[i] if i < len(zero_points) else zero_points[-1]
+            zero_point = (
+                input_zero_points[i]
+                if i < len(input_zero_points)
+                else input_zero_points[-1]
+            )
             traced_module.graph.inputs[i + 1].qparams.zero_point = Tensor(
                 int(zero_point)
             )

@@ -31,6 +31,7 @@ from .ir_op import (
     HardSwishOpr,
     IdentityOpr,
     LeakyReluOpr,
+    LinearOpr,
     MulOpr,
     OpBase,
     PadOpr,
@@ -62,6 +63,7 @@ class TransformerRule(Enum):
     CONV_ADD_ZERO_BIAS = 103
     FUSE_FOR_CONV_BIAS = 103.1
     FUSE_CONV_BN = 104
+    FUSE_LINEAR_BN = 104.1
     DECONV_ADD_ZERO_BIAS = 105
     # DEPTHWISE_CONV_RESHAPE_WEIGHT requirs RESHAPE_BIAS_TO_1DIM
     DEPTHWISE_CONV_RESHAPE_WEIGHT = 106
@@ -1016,6 +1018,21 @@ def fold_conv_bn(
     return w_fold, b_fold
 
 
+def fold_linear_bn(linear_weight, linear_bias, gamma, beta, bn_mean, bn_var, eps):
+    linear_bias = linear_bias.reshape(1, -1)
+    gamma = gamma.reshape(1, -1)
+    beta = beta.reshape(1, -1)
+    bn_mean = bn_mean.reshape(1, -1)
+    bn_var = bn_var.reshape(1, -1)
+    # bn_istd = 1 / bn_std
+    bn_istd = 1.0 / sqrt(bn_var + eps)  # type: ignore[attr-defined]
+    # w_fold = gamma / bn_std * W
+    scale_factor = gamma * bn_istd
+    w_fold = linear_weight * scale_factor.reshape(-1, 1)
+    b_fold = beta + gamma * (linear_bias - bn_mean) * bn_istd
+    return w_fold, b_fold
+
+
 @_register_tranformation_rule(TransformerRule.FUSE_CONV_BN)
 def _fuse_conv_bn(net: IRGraph):
     for opr in net.all_oprs:
@@ -1094,6 +1111,106 @@ def _fuse_conv_bn(net: IRGraph):
             # delete bn opr
             conv_op.out_tensors[0] = opr.out_tensors[-1]
             conv_op.out_tensors[0].owner_opr = conv_op
+            index = net._opr_ids.index(id(opr))
+            net.delete_ops(index)
+
+
+@_register_tranformation_rule(TransformerRule.FUSE_LINEAR_BN)
+def _fuse_linear_bn(net: IRGraph):
+    for opr in net.all_oprs:
+        if (
+            opr.name == "BatchNormalization"
+            and len(net.find_inp_oprs(opr)) == 1
+            and net.find_inp_oprs(opr)[0].name in ("Linear", "MatMul")
+            and len(net.find_out_oprs(net.find_inp_oprs(opr)[0])) == 1
+            and net.find_out_oprs(net.find_inp_oprs(opr)[0])[0] == opr
+        ):
+            gamma = (
+                Tensor(opr.weight)  # type: ignore[attr-defined]
+                if opr.weight is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[1].np_data)
+            )
+            beta = (
+                Tensor(opr.bias)  # type: ignore[attr-defined]
+                if opr.bias is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[2].np_data)
+            )
+            bn_mean = (
+                Tensor(opr.mean)  # type: ignore[attr-defined]
+                if opr.mean is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[3].np_data)
+            )
+            bn_var = (
+                Tensor(opr.var)  # type: ignore[attr-defined]
+                if opr.var is not None  # type: ignore[attr-defined]
+                else Tensor(opr.inp_tensors[4].np_data)
+            )
+
+            linear_op = net.find_inp_oprs(opr)[0]
+            if not isinstance(linear_op, LinearOpr):
+                if (
+                    linear_op.inp_tensors[0].np_data is not None
+                    or linear_op.inp_tensors[1].np_data is None
+                ):
+                    continue
+                new_opr = LinearOpr(has_bias=True)
+                new_opr.add_inp_tensors(linear_op.inp_tensors[0])
+                new_opr.add_inp_tensors(linear_op.inp_tensors[1])
+                new_opr.transpose_a = linear_op.transpose_a
+                new_opr.transpose_b = linear_op.transpose_b
+
+                new_opr.add_out_tensors(linear_op.out_tensors[0])
+                linear_op.out_tensors[0].owner_opr = new_opr
+                for inp in linear_op.inp_tensors:
+                    inp.user_opr.remove(linear_op)
+                    inp.user_opr.append(new_opr)
+                net.replace_op(linear_op, new_opr)
+                linear_op = new_opr
+                if len(linear_op.inp_tensors[1].shape) != 2:
+                    continue
+
+            if not linear_op.transpose_b:
+                linear_op.transpose_b = True
+                linear_op.inp_tensors[1].np_data = linear_op.inp_tensors[1].np_data.T
+                linear_op.inp_tensors[1].shape = linear_op.inp_tensors[1].np_data.shape
+
+            linear_weight = linear_op.inp_tensors[1].np_data
+            if len(linear_op.inp_tensors) == 2:
+                # add linear bias tensor
+                weight_shape = linear_op.inp_tensors[1].shape
+                bias_shape = weight_shape[0]
+                bias_shape = (1, bias_shape)
+                linear_bias = IRTensor(
+                    name=linear_op.inp_tensors[0].name + "_bias",
+                    shape=bias_shape,
+                    dtype=np.float32,
+                    np_data=np.zeros(bias_shape, dtype=np.float32),
+                    owner_opr=linear_op,
+                )
+                if linear_op.inp_tensors[0].scale and linear_op.inp_tensors[1].scale:
+                    linear_bias.set_qparams(
+                        linear_op.inp_tensors[0].scale * linear_op.inp_tensors[1].scale,
+                        0,
+                    )
+                    linear_bias.q_dtype = "int32"
+                linear_op.inp_tensors.append(linear_bias)
+            linear_bias = linear_op.inp_tensors[2].np_data.reshape(1, -1)
+
+            w_fold, b_fold = fold_linear_bn(
+                linear_weight,
+                linear_bias,
+                gamma,
+                beta,
+                bn_mean,
+                bn_var,
+                opr.eps,  # type: ignore[attr-defined]
+            )
+            linear_op.inp_tensors[1].np_data = w_fold.numpy()
+            linear_op.inp_tensors[2].np_data = b_fold.numpy()
+            linear_op.has_bias = True
+            # delete bn opr
+            linear_op.out_tensors[0] = opr.out_tensors[-1]
+            linear_op.out_tensors[0].owner_opr = linear_op
             index = net._opr_ids.index(id(opr))
             net.delete_ops(index)
 
