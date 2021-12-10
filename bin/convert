@@ -40,7 +40,7 @@ complete_str = """_mgeconvert(){
             return
             ;;
         tracedmodule_to_caffe)
-            words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend  --outspec"
+            words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu  --fuse_bn --convert_backend  --outspec"
             COMPREPLY=( $(compgen -W "$words" -- $word) )
             return
             ;;
@@ -73,7 +73,7 @@ complete_str = """_mgeconvert(){
             subscript=${COMP_WORDS[1]}
             case $subscript in
                 tracedmodule_to_caffe)
-                    words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --convert_backend  --outspec"
+                    words="-i --input -c --prototxt -b --caffemodel --end_point --use_empty_blobs --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --split_conv_relu --fuse_relu --convert_backend  --outspec"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
@@ -135,6 +135,7 @@ def init(subparsers):
                     require_quantize=args.require_quantize,
                     param_fake_quant=args.param_fake_quant,
                     split_conv_relu=args.split_conv_relu,
+                    fuse_bn=args.fuse_bn,
                     quantize_file_path=args.quantize_file_path,
                     convert_backend=args.convert_backend,
                 )
@@ -221,6 +222,13 @@ def init(subparsers):
                     default=False,
                     action="store_true",
                     help="do not use relu for snpe",
+                )
+
+                p.add_argument(
+                    "--fuse_bn",
+                    default=False,
+                    action="store_true",
+                    help="fuse bn",
                 )
 
                 p.add_argument(

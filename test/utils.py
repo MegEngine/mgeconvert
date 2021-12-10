@@ -135,6 +135,34 @@ class LinearOpr(M.Module):
         return x
 
 
+class LinearBnOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((10, 100)).astype(np.float32)
+        self.linear = M.Linear(100, 200, bias=False)
+        self.bn = M.BatchNorm1d(200)
+
+    def forward(self, x):
+        x = self.linear(x)
+        x = self.bn(x)
+        return x
+
+
+class MatrixMulBnOpr(M.Module):
+    def __init__(self, transpose=False):
+        super().__init__()
+        self.transpose = transpose
+        self.data = np.random.random((10, 100)).astype(np.float32)
+        weight = np.random.random((200, 100) if transpose else (100, 200))
+        self.linear_weight = mge.Tensor(weight)
+        self.bn = M.BatchNorm1d(200)
+
+    def forward(self, x):
+        x = F.matmul(x, self.linear_weight, transpose_b=self.transpose)
+        x = self.bn(x)
+        return x
+
+
 class PoolOpr(M.Module):
     def __init__(self, mode):
         super().__init__()

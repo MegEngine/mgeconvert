@@ -18,7 +18,9 @@ from test.utils import (
     ElemwiseOpr,
     FConcatOpr,
     FlattenOpr,
+    LinearBnOpr,
     LinearOpr,
+    MatrixMulBnOpr,
     PoolOpr,
     ReduceOpr,
     RepeatOpr,
@@ -54,6 +56,7 @@ def _test_convert_result(
     require_quantize=False,
     param_fake_quant=False,
     split_conv_relu=False,
+    fuse_bn=False,
     input_name="x",
 ):
     tracedmodule_to_caffe(
@@ -66,6 +69,7 @@ def _test_convert_result(
         require_quantize=require_quantize,
         param_fake_quant=param_fake_quant,
         split_conv_relu=split_conv_relu,
+        fuse_bn=fuse_bn,
     )
 
     caffe_net = caffe.Net(tmp_file + ".txt", tmp_file + ".caffemodel", caffe.TEST)
@@ -128,6 +132,25 @@ def test_linear():
     net = LinearOpr()
     tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(net.data, tm_module, mge_result, max_error)
+
+
+def test_linear_bn():
+    net = LinearBnOpr()
+    for _ in range(10):
+        net(mge.tensor(net.data)).numpy()
+    net.eval()
+    tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, tm_module, mge_result, 1e-4, fuse_bn=True)
+
+
+@pytest.mark.parametrize("mode", [True, False])
+def test_matmul_bn(mode):
+    net = MatrixMulBnOpr(mode)
+    for _ in range(10):
+        net(mge.tensor(net.data)).numpy()
+    net.eval()
+    tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, tm_module, mge_result, 1e-4, fuse_bn=True)
 
 
 def test_squeeze():

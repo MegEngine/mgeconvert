@@ -32,6 +32,7 @@ def tracedmodule_to_caffe(
     require_quantize=False,
     param_fake_quant=False,
     split_conv_relu=False,
+    fuse_bn=False,
     quantize_file_path="quant_params.json",
     convert_backend: BackEnd = BackEnd.CAFFE,
 ):
@@ -68,6 +69,12 @@ def tracedmodule_to_caffe(
         TransformerRule.ADD_FAKE_HSIGMOID_OUT,
         TransformerRule.EXPAND_CONVRELU,
     ]
+    if fuse_bn:
+        transformer_options += [
+            TransformerRule.FUSE_LINEAR_BN,
+            TransformerRule.FUSE_CONV_BN,
+        ]
+
     if split_conv_relu:
         transformer_options += [TransformerRule.REMOVE_RELU]
     transformer = IRTransform(transformer_options)

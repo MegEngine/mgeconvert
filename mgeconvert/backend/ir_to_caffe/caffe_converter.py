@@ -229,14 +229,14 @@ class CaffeConverter:
             layers = _reorder_outputs(self)
             self.layers = layers
         except ReorderError as e:
-            logger.error(str(e))
-            logger.error(
+            logger.warning(str(e))
+            logger.warning(
                 "Can not keep the same order with original network, "
                 "ignore reorder error and fallback to unordered caffe network."
             )
-            header = ["megskull output varnode", "caffe blob name"]
+            header = ["megengine output tensor", "caffe blob name"]
             outputs = []
             for var in self.net.graph_outputs:
                 blob = self.get_blob_name(var)
-                outputs.append([var, blob])
+                outputs.append([var.name, blob])
             logger.info(tabulate(outputs, header))
