@@ -17,13 +17,12 @@ fi
 
 TMP_DIR="/tmp/mgeconvert/flatbuffers"
 
-if [[ "$FLATC_VERSION" != "flatc version 1.12.0" || "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
+if [[ ! -L "$HOME/.local/lib/libflatbuffers.so" || "$FLATC_VERSION" != "flatc version 1.12.0" || "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
     rm -rf $TMP_DIR
     git clone https://github.com/google/flatbuffers.git -b v1.12.0 $TMP_DIR
 fi
 
-if [[ "$FLATC_VERSION" != "flatc version 1.12.0" ]]; then
-    python3 -m pip uninstall flatbuffers -y
+if [[ ! -L "$HOME/.local/lib/libflatbuffers.so" || "$FLATC_VERSION" != "flatc version 1.12.0" ]]; then
     rm -rf $HOME/.local/bin/flatc
     rm -rf $HOME/.local/lib/libflatbuffers*
     # build flatbuffers
@@ -69,4 +68,4 @@ PYTHON_STDLIB=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['stdli
 
 g++ fbconverter.cc --std=c++14 -fPIC --shared -I$HOME/.local/include -I${PYBIND11_HEADER} -I${PYTHON_INCLUDE} -L${PYTHON_STDLIB} -L$HOME/.local/lib  -lflatbuffers -o fbconverter.so
 
-rm -r /tmp/mgeconvert
+rm -rf /tmp/mgeconvert
