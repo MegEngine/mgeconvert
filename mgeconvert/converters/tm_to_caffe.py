@@ -75,6 +75,11 @@ def tracedmodule_to_caffe(
             TransformerRule.FUSE_CONV_BN,
         ]
 
+    if convert_backend == BackEnd.NNIE:
+        transformer_options.extend(
+            [TransformerRule.REMOVE_FLATTEN_BEFORE_LINEAR,]
+        )
+
     if split_conv_relu:
         transformer_options += [TransformerRule.REMOVE_RELU]
     transformer = IRTransform(transformer_options)
