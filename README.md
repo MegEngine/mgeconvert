@@ -85,6 +85,12 @@ python3 -m pip install git+https://github.com/MegEngine/mgeconvert.git@v0.4.2 --
 --install-option="--targets=tflite --tfversion=r2.4"
 ```
 
+`tflite`转换器依赖的 `libflatbuffers.so`位于 `$HOME/.local/lib`下，使用前需要执行：
+
+```bash
+export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+```
+
 ### 源代码安装
 
 安装选项说明同上，以 caffe 为例，下面的命令将安装0.4.2版本的caffe转换器：
@@ -229,6 +235,17 @@ error removing /home/user/.local/lib/python3.6/site-packages/mgeconvert-0.5.0-py
 
 ```bash
 sudo pip3 uninstall mgeconvert
+```
+
+2. 使用`tflite`转换器时`fbconverter.so`出现 `undefined symbol`错误：
+
+```
+ImportError: /home//lib/python3.6/site-packages/mgeconvert/backend/ir_to_tflite/pyflexbuffers/fbconverter.so: undefined symbol: _ZN11flatbuffers13ClassicLocale9instance_E
+```
+这是链接的`libflatbuffers.so`版本和依赖版本不一致导致的问题，执行以下命令使用`mgeconvert`编译的`libflatbuffers.so` ：
+
+```bash
+export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
 ```
 
 ## 算子支持列表
