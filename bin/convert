@@ -123,6 +123,18 @@ def init(subparsers):
                 "tracedmodule_to_caffe": mgeconvert.tracedmodule_to_caffe,
                 "mge_to_caffe": mgeconvert.mge_to_caffe,
             }
+            convert_backend_map = {
+                "caffe": 1,
+                "1":1,
+                "snpe": 2,
+                "2":2,
+                "trt": 3,
+                "3":3,
+                "nnie": 4,
+                "4":4
+            }
+            assert args.convert_backend in convert_backend_map, "unsupported backend"
+            convert_backend = convert_backend_map[args.convert_backend]
             if "tracedmodule" in target:
                 converter_map[target](
                     args.input,
@@ -137,7 +149,7 @@ def init(subparsers):
                     split_conv_relu=args.split_conv_relu,
                     fuse_bn=args.fuse_bn,
                     quantize_file_path=args.quantize_file_path,
-                    convert_backend=args.convert_backend,
+                    convert_backend=convert_backend,
                 )
             else:
                 converter_map[target](
@@ -145,7 +157,7 @@ def init(subparsers):
                     prototxt=args.prototxt,
                     caffemodel=args.caffemodel,
                     outspec=outspec,
-                    convert_backend=args.convert_backend,
+                    convert_backend=convert_backend,
                 )
 
         def caffe_parser(subparsers):
@@ -240,9 +252,9 @@ def init(subparsers):
 
             p.add_argument(
                 "--convert_backend",
-                default=1,
-                type=int,
-                help="backend  1 for caffe, 2 for snpe, 3 for trt",
+                default='1',
+                type=str,
+                help="backend  '1' or 'caffe' for caffe, '2' or 'snpe' for snpe, '3' or 'trt' for trt, '4' or 'nnie' for nnie",
             )
 
         caffe_parser(subparsers)

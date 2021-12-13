@@ -78,6 +78,7 @@ class BackEnd(IntEnum):
     CAFFE = 1
     SNPE = 2
     TRT = 3
+    NNIE = 4
 
 
 def isconst(x):
@@ -118,7 +119,10 @@ def _gen_layer(opr, etype, context, single_input=True, **kwargs):
         if single_input
         else list(map(context.get_blob_name, opr.inp_tensors))
     )
-    top = [context.set_blob_name(opr.out_tensors[0], opr.out_tensors[0].name)]
+    if etype == "ReLU" and context.convert_backend == BackEnd.NNIE:
+        top = [context.set_blob_name(opr.out_tensors[0], opr.inp_tensors[0].name)]
+    else:
+        top = [context.set_blob_name(opr.out_tensors[0], opr.out_tensors[0].name)]
     return cp.LayerParameter(
         bottom=bottom, top=top, name=opr.out_tensors[0].name, type=etype, **kwargs
     )
@@ -949,11 +953,8 @@ def _reshape(opr, context):
         tmp_shape = out_shape + (1,) * d
         bottom = [context.get_blob_name(opr.inp_tensors[0])]
         top = [context.set_blob_name(opr.out_tensors[0], opr.out_tensors[0].name)]
-        if context.convert_backend == BackEnd.CAFFE:
+        if context.convert_backend == BackEnd.NNIE:
             if inp_shape != tmp_shape:
-                logger.warning(
-                    "trt don't support flatten after reshape, but caffe support! please use BackEnd.TRT in tracedmodule_to_caffe by pass convert_backend:BackEnd=BackEnd.TRT"
-                )
                 param = cp.ReshapeParameter(shape=cp.BlobShape(dim=tmp_shape))
                 tmp = [bottom[0] + "tmp"]
                 context.add_layer(
@@ -976,18 +977,17 @@ def _reshape(opr, context):
                     flatten_param=param,
                 )
             )
-        elif context.convert_backend == BackEnd.TRT:
-            if inp_shape != tmp_shape:
-                param = cp.ReshapeParameter(shape=cp.BlobShape(dim=tmp_shape))
-                context.add_layer(
-                    cp.LayerParameter(
-                        bottom=bottom,
-                        top=top,
-                        name=opr.out_tensors[0].name,
-                        type="Reshape",
-                        reshape_param=param,
-                    )
+        else:
+            param = cp.ReshapeParameter(shape=cp.BlobShape(dim=out_shape))
+            context.add_layer(
+                cp.LayerParameter(
+                    bottom=bottom,
+                    top=top,
+                    name=opr.out_tensors[0].name,
+                    type="Reshape",
+                    reshape_param=param,
                 )
+            )
     else:
         logger.warning(
             "NNIE doesn't support this reshape Opr %s, inp_shape %s, out_shape %s, NNIE reshape only support C/H/W, not N!",

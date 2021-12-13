@@ -120,16 +120,21 @@ class ConvRelu2dOpr(M.Module):
 
 
 class LinearOpr(M.Module):
-    def __init__(self):
+    def __init__(self, mode="normal"):
         super().__init__()
         self.data = np.random.random((10, 100)).astype(np.float32)
+        self.data1 = np.random.random((10, 10, 10)).astype(np.float32)
         self.linear = M.Linear(100, 200, bias=False)
         self.linear_bias = M.Linear(200, 200, bias=True)
         self.linear_bias.bias = mge.Parameter(
             np.random.random(self.linear_bias.bias.shape).astype(np.float32)
         )
+        self.mode = mode
 
     def forward(self, x):
+        if self.mode == "flatten":
+            x = F.flatten(x, 1)
+
         x = self.linear(x)
         x = self.linear_bias(x)
         return x

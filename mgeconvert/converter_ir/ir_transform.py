@@ -32,6 +32,7 @@ from .ir_op import (
     IdentityOpr,
     LeakyReluOpr,
     LinearOpr,
+    MatMulOpr,
     MulOpr,
     OpBase,
     PadOpr,
@@ -83,7 +84,8 @@ class TransformerRule(Enum):
     # for TFLite Converter
     SLICE_PARAMS_AS_INPUTS_AND_MAKE_SQUEEZE = 119
     RESIZE_PARAMS_AS_INPUT = 120
-    REPLACE_FLATTEN_TO_RESHAPE = 120.1
+    REMOVE_FLATTEN_BEFORE_LINEAR = 120.1
+    REPLACE_FLATTEN_TO_RESHAPE = 120.2
 
     # remove reshape
     REMOVE_RESHAPE_REALTED_OP = 121
@@ -1273,3 +1275,25 @@ def _expand_conv_relu(net: IRGraph):
             t.owner_opr = relu_op
 
         net.replace_op(opr, relu_op)
+
+
+@_register_tranformation_rule(TransformerRule.REMOVE_FLATTEN_BEFORE_LINEAR)
+def _remove_flatten(net: IRGraph):
+    for opr in net.all_oprs:
+        if not isinstance(opr, MatMulOpr):
+            continue
+        inp_oprs = net.find_inp_oprs(opr)
+
+        if (
+            isinstance(inp_oprs[0], OpBase)
+            and isinstance(inp_oprs[0], FlattenOpr)
+            and len(net.find_out_oprs(inp_oprs[0])) == 1
+            and net.find_out_oprs(inp_oprs[0])[0] == opr
+        ):
+            assert opr.inp_tensors[0].np_data is None
+            flatten_opr = inp_oprs[0]
+            opr.inp_tensors[0] = flatten_opr.inp_tensors[0]
+            flatten_opr.inp_tensors[0].user_opr.remove(flatten_opr)
+            flatten_opr.inp_tensors[0].user_opr.append(opr)
+            idx = net.all_oprs.index(flatten_opr)
+            net.delete_ops(idx)

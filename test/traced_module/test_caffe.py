@@ -58,6 +58,7 @@ def _test_convert_result(
     split_conv_relu=False,
     fuse_bn=False,
     input_name="x",
+    convert_backend=1,
 ):
     tracedmodule_to_caffe(
         trace_module,
@@ -70,6 +71,7 @@ def _test_convert_result(
         param_fake_quant=param_fake_quant,
         split_conv_relu=split_conv_relu,
         fuse_bn=fuse_bn,
+        convert_backend=convert_backend,
     )
 
     caffe_net = caffe.Net(tmp_file + ".txt", tmp_file + ".caffemodel", caffe.TEST)
@@ -132,6 +134,12 @@ def test_linear():
     net = LinearOpr()
     tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(net.data, tm_module, mge_result, max_error)
+
+
+def test_flatten_linear():
+    net = LinearOpr("flatten")
+    tm_module, mge_result = get_traced_module(net, mge.tensor(net.data1))
+    _test_convert_result(net.data1, tm_module, mge_result, max_error, convert_backend=4)
 
 
 def test_linear_bn():
@@ -247,6 +255,13 @@ def test_active(mode):
     net = ActiveOpr(mode)
     tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(net.data, tm_module, mge_result, max_error)
+
+
+@pytest.mark.parametrize("mode", ["relu",])
+def test_active_inplace(mode):
+    net = ActiveOpr(mode)
+    tm_module, mge_result = get_traced_module(net, mge.tensor(net.data))
+    _test_convert_result(net.data, tm_module, mge_result, max_error, convert_backend=4)
 
 
 @pytest.mark.parametrize("mode", ["max", "sum", "mean"])
