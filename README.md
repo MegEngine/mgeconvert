@@ -3,6 +3,7 @@
 适用于 [MegEngine](https://github.com/MegEngine/MegEngine) 的各种转换器, 目前支持的框架有 [Caffe](https://github.com/BVLC/caffe)、[ONNX](https://github.com/onnx/onnx) 和 TFLite。
 
 MgeConvert转换工具位于converters目录下，可直接调用其中的脚本将MegEngine导出的mge/TracedModule模型转换为第三方模型文件。
+目前，MgeConvert 亦支持将 ONNX 模型转换到 mge/TracedModule 模型。
 
 MgeConvert转换器的结构包含前端、中间表示（IR）、后端三个部分：
 1. 前端的部分位于 `frontend` 目录下, 支持 mge 和 traced module 模型格式，可以将 MegEngine 序列化出来的计算图转为IR图结构
@@ -42,7 +43,7 @@ MgeConvert 基于 MegEngine 工作，因此确保您的电脑已经安装 MegEng
 
 2. onnx
 
- - Python packages: protobuf, onnx>=1.7.0, onnxoptimizer
+ - Python packages: protobuf, onnx>=1.7.0, onnx-simplifier
 
 3. tflite
 
@@ -204,11 +205,12 @@ convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --quantize_file_
 convert tracedmodule_to_tflite -i tracedmodule.tm -o out.tflite --input_data_type quint8 --input_scales 0.125,0.125 --input_zero_points 128,128 --require_quantize
 ```
 
-#### onnx模型转换
+#### onnx模型互转
 
 mgeconvert 转 onnx 模型支持 [opset](https://github.com/onnx/onnx/blob/master/docs/Operators.md) 7~12 的转换。
+onnx 转 mge/TracedModule 对各时期的 opset 变更均进行了适配，理论上没有 opset 的限制。
 
-目前只支持float模型转到onnx，转换命令参考：
+目前只支持float模型的互转，转换命令参考：
 
 ```bash
 convert mge_to_onnx -i model.mge -o out.onnx
@@ -216,6 +218,14 @@ convert mge_to_onnx -i model.mge -o out.onnx
 
 ```bash
 convert tracedmodule_to_onnx -i tracedmodule.tm -o out.onnx
+```
+
+```bash
+convert onnx_to_mge -i model.onnx -o out.mge
+```
+
+```bash
+convert onnx_to_tracedmodule -i tracedmodule.onnx -o out.tm
 ```
 
 ### 2. python接口使用
@@ -288,3 +298,27 @@ export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
 | transpose(dimshuffle)    | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | AdaptiveAvgPool2d        | ×<br/>× | ✓<br/>✓ | ✓<br/>✓ |
 | flatten                  | ×<br/>× | ×<br/>× | ✓<br/>✓ |
+
+
+| ONNX                     | tracemodule:rocket:<br/>mge:fire:  |
+|--------------------------|---------|
+| Abs                      | ✓<br/>✓ |
+| AveragePool              | ✓<br/>✓ |
+| Cast                     | ✓<br/>✓ |
+| Conv                     | ✓<br/>✓ |
+| Clip                     | ✓<br/>✓ |
+| Concat                   | ✓<br/>✓ |
+| Dropout                  | ✓<br/>✓ |
+| Flatten                  | ✓<br/>✓ |
+| Gemm                     | ✓<br/>✓ |
+| GlobalAveragePool        | ✓<br/>✓ |
+| GlobalMaxPool            | ✓<br/>✓ |
+| MaxPool                  | ✓<br/>✓ |
+| Mul                      | ✓<br/>✓ |
+| Relu                     | ✓<br/>✓ |
+| Reshape                  | ✓<br/>✓ |
+| Resize                   | ✓<br/>✓ |
+| Sigmoig                  | ✓<br/>✓ |
+| Slice                    | ✓<br/>✓ |
+| Softmax                  | ✓<br/>✓ |
+| Transpose                | ✓<br/>✓ |

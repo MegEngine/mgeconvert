@@ -38,3 +38,6 @@ python3 bin/convert tracedmodule_to_caffe -i qat_model.tm -c out.prototxt -b out
 
 python3 bin/convert tracedmodule_to_onnx -i float_model.tm -o out.onnx
 python3 bin/convert mge_to_onnx -i float_model.mge -o out.onnx
+
+python3 bin/convert onnx_to_tracedmodule -i out.onnx -o out.tm
+python3 bin/convert onnx_to_mge -i out.onnx -o out.mge

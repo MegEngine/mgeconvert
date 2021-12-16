@@ -260,23 +260,25 @@ def init(subparsers):
         caffe_parser(subparsers)
     if "onnx" in target:
 
-        def to_onnx(args):
+        def convert_func(args):
             outspec = None
             if args.end_point is not None:
                 outspec = args.end_point.split(";")
             converter_map = {
                 "tracedmodule_to_onnx": mgeconvert.tracedmodule_to_onnx,
                 "mge_to_onnx": mgeconvert.mge_to_onnx,
+                "onnx_to_tracedmodule": mgeconvert.onnx_to_tracedmodule,
+                "onnx_to_mge": mgeconvert.onnx_to_mge,
             }
 
-            if "tracedmodule" in target:
+            if "tracedmodule_to" in target:
                 converter_map[target](
                     args.input,
                     args.output,
                     graph_name=args.graph_name,
                     opset=args.opset,
                 )
-            else:
+            elif "mge_to" in target:
                 converter_map[target](
                     args.input,
                     args.output,
@@ -284,23 +286,28 @@ def init(subparsers):
                     opset=args.opset,
                     outspec=outspec,
                 )
+            else:
+                converter_map[target](
+                    args.input,
+                    args.output,
+                )
 
         def onnx_parser(subparsers):
             p = subparsers.add_parser(target)
-            p.set_defaults(func=to_onnx)
+            p.set_defaults(func=convert_func)
             p.add_argument(
                 "-i",
                 "--input",
                 required=True,
                 type=str,
-                help="Input megengine dump model file",
+                help="Input megengine dump model file or onnx model",
             )
             p.add_argument(
                 "-o",
                 "--output",
                 required=True,
                 type=str,
-                help="Output onnx .onnx file",
+                help="Output onnx .onnx file or megengine model file(mge c++ model or traced module)",
             )
             p.add_argument(
                 "--opset", default=8, type=int, help="Onnx opset version"
