@@ -33,6 +33,7 @@ from ...converter_ir.ir_op import (
     MulOpr,
     OpBase,
     PadOpr,
+    PixelShuffle,
     PowOpr,
     ReduceOpr,
     ReluOpr,
@@ -56,6 +57,7 @@ from .tflite import (
     CastOptions,
     ConcatenationOptions,
     Conv2DOptions,
+    DepthToSpaceOptions,
     DepthwiseConv2DOptions,
     DivOptions,
     ExpOptions,
@@ -70,6 +72,7 @@ from .tflite import (
     ReshapeOptions,
     ResizeBilinearOptions,
     SoftmaxOptions,
+    SpaceToDepthOptions,
     SqueezeOptions,
     StridedSliceOptions,
     SubOptions,
@@ -571,3 +574,32 @@ def _typecvt(mge_opr, builder):
     )
     options = CastOptions.CastOptionsEnd(builder)
     return BuiltinOperator.CAST, BuiltinOptions.CastOptions, options
+
+
+@_register_op(PixelShuffle)
+def _pixel_shuffle(mge_opr, builder):
+    op_map = {
+        "upsample": BuiltinOperator.DEPTH_TO_SPACE,
+        "downsample": BuiltinOperator.SPACE_TO_DEPTH,
+    }
+    option_map = {
+        "upsample": BuiltinOptions.DepthToSpaceOptions,
+        "downsample": BuiltinOptions.SpaceToDepthOptions,
+    }
+    if mge_opr.mode == "upsample":
+        DepthToSpaceOptions.DepthToSpaceOptionsStart(builder)
+        DepthToSpaceOptions.DepthToSpaceOptionsAddBlockSize(
+            builder, mge_opr.scale_factor
+        )
+        options = DepthToSpaceOptions.DepthToSpaceOptionsEnd(builder)
+    elif mge_opr.mode == "downsample":
+        SpaceToDepthOptions.SpaceToDepthOptionsStart(builder)
+        SpaceToDepthOptions.SpaceToDepthOptionsAddBlockSize(
+            builder, mge_opr.scale_factor
+        )
+        options = SpaceToDepthOptions.SpaceToDepthOptionsEnd(builder)
+    return (
+        op_map[mge_opr.mode],
+        option_map[mge_opr.mode],
+        options,
+    )

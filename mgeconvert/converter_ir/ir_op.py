@@ -301,6 +301,15 @@ class BroadcastOpr(OpBase):
     name = "Broadcast"
 
 
+class PixelShuffle(OpBase):
+    name = "PixelShuffle"
+
+    def __init__(self, scale_factor, mode="downsample"):
+        super().__init__()
+        self.scale_factor = scale_factor
+        self.mode = mode
+
+
 ############################ elemwise ########################
 
 
