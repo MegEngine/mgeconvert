@@ -39,6 +39,10 @@ class _ConvOpr(OpBase):
 class Conv2dOpr(_ConvOpr):
     name = "Conv2d"
 
+    def __init__(self, stride, padding, dilation, groups, auto_pad="NOTSET"):
+        super().__init__(stride, padding, dilation, groups)
+        self.auto_pad = auto_pad
+
 
 class Deconv2dOpr(_ConvOpr):
     name = "Deconv2d"
@@ -75,8 +79,21 @@ class _PoolOpr(OpBase):
 class MaxPool2dOpr(_PoolOpr):
     name = "MaxPool2d"
 
-    def __init__(self, kernel_size, stride, padding):
+    def __init__(
+        self,
+        kernel_size,
+        stride,
+        padding,
+        auto_pad="NOTSET",
+        ceil_mode=0,
+        dilations=None,
+        storage_order=0,
+    ):
         super().__init__(kernel_size, stride, padding)
+        self.auto_pad = auto_pad
+        self.ceil_mode = ceil_mode
+        self.dilations = dilations
+        self.storage_order = storage_order
         self.mode = "MAX"
 
 
@@ -84,10 +101,18 @@ class AvgPool2dOpr(_PoolOpr):
     name = "AvgPool2d"
 
     def __init__(
-        self, kernel_size, stride, padding, mode="AVERAGE_COUNT_EXCLUDE_PADDING"
+        self,
+        kernel_size,
+        stride,
+        padding,
+        mode="AVERAGE_COUNT_EXCLUDE_PADDING",
+        auto_pad="NOTSET",
+        ceil_mode=0,
     ):
         super().__init__(kernel_size, stride, padding)
         self.mode = mode
+        self.auto_pad = auto_pad
+        self.ceil_mode = ceil_mode
 
 
 class PadOpr(OpBase):
@@ -137,12 +162,16 @@ class MatMulOpr(OpBase):
         transpose_b=False,
         compute_mode="default",
         format="default",
+        alpha=1.0,
+        beta=1.0,
     ):
         super().__init__()
         self.transpose_a = transpose_a
         self.transpose_b = transpose_b
         self.compute_mode = compute_mode
         self.format = format
+        self.alpha = alpha
+        self.beta = beta
 
 
 class LinearOpr(MatMulOpr):
@@ -286,6 +315,7 @@ class ResizeOpr(OpBase):
         self.scale_factor = scale_factor
         self.mode = mode
         self.align_corners = align_corners
+        self.extra_param = {}
 
 
 class AxisAddRemoveOpr(OpBase):
@@ -418,3 +448,12 @@ class RepeatOpr(OpBase):
         super().__init__()
         self.repeats = repeats
         self.axis = 0 if axis is None else axis
+
+
+class ClipOpr(OpBase):
+    name = "Clip"
+
+    def __init__(self, upper=float("inf"), lower=float("-inf")):
+        super().__init__()
+        self.upper = upper
+        self.lower = lower

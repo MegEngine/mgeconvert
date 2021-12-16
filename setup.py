@@ -50,6 +50,11 @@ class install(_install):
                 )
                 for i in targets
             ]
+            if "onnx" in targets:
+                init_file.write("from .converters.onnx_to_mge import onnx_to_mge\n")
+                init_file.write(
+                    "from .converters.onnx_to_tm import onnx_to_tracedmodule\n"
+                )
 
         global tfversion
         tfversion = self.tfversion
