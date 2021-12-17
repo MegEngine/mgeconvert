@@ -32,6 +32,7 @@ def tracedmodule_to_tflite(
     graph_name="graph",
     mtk=False,
     outspec=None,
+    remove_relu=False,
 ):
     """
 	Convert traced model to TFLite,
@@ -75,6 +76,8 @@ def tracedmodule_to_tflite(
         # MTK devices only support batch_size 1
         set_platform("mtk")
         transformer_options.append(TransformerRule.DECONV_ADD_ZERO_BIAS,)
+    if remove_relu:
+        transformer_options.append(TransformerRule.REMOVE_TFLITE_RELU,)
 
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)

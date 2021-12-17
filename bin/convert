@@ -93,7 +93,7 @@ complete_str = """_mgeconvert(){
                     return
                     ;;
                 tracedmodule_to_tflite)
-                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec"
+                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec --remove_relu"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
@@ -377,6 +377,7 @@ def init(subparsers):
                     graph_name=args.graph_name,
                     mtk=args.mtk,
                     outspec=args.outspec,
+                    remove_relu=args.remove_relu,
                 )
             else:
                 mgeconvert.mge_to_tflite(
@@ -438,6 +439,11 @@ def init(subparsers):
                     default="quant_params.json",
                     type=str,
                     help="",
+                )
+                p.add_argument(
+                    "--remove_relu",
+                    action="store_false",
+                    help="whether to remove relu operation",
                 )
             p.add_argument(
                 "--graph-name",

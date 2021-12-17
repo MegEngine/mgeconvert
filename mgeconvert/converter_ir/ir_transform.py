@@ -91,9 +91,10 @@ class TransformerRule(Enum):
     REMOVE_RESHAPE_REALTED_OP = 121
     REMOVE_DROPOUT = 122
 
-    FUSE_ACTIVATION = 123
-    REMOVE_IDENTITY = 124
-    REMOVE_RELU = 125
+    REMOVE_IDENTITY = 123
+    REMOVE_RELU = 124
+    REMOVE_TFLITE_RELU = 124.1
+    FUSE_ACTIVATION = 125
 
     REMOVE_UNRELATED_IROP = 130
     ADD_FAKE_HSIGMOID_OUT = 131
@@ -934,6 +935,27 @@ def _remove_relu(net: IRGraph):
             net.graph_outputs[idx] = owner_opr.inp_tensors[0]
 
 
+@_register_tranformation_rule(TransformerRule.REMOVE_TFLITE_RELU)
+def _remove_tflite_relu(net: IRGraph):
+    delete_intended = []
+    for op_id, opr in zip(net._opr_ids, net.all_oprs):
+        if isinstance(opr, ReluOpr):
+            user_ops = net.find_out_oprs(opr)
+            for user in user_ops:
+                idx = user.inp_tensors.index(opr.out_tensors[0])
+                user.inp_tensors[idx] = opr.inp_tensors[0]
+                try:
+                    idx = opr.inp_tensors[0].user_opr.index(opr)
+                    opr.inp_tensors[0].user_opr[idx] = user
+                except:  # pylint: disable=bare-except
+                    opr.inp_tensors[0].user_opr.append(user)
+            delete_intended.append(net._opr_ids.index(op_id))
+        elif isinstance(opr, (Conv2dOpr, Deconv2dOpr)) and opr.activation == "RELU":
+            opr.activation = "IDENTITY"
+    for delete_idx in delete_intended[::-1]:
+        net.delete_ops(delete_idx)
+
+
 visited_tensor = set()  # type: set
 
 
@@ -1228,8 +1250,11 @@ def _remove_identity(net: IRGraph):
         for user in user_ops:
             idx = user.inp_tensors.index(opr.out_tensors[0])
             user.inp_tensors[idx] = opr.inp_tensors[0]
-            idx = opr.inp_tensors[0].user_opr.index(opr)
-            opr.inp_tensors[0].user_opr[idx] = user
+            try:
+                idx = opr.inp_tensors[0].user_opr.index(opr)
+                opr.inp_tensors[0].user_opr[idx] = user
+            except:  # pylint: disable=bare-except
+                opr.inp_tensors[0].user_opr.append(user)
         delete_intended.append(net._opr_ids.index(op_id))
 
     for delete_idx in delete_intended[::-1]:
