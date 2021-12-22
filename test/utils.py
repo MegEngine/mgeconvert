@@ -180,6 +180,17 @@ class PoolOpr(M.Module):
         return getattr(self, self.mode + "pool")(x)
 
 
+class PadOpr(M.Module):
+    def __init__(self):
+        super().__init__()
+        self.data = np.random.random((3, 3, 64, 64)).astype(np.float32)
+        self.pad = M.Pad(((0, 0), (0, 0), (2, 2), (3, 3),))
+
+    def forward(self, x):
+        x = F.nn.pad(self.pad(x), ((0, 0), (0, 0), (2, 2), (3, 3),))
+        return x
+
+
 class BnOpr(M.Module):
     def __init__(self, mode):
         super().__init__()

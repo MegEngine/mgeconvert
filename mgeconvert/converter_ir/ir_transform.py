@@ -95,6 +95,7 @@ class TransformerRule(Enum):
     REMOVE_RELU = 124
     REMOVE_TFLITE_RELU = 124.1
     FUSE_ACTIVATION = 125
+    PAD_WIDTH_AS_INPUT = 126
 
     REMOVE_UNRELATED_IROP = 130
     ADD_FAKE_HSIGMOID_OUT = 131
@@ -218,6 +219,34 @@ def _transpose_pattern_as_input(net):
             axis=None,
         )
         op.add_inp_tensors(perm_tensor)
+
+
+@_register_tranformation_rule(TransformerRule.PAD_WIDTH_AS_INPUT)
+def _pad_width_as_input(net):
+    for op in net.all_oprs:
+        if not isinstance(op, PadOpr):
+            continue
+        if len(op.inp_tensors) > 1:
+            continue
+
+        paddings_shape = np.array(op.pad_width).shape
+        assert (
+            paddings_shape[0]  # pylint:disable=unsubscriptable-object
+            == op.inp_tensors[0].ndim
+        ), "paddings shape[0] should be equal to input's dims "
+        padddings = np.vstack(
+            (op.pad_width[0], op.pad_width[2:4], op.pad_width[1])
+        ).astype(np.int32)
+        pad_tensor = IRTensor(
+            name=op.inp_tensors[0].name + "_paddings",
+            shape=paddings_shape,
+            dtype=np.int32,
+            np_data=padddings,
+            owner_opr=op,
+            q_type=np.int32,
+            axis=None,
+        )
+        op.add_inp_tensors(pad_tensor)
 
 
 @_register_tranformation_rule(TransformerRule.REDUCE_AXIS_AS_INPUT)

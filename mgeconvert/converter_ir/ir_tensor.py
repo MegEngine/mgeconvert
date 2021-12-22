@@ -139,3 +139,6 @@ class IRTensor:
 
         if self.q_dtype is not None:
             self.q_dtype = q_dtype
+
+    def __repr__(self):
+        return self.name
