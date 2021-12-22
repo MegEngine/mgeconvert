@@ -41,7 +41,6 @@ class GenConvBnBase(GenConvBase):
         self.running_var = bn_module.running_var
         self.bn_weight = bn_module.weight
         self.bn_bias = bn_module.bias
-
         self.op = op_cls(self.stride, self.padding, self.dilation, self.groups)
 
         if self.bias is None:

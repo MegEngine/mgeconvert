@@ -9,6 +9,7 @@ from typing import List, Union
 
 import mgeconvert
 
+sys.setrecursionlimit(1000000)
 
 def get_targets(module):
     targets = []

@@ -24,6 +24,7 @@ from ....converter_ir.ir_op import (
     ExpOpr,
     FloorDivOpr,
     FloorOpr,
+    FuseAddReluOpr,
     HardSigmoidOpr,
     HardSwishOpr,
     IdentityOpr,
@@ -239,6 +240,11 @@ class GenIdentityOpr(GenElemwiseOpr):
         super().__init__(expr, irgraph, IdentityOpr)
 
 
+class GenFuseAddReluOpr(GenElemwiseOpr):
+    def __init__(self, expr, irgraph) -> None:
+        super().__init__(expr, irgraph, FuseAddReluOpr)
+
+
 method_opr_map = {
     "add": GenAddOpr,
     "sigmoid": GenSigmoidOpr,
@@ -260,6 +266,7 @@ method_opr_map = {
     "identity": GenIdentityOpr,
     "hswish": GenHardSwishOpr,
     "hsigmoid": GenHardSigmoidOpr,
+    "fuse_add_relu": GenFuseAddReluOpr,
 }
 
 
@@ -267,7 +274,7 @@ method_opr_map = {
 def get_elemwise_op(expr, net):
     assert isinstance(expr, CallMethod)
     module = expr.inputs[0].owner
-    method = module.method
+    method = module.method.lower()
     op_gen = method_opr_map[method](expr, net)
 
     if isinstance(module, QAT.QATModule):

@@ -68,6 +68,7 @@ def tracedmodule_to_caffe(
         TransformerRule.REMOVE_UNRELATED_IROP,
         TransformerRule.ADD_FAKE_HSIGMOID_OUT,
         TransformerRule.EXPAND_CONVRELU,
+        TransformerRule.EXPAND_ADD_RELU,
     ]
     if fuse_bn:
         transformer_options += [
@@ -84,7 +85,6 @@ def tracedmodule_to_caffe(
         transformer_options += [TransformerRule.REMOVE_RELU]
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
-
     quantizer = IRQuantizer(
         require_quantize=require_quantize, param_fake_quant=param_fake_quant
     )
