@@ -409,6 +409,10 @@ class FuseMulAdd3Opr(OpBase):
     name = "FuseMulAdd3"
 
 
+class FuseAddReluOpr(OpBase):
+    name = "FuseAddRelu"
+
+
 ############################# activation ###########################
 
 

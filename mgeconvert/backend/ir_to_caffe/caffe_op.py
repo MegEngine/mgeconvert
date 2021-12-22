@@ -989,12 +989,13 @@ def _reshape(opr, context):
                 )
             )
     else:
-        logger.warning(
-            "NNIE doesn't support this reshape Opr %s, inp_shape %s, out_shape %s, NNIE reshape only support C/H/W, not N!",
-            opr.out_tensors[0].name,
-            inp_shape,
-            out_shape,
-        )
+        if context.convert_backend == BackEnd.NNIE:
+            logger.warning(
+                "NNIE doesn't support this reshape Opr %s, inp_shape %s, out_shape %s, NNIE reshape only support C/H/W, not N!",
+                opr.out_tensors[0].name,
+                inp_shape,
+                out_shape,
+            )
         if out_shape is None:
             out_shape = opr.shape_param
         param = cp.ReshapeParameter(shape=cp.BlobShape(dim=out_shape))

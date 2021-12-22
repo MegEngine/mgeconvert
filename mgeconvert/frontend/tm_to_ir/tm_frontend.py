@@ -12,6 +12,8 @@ from typing import List, Sequence
 import megengine
 from megengine.core._imperative_rt.core2 import Tensor as RawTensor
 from megengine.module.qat import QATModule, QuantStub
+from megengine.module.quant_dequant import DequantStub as FloatDequantStub
+from megengine.module.quant_dequant import QuantStub as FloatQuantStub
 from megengine.traced_module import TracedModule
 from megengine.traced_module.expr import (
     Apply,
@@ -138,6 +140,12 @@ class TM_FrontEnd:
                         out_tensor.q_dtype = qdtype
                         out_tensor.scale = float(scale)
                         out_tensor.zero_point = int(zero_point) if zero_point else None
+                    elif isinstance(m.owner, (FloatQuantStub, FloatDequantStub)):
+                        module = m.owner
+                        inp_tensor = self.tensor_resolver.get_ir_tensor(expr.inputs[1])
+                        self.irgraph.get_tensor(
+                            expr.outputs[0]._id, None, origin_tensor=inp_tensor
+                        )
                     else:
                         self.has_qat = self.has_qat or isinstance(m.owner, QATModule)
                         op_gen_cls = EXPR2OP.get(type(m.owner), None)

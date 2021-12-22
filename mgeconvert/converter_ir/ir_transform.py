@@ -25,6 +25,7 @@ from .ir_op import (
     DropoutOpr,
     ExpOpr,
     FlattenOpr,
+    FuseAddReluOpr,
     FuseMulAdd3Opr,
     GetSubTensorOpr,
     HardSigmoidOpr,
@@ -78,6 +79,7 @@ class TransformerRule(Enum):
     # FUSE_FOR_LEAKY_RELU should happen before EXPAND_MUL_ADD3
     FUSE_FOR_LEAKY_RELU = 113
     EXPAND_MUL_ADD3 = 114
+    EXPAND_ADD_RELU = 114.1
     EXPAND_ADD_SIGMOID = 115  ##
     FUSE_FOR_DECONV_BIAS = 117
     FUSE_FOR_FULLY_CONNECTED = 118  ##
@@ -884,12 +886,13 @@ def _expand_mul_add3(net: IRGraph):
         if not isinstance(op, FuseMulAdd3Opr):
             continue
 
-        last_op = net.find_inp_oprs(op)
-        assert len(last_op) == 1
         mul_out_tensor = IRTensor(
-            name=op.inp_tensors[0].name + "_mul_out",
-            shape=op.inp_tensors[0].shape,
-            dtype=op.inp_tensors[0].dtype,
+            name=op.out_tensors[0].name + "_mul_out",
+            shape=op.out_tensors[0].shape,
+            dtype=op.out_tensors[0].dtype,
+            scale=op.out_tensors[0].scale,
+            zero_point=op.out_tensors[0].zero_point,
+            q_type=op.out_tensors[0].q_dtype,
         )
         new_tensor_id = max(net._tensor_ids) + 1
         net.add_tensor(new_tensor_id, mul_out_tensor)
@@ -906,11 +909,50 @@ def _expand_mul_add3(net: IRGraph):
         add_op.inp_tensors = [mul_out_tensor, op.inp_tensors[2]]
         mul_out_tensor.user_opr.append(add_op)
         add_op.out_tensors = op.out_tensors
-
+        op.out_tensors[0].owner_opr = add_op
         index = net._opr_ids.index(id(op))
         net.delete_ops(index)
         net.add_op(mul_op, index)
         net.add_op(add_op, index + 1)
+
+
+@_register_tranformation_rule(TransformerRule.EXPAND_ADD_RELU)
+def _expand_add_relu(net: IRGraph):
+
+    for op in net.all_oprs:
+        if not isinstance(op, FuseAddReluOpr):
+            continue
+
+        add_out_tensor = IRTensor(
+            name=op.out_tensors[0].name + "_add_out",
+            shape=op.out_tensors[0].shape,
+            dtype=op.out_tensors[0].dtype,
+            scale=op.out_tensors[0].scale,
+            zero_point=op.out_tensors[0].zero_point,
+            q_type=op.out_tensors[0].q_dtype,
+        )
+        new_tensor_id = max(net._tensor_ids) + 1
+        net.add_tensor(new_tensor_id, add_out_tensor)
+
+        add_op = AddOpr()
+        add_out_tensor.owner_opr = add_op
+        add_op.inp_tensors = op.inp_tensors[:2]
+        for o in add_op.inp_tensors:
+            index = o.user_opr.index(op)
+            o.user_opr[index] = add_op
+        add_op.out_tensors = [add_out_tensor]
+
+        relu_op = ReluOpr()
+        relu_op.inp_tensors = [add_out_tensor]
+        add_out_tensor.user_opr.append(relu_op)
+        assert len(op.out_tensors) == 1
+        relu_op.out_tensors = [op.out_tensors[0]]
+        op.out_tensors[0].owner_opr = relu_op
+
+        index = net._opr_ids.index(id(op))
+        net.delete_ops(index)
+        net.add_op(add_op, index)
+        net.add_op(relu_op, index + 1)
 
 
 @_register_tranformation_rule(TransformerRule.REPLACE_FLATTEN_TO_RESHAPE)
