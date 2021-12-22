@@ -93,6 +93,12 @@ class AvgPool2dOpr(_PoolOpr):
 class PadOpr(OpBase):
     name = "Pad"
 
+    def __init__(self, pad_width=None, mode="constant", pad_val=0.0):
+        super().__init__()
+        self.pad_width = pad_width
+        self.mode = mode
+        self.pad_val = pad_val
+
 
 class BatchNormalizationOpr(OpBase):
     name = "BatchNormalization"

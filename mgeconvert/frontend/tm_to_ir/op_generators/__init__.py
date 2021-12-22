@@ -19,6 +19,7 @@ from .elemwise import *
 from .flatten import GenFlattenOpr
 from .getvarshape import GenGetVarShapeOpr
 from .matmul import *
+from .pad import *
 from .pooling import *
 from .reduce import GenReduceOpr
 from .reshape import GenRepeatOpr, GenReshapeOpr

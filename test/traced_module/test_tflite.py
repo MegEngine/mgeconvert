@@ -16,6 +16,7 @@ from test.utils import (
     ElemwiseOpr,
     FConcatOpr,
     LinearOpr,
+    PadOpr,
     PoolOpr,
     ReduceOpr,
     ReshapeOpr,
@@ -195,6 +196,12 @@ def test_pooling(mode):
     traced_module, tm_result = get_traced_module(net, mge.tensor(net.data))
     print(traced_module.flatten().graph)
 
+    _test_convert_result(mge.tensor(net.data), traced_module, tm_result)
+
+
+def test_pad():
+    net = PadOpr()
+    traced_module, tm_result = get_traced_module(net, mge.tensor(net.data))
     _test_convert_result(mge.tensor(net.data), traced_module, tm_result)
 
 
