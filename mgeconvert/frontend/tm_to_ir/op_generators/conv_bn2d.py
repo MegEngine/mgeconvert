@@ -8,6 +8,7 @@
 
 # pylint: disable=import-error,no-name-in-module, super-init-not-called, non-parent-init-called
 
+import megengine.functional as F
 import megengine.module as M
 import megengine.module.qat as QAT
 from megengine.traced_module.expr import CallMethod
@@ -39,6 +40,11 @@ class GenConvBnBase(GenConvBase):
         self.running_var = bn_module.running_var
         self.bn_weight = bn_module.weight
         self.bn_bias = bn_module.bias
+        self.bias = (
+            self.bias
+            if self.bias is not None
+            else F.zeros(expr.inputs[0].owner.conv._infer_bias_shape())
+        )
 
         self.weight, self.bias = fold_conv_bn(
             self.weight,
