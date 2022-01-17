@@ -10,6 +10,8 @@
 
 import megengine.module as M
 import megengine.module.qat as QAT
+import numpy as np
+from megengine.tensor import Parameter
 from megengine.traced_module.expr import CallMethod
 
 from ....converter_ir.ir_op import Conv2dOpr, ConvRelu2dOpr
@@ -40,6 +42,17 @@ class GenConvBnBase(GenConvBase):
         self.bn_weight = bn_module.weight
         self.bn_bias = bn_module.bias
 
+        self.op = op_cls(self.stride, self.padding, self.dilation, self.groups)
+
+        if self.bias is None:
+            weight_shape = self.weight.shape
+            bias_shape = (
+                weight_shape[0]
+                if len(weight_shape) == 4
+                else weight_shape[0] * weight_shape[1]
+            )
+            bias_shape = (1, bias_shape, 1, 1)
+            self.bias = Parameter(np.zeros(bias_shape, dtype=np.float32))
         self.weight, self.bias = fold_conv_bn(
             self.weight,
             self.bias,
@@ -50,7 +63,6 @@ class GenConvBnBase(GenConvBase):
             self.running_var,
             bn_module.eps,
         )
-        self.op = op_cls(self.stride, self.padding, self.dilation, self.groups)
 
 
 @_register_op(M.ConvBn2d)
