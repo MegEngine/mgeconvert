@@ -130,8 +130,11 @@ def test_convrelu():
     _test_convert_result(data, traced_module, tm_result)
 
 
-def test_convbn():
-    net = ConvBn2dOpr()
+@pytest.mark.parametrize(
+    "has_bias", [True, False],
+)
+def test_convbn(has_bias):
+    net = ConvBn2dOpr(has_bias)
     net.eval()
     data = mge.tensor(net.data)
     traced_module, tm_result = get_traced_module(net, data)
@@ -140,8 +143,11 @@ def test_convbn():
     _test_convert_result(data, traced_module, tm_result)
 
 
-def test_convbnrelu():
-    net = ConvBnRelu2dOpr()
+@pytest.mark.parametrize(
+    "has_bias", [True, False],
+)
+def test_convbnrelu(has_bias):
+    net = ConvBnRelu2dOpr(has_bias)
     net.eval()
     data = mge.tensor(net.data)
     traced_module, tm_result = get_traced_module(net, data)

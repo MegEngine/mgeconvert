@@ -205,11 +205,11 @@ class BnOpr(M.Module):
 
 
 class ConvBn2dOpr(M.Module):
-    def __init__(self):
+    def __init__(self, has_bias=True):
         super().__init__()
         self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
         self.convbn = M.ConvBn2d(
-            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1)
+            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1), bias=has_bias
         )
 
     def forward(self, x):
@@ -217,11 +217,11 @@ class ConvBn2dOpr(M.Module):
 
 
 class ConvBnRelu2dOpr(M.Module):
-    def __init__(self):
+    def __init__(self, has_bias=True):
         super().__init__()
         self.data = np.random.random((1, 3, 224, 224)).astype(np.float32)
         self.convbnrelu = M.ConvBnRelu2d(
-            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1)
+            3, 10, 3, stride=(2, 3), dilation=(2, 2), padding=(3, 1), bias=has_bias
         )
 
     def forward(self, x):
