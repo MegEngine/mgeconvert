@@ -1307,7 +1307,7 @@ def _expand_conv_relu(net: IRGraph):
             idx = t.user_opr.index(opr)
             t.user_opr[idx] = conv_op
         conv_out_tensor = IRTensor(
-            name=opr.inp_tensors[0].name + "_conv_out",
+            name=opr.out_tensors[0].name + "_conv_out",
             shape=opr.out_tensors[0].shape,
             dtype=opr.out_tensors[0].dtype,
             scale=opr.out_tensors[0].scale,
