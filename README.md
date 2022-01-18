@@ -313,6 +313,7 @@ export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
 | Gemm                     | ✓<br/>✓ |
 | GlobalAveragePool        | ✓<br/>✓ |
 | GlobalMaxPool            | ✓<br/>✓ |
+| LSTM                     | ✓<br/>✓ |
 | MaxPool                  | ✓<br/>✓ |
 | Mul                      | ✓<br/>✓ |
 | Relu                     | ✓<br/>✓ |

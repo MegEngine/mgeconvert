@@ -15,6 +15,13 @@ from ...converter_ir.ir_graph import IRGraph
 from .onnxproto_resolver import ONNXProtoResolver
 from .op_generators import ONNX2OP
 
+ONNXDTYPE2NUMPY = {
+    "tensor(float)": np.float32,
+    "tensor(int16)": np.int16,
+    "tensor(uint8)": np.uint8,
+    "tensor(int8)": np.int8,
+}
+
 
 class ONNX_FrontEnd:
     def __init__(self, onnx_model_path):
@@ -73,16 +80,9 @@ class ONNX_FrontEnd:
         inputs = []
         inputs_feed = {}
         for node in self.onnx_session.get_inputs():
-            if node.type == "tensor(float)":
-                tensor = np.random.randint(
-                    low=0, high=100, size=node.shape, dtype="int32"
-                ).astype("float32")
-            elif node.type == "tensor(int16)":
-                tensor = np.random.randint(
-                    low=0, high=100, size=node.shape, dtype="int32"
-                ).astype("int16")
-            else:
-                raise RuntimeError(f"No Support for ONNX dtype {node.type}")
+            tensor = np.random.randint(
+                low=0, high=100, size=node.shape, dtype="int32"
+            ).astype(ONNXDTYPE2NUMPY[node.type])
             inputs_feed[node.name] = tensor
             inputs.append(node.name)
 

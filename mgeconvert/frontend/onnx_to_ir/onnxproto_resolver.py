@@ -21,6 +21,7 @@ onnx2np_dtype_mapping = {
     onnx.TensorProto.INT32: np.int32,
     onnx.TensorProto.INT64: np.int64,
     onnx.TensorProto.UINT8: np.uint8,
+    onnx.TensorProto.UINT16: np.uint16,
 }
 
 

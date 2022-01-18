@@ -15,7 +15,7 @@ import numpy as np
 from megengine import jit
 
 from ...converter_ir.ir_quantizer import IRQuantizer
-from .mge_op import ONNX2MGE, PARAMEXTRACT
+from .mge_op import MGE_MODULE_SUPPORT, ONNX2MGE, PARAMEXTRACT
 
 
 def for_each_opr(
@@ -28,6 +28,7 @@ def for_each_opr(
     params,
     quantizer,
     map_ir_tensor_2_mge_tensor,
+    map_op_name_2_mge_module,
 ):
     for (
         opr,
@@ -48,6 +49,7 @@ def for_each_opr(
             input_data,
             opr_outputs,
             map_ir_tensor_2_mge_tensor,
+            map_op_name_2_mge_module,
         )
 
 
@@ -63,6 +65,8 @@ class ONNXModule(M.Module):
         params,
         quantizer,
         map_ir_tensor_2_mge_tensor,
+        arg_names,
+        map_op_name_2_mge_module,
         graph_outputs,
     ):
         super().__init__()
@@ -82,12 +86,14 @@ class ONNXModule(M.Module):
             self.param_fake_quant = quantizer.param_fake_quant
             self.quant_params = quantizer.quant_params
         self.map_ir_tensor_2_mge_tensor = map_ir_tensor_2_mge_tensor
+        self.arg_names = arg_names
+        self.map_op_name_2_mge_module = map_op_name_2_mge_module
         self.graph_outputs = graph_outputs
 
     def forward(self, *args):
-        assert len(args) == len(
-            self.map_ir_tensor_2_mge_tensor
-        ), "Number of inputs mismatch"
+        assert len(args) == len(self.arg_names), "Number of inputs mismatch"
+        for name, data in zip(self.arg_names, args):
+            self.map_ir_tensor_2_mge_tensor[name] = data
 
         if self.has_quantizer:
             quantizer = IRQuantizer(self.require_quantize, self.param_fake_quant)
@@ -105,6 +111,7 @@ class ONNXModule(M.Module):
             self.param,
             quantizer,
             self.map_ir_tensor_2_mge_tensor,
+            self.map_op_name_2_mge_module,
         )
         return [self.map_ir_tensor_2_mge_tensor[name] for name in self.graph_outputs]
 
@@ -114,6 +121,7 @@ class MGEConverter:
         self.ir_graph = ir_graph
         self.quantizer = quantizer
         self.map_ir_tensor_2_mge_tensor = {}  # type: Dict[str, mge.tensor]
+        self.map_op_name_2_mge_module = {}  # type: Dict[str, mge.module]
         self.tm = None
 
         self.arg_names = []  # type: List[str]
@@ -123,7 +131,6 @@ class MGEConverter:
             mge_input = F.zeros(shape=input.shape, dtype=input.dtype)
             self.inp_data.append(mge_input)
             self.arg_names.append(input.name)
-            self.map_ir_tensor_2_mge_tensor[input.name] = mge_input
 
         self.graph_outputs = [o.name for o in ir_graph.graph_outputs]
 
@@ -153,6 +160,15 @@ class MGEConverter:
             ), "MegEngine Cannot supports multiple outputs of one Opr"
             outputs.append([o.name for o in opr.out_tensors])
 
+            # gen module
+            op_cls = MGE_MODULE_SUPPORT.get(type(opr), None)
+            if op_cls is not None:
+                op_cls(opr).mge_module_gen(
+                    [i.name for i in opr.inp_tensors],
+                    [o.name for o in opr.out_tensors],
+                    self.map_op_name_2_mge_module,
+                )
+
         module = ONNXModule(
             all_opr,
             inputs,
@@ -163,6 +179,8 @@ class MGEConverter:
             params,
             self.quantizer,
             self.map_ir_tensor_2_mge_tensor,
+            self.arg_names,
+            self.map_op_name_2_mge_module,
             self.graph_outputs,
         )
 
