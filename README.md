@@ -318,7 +318,7 @@ export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
 | Relu                     | ✓<br/>✓ |
 | Reshape                  | ✓<br/>✓ |
 | Resize                   | ✓<br/>✓ |
-| Sigmoig                  | ✓<br/>✓ |
+| Sigmoid                  | ✓<br/>✓ |
 | Slice                    | ✓<br/>✓ |
 | Softmax                  | ✓<br/>✓ |
 | Transpose                | ✓<br/>✓ |
