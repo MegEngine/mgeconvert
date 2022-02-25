@@ -33,7 +33,7 @@ class TensorNodeResolver:
             if isinstance(inp.expr, Constant):
                 np_data = inp.expr.value.numpy()
             elif isinstance(inp.expr, GetAttr):
-                np_data = getattr(inp.expr.inputs[0].owner, inp.expr.name).numpy()
+                np_data = inp.expr.interpret(inp.expr.inputs[0].owner)[0].numpy()
             else:
                 np_data = None
             name = inp._name
