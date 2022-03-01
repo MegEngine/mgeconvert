@@ -207,6 +207,20 @@ class SoftmaxOpr(OpBase):
         self.beta = beta
 
 
+class ResizeOpr(OpBase):
+    name = "Resize"
+
+    def __init__(
+        self, out_size, scale_factor=None, mode="bilinear", align_corners=None
+    ):
+        super().__init__()
+        self.out_size = out_size
+        self.scale_factor = scale_factor
+        self.mode = mode
+        self.align_corners = align_corners
+        self.extra_param = {}
+
+
 ####################  tensor related ############################
 class FlattenOpr(OpBase):
     name = "Flatten"
@@ -280,6 +294,7 @@ class ReshapeOpr(OpBase):
     def __init__(self, out_shape):
         super().__init__()
         self.out_shape = out_shape
+        self.allowzero = 0
 
 
 class TransposeOpr(OpBase):
@@ -310,18 +325,12 @@ class GetSubTensorOpr(OpBase):
         self.squeeze_axis = squeeze_axis
 
 
-class ResizeOpr(OpBase):
-    name = "Resize"
+class GatherOpr(OpBase):
+    name = "Gather"
 
-    def __init__(
-        self, out_size, scale_factor=None, mode="bilinear", align_corners=None
-    ):
+    def __init__(self, axis):
         super().__init__()
-        self.out_size = out_size
-        self.scale_factor = scale_factor
-        self.mode = mode
-        self.align_corners = align_corners
-        self.extra_param = {}
+        self.axis = axis
 
 
 class AxisAddRemoveOpr(OpBase):

@@ -17,6 +17,7 @@ from .op_generators import ONNX2OP
 
 ONNXDTYPE2NUMPY = {
     "tensor(float)": np.float32,
+    "tensor(uint16)": np.uint16,
     "tensor(int16)": np.int16,
     "tensor(uint8)": np.uint8,
     "tensor(int8)": np.int8,
@@ -34,7 +35,9 @@ class ONNX_FrontEnd:
             print(f"ONNX Model Version : {self.onnx_model.model_version}")
         if self.onnx_model.doc_string:
             print(self.onnx_model.doc_string)
-        print(f"ONNX Model OpSet : {self.onnx_model.opset_import[0].version}")
+
+        self.onnx_opset = self.onnx_model.opset_import[0].version
+        print(f"ONNX Model OpSet : {self.onnx_opset}")
 
         self.ir_graph = IRGraph()
         self.resolver = ONNXProtoResolver(self.onnx_model)
@@ -71,7 +74,9 @@ class ONNX_FrontEnd:
     def add_node(self, node):
         op_gen_cls = ONNX2OP.get(node.op_type, None)
         assert op_gen_cls, f"OP {node.op_type} is not supported"
-        ir_opr = op_gen_cls(node, self.ir_graph, self.resolver).get_opr()
+        ir_opr = op_gen_cls(
+            node, self.ir_graph, self.resolver, self.onnx_opset
+        ).get_opr()
 
         self.ir_graph.add_op(ir_opr)
 
