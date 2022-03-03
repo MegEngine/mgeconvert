@@ -22,15 +22,27 @@ def onnx_to_tracedmodule(onnx_fpath, output="out.mge"):
     """
     seed = int(time.time())
     assert isinstance(onnx_fpath, str), "onnx_fpath must be string"
+    assert isinstance(output, str), "mge_fpath must be string"
+
     front = ONNX_FrontEnd(onnx_fpath)
     ir_graph = front.resolve()
     onnx_res = front.eval(seed)
-    assert isinstance(output, str), "mge_fpath must be string"
+
     converter = MGEConverter(ir_graph)
-    converter.dump_tm_model(output)
     mge_res = converter.eval(seed)
+
+    # check forwarding result
     for onnx_data, mge_data in zip(onnx_res, mge_res):
-        compare = abs(onnx_data - mge_data.numpy()) < 1e-3
-        assert (
-            compare.all()
-        ), f"Forward Result of ONNX and Mge Mismatch {onnx_res}(ONNX) vs {mge_res}(Mge) with model : {onnx_fpath}"
+        if onnx_data.dtype in ["uint8", "int8"]:
+            eps = 1
+        else:
+            eps = 1e-3
+        onnx_data_f = onnx_data.flatten()
+        mge_data_f = mge_data.numpy().flatten()
+        for i, (i1, i2) in enumerate(zip(onnx_data_f, mge_data_f)):
+            assert (
+                abs(float(i1) - float(i2)) <= eps
+            ), f"Forward Result of ONNX and Mge Mismatch {i1}(ONNX) vs {i2}(Mge) with model at index {i}"
+
+    # finally dump traced module
+    converter.dump_tm_model(output)

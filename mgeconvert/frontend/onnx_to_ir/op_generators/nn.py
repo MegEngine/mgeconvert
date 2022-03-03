@@ -5,7 +5,9 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from ....converter_ir.ir_op import AvgPool2dOpr, Conv2dOpr, MaxPool2dOpr
+import numpy as np
+
+from ....converter_ir.ir_op import AvgPool2dOpr, Conv2dOpr, LstmOpr, MaxPool2dOpr
 from .base import OpGenBase, _register_op
 
 
@@ -98,3 +100,187 @@ class GenMaxPoolOpr(OpGenBase):
         if "Global" in node.op_type:
             shape = self.op.inp_tensors[0].shape
             self.op.kernel_size = [shape[2], shape[3]]
+
+
+@_register_op("LSTM")
+class GenLSTMOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver):
+        super().__init__(node, ir_graph, resolver)
+
+        activation_alpha = None
+        activation_beta = None
+        activations = None
+        clip = None
+        direction = "forward"
+        hidden_size = 16
+        input_forget = None
+        output_sequence = None
+        layout = 0
+
+        for attr in node.attribute:
+            if attr.name == "activation_alpha":
+                activation_alpha = attr.floats
+            if attr.name == "activation_beta":
+                activation_beta = attr.floats
+            if attr.name == "activations":
+                activations = attr.strings
+            if attr.name == "clip":
+                clip = attr.f
+            if attr.name == "direction":
+                direction = str(attr.s, "utf-8")
+            if attr.name == "hidden_size":
+                hidden_size = attr.i
+            if attr.name == "input_forget":
+                input_forget = attr.i
+            if attr.name == "output_sequence":
+                output_sequence = attr.i
+            if attr.name == "layout":
+                layout = attr.i
+
+        self.op = LstmOpr(0, 0, 1, False, False, 0, direction, 0)
+        self.add_tensors()
+        inp_tensors = self.op.inp_tensors
+
+        # input_size
+        self.op.input_size = inp_tensors[0].shape[2]
+        self.op.batch_size = inp_tensors[0].shape[1]
+        self.op.hidden_size = hidden_size
+        if layout:
+            self.op.batch_first = True
+
+        W = np.frombuffer(inp_tensors[1].np_data, dtype=inp_tensors[1].dtype).reshape(
+            inp_tensors[1].shape
+        )
+        R = np.frombuffer(inp_tensors[2].np_data, dtype=inp_tensors[2].dtype).reshape(
+            inp_tensors[2].shape
+        )
+        # weight_ih
+        self.op.weight_ih_l.append(
+            np.concatenate(
+                (
+                    W[0][:hidden_size],
+                    W[0][2 * hidden_size : 4 * hidden_size],
+                    W[0][hidden_size : 2 * hidden_size],
+                ),
+                axis=0,
+            )
+        )
+        # weight_hh
+        self.op.weight_hh_l.append(
+            np.concatenate(
+                (
+                    R[0][:hidden_size],
+                    R[0][2 * hidden_size : 4 * hidden_size],
+                    R[0][hidden_size : 2 * hidden_size],
+                ),
+                axis=0,
+            )
+        )
+        # bias_ih and bias_hh
+        try:
+            B = np.frombuffer(
+                inp_tensors[3].np_data, dtype=inp_tensors[3].dtype
+            ).reshape(inp_tensors[3].shape)
+            self.op.bias_ih_l.append(
+                np.concatenate(
+                    (
+                        B[0][:hidden_size],
+                        B[0][2 * hidden_size : 4 * hidden_size],
+                        B[0][hidden_size : 2 * hidden_size],
+                    ),
+                    axis=0,
+                )
+            )
+            self.op.bias_hh_l.append(
+                np.concatenate(
+                    (
+                        B[0][4 * hidden_size : 5 * hidden_size],
+                        B[0][6 * hidden_size : 8 * hidden_size],
+                        B[0][5 * hidden_size : 6 * hidden_size],
+                    ),
+                    axis=0,
+                )
+            )
+            self.op.bias = True
+        except IndexError:
+            pass
+
+        if direction == "bidirectional":
+            self.op.weight_ih_l_reverse.append(
+                np.concatenate(
+                    (
+                        W[1][:hidden_size],
+                        W[1][2 * hidden_size : 4 * hidden_size],
+                        W[1][hidden_size : 2 * hidden_size],
+                    ),
+                    axis=0,
+                )
+            )
+            self.op.weight_hh_l_reverse.append(
+                np.concatenate(
+                    (
+                        R[1][:hidden_size],
+                        R[1][2 * hidden_size : 4 * hidden_size],
+                        R[1][hidden_size : 2 * hidden_size],
+                    ),
+                    axis=0,
+                )
+            )
+            try:
+                self.op.bias_ih_l_reverse.append(
+                    np.concatenate(
+                        (
+                            B[1][:hidden_size],
+                            B[1][2 * hidden_size : 4 * hidden_size],
+                            B[1][hidden_size : 2 * hidden_size],
+                        ),
+                        axis=0,
+                    )
+                )
+                self.op.bias_hh_l_reverse.append(
+                    np.concatenate(
+                        (
+                            B[1][4 * hidden_size : 5 * hidden_size],
+                            B[1][6 * hidden_size : 8 * hidden_size],
+                            B[1][5 * hidden_size : 6 * hidden_size],
+                        ),
+                        axis=0,
+                    )
+                )
+            except NameError:
+                pass
+
+        # sequence_lens
+        try:
+            self.op.sequence_lens = inp_tensors[4].np_data
+        except IndexError:
+            pass
+
+        inps = [inp_tensors[0]]
+
+        # init_h
+        try:
+            inps.append(inp_tensors[5])
+        except IndexError:
+            pass
+
+        # init_c
+        try:
+            inps.append(inp_tensors[6])
+        except IndexError:
+            pass
+
+        # p
+        try:
+            self.op.p = inp_tensors[7].np_data
+        except IndexError:
+            pass
+
+        self.op.activation_alpha = activation_alpha
+        self.op.activation_beta = activation_beta
+        self.op.activations = activations
+        self.op.clip = clip
+        self.op.input_forget = input_forget
+        self.op.output_sequence = output_sequence
+
+        self.op.inp_tensors = inps

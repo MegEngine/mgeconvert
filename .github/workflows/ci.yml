@@ -22,7 +22,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install -r ./ci/requires-style.txt
-        python3 -m pip install -q megengine==1.6.0 -f https://megengine.org.cn/whl/mge.html
+        python3 -m pip install -q megengine==1.8.1 -f https://megengine.org.cn/whl/mge.html
     - name: check format
       run: ./ci/run_format_check.sh
     - name: lint

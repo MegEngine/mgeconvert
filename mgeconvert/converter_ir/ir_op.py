@@ -476,3 +476,46 @@ class ClipOpr(OpBase):
         super().__init__()
         self.upper = upper
         self.lower = lower
+
+
+class LstmOpr(OpBase):
+    name = "LSTM"
+
+    def __init__(
+        self,
+        input_size,
+        hidden_size,
+        num_layers,
+        bias,
+        batch_first,
+        dropout,
+        direction,
+        proj_size,
+    ):
+        super().__init__()
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bias = bias
+        self.batch_first = batch_first
+        self.dropout = dropout
+        self.direction = direction
+        self.proj_size = proj_size
+        self.batch_size = 1
+
+        self.activation_alpha = None
+        self.activation_beta = None
+        self.activations = None
+        self.clip = None
+        self.input_forget = None
+        self.output_sequence = None
+        self.weight_ih_l = []
+        self.weight_ih_l_reverse = []
+        self.weight_hh_l = []
+        self.weight_hh_l_reverse = []
+        self.bias_ih_l = []
+        self.bias_ih_l_reverse = []
+        self.bias_hh_l = []
+        self.bias_hh_l_reverse = []
+        self.sequence_lens = None
+        self.p = None

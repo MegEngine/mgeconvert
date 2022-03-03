@@ -7,6 +7,7 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import megengine as mge
 import megengine.functional as F
+import megengine.module as M
 import numpy as np
 
 from ...converter_ir.ir_op import (
@@ -18,6 +19,7 @@ from ...converter_ir.ir_op import (
     DropoutOpr,
     FlattenOpr,
     GetSubTensorOpr,
+    LstmOpr,
     MatMulOpr,
     MaxPool2dOpr,
     MulOpr,
@@ -29,6 +31,8 @@ from ...converter_ir.ir_op import (
     TransposeOpr,
     TypeCvtOpr,
 )
+
+mge_version = mge.__version__
 
 ONNX2MGE = {}
 
@@ -54,13 +58,16 @@ def _register_param_extract(*oprs):
     return callback
 
 
-def expand(x):
-    if isinstance(x, (list, tuple)):
-        return x
-    elif isinstance(x, int):
-        return x, x
-    else:
-        raise TypeError(f"get error type! got {type(x)} expect int or tuple[int,..]")
+MGE_MODULE_SUPPORT = {}
+
+
+def _register_mge_module(*oprs):
+    def callback(impl):
+        for opr in oprs:
+            MGE_MODULE_SUPPORT[opr] = impl
+        return impl
+
+    return callback
 
 
 def convert_onnx_padding_to_mge_padding(onnx_padding):
@@ -119,8 +126,8 @@ class OperatorBaseConverter:
                 assert (
                     data is not None
                 ), "This Tensor should be parameter given by model"
-                np_data = np.frombuffer(data, dtype=dtype)
-                x = mge.tensor(np_data).reshape(shape)
+                np_data = np.frombuffer(data, dtype=dtype).reshape(shape)
+                x = mge.tensor(np_data)
                 map_ir_tensor_2_mge_tensor[name] = x
                 inp.append(x)
         return inp
@@ -146,8 +153,16 @@ class OperatorBaseConverter:
         """
 
     def convert(
-        self, inputs, dtypes, shapes, datas, outputs, map_ir_tensor_2_mge_tensor
+        self,
+        inputs,
+        dtypes,
+        shapes,
+        datas,
+        outputs,
+        map_ir_tensor_2_mge_tensor,
+        map_op_name_2_mge_module,
     ):
+        # pylint: disable=W0612,W0613
         """
         Do check, find, forward and set with Mge Tensors
         """
@@ -551,3 +566,143 @@ class ResizeConvert(SISOConvert):
                 mode=self.param["mode"],
                 align_corners=self.param["align_corners"],
             )
+
+
+@_register_param_extract(LstmOpr)
+class LstmExtractor:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def extract(self):
+        op = self._opr
+        num_directions = 2 if op.direction == "bidirectional" else 1
+        return {
+            "batch_first": op.batch_first,
+            "batch": op.batch_size,
+            "hidden_size": op.hidden_size,
+            "num_directions": num_directions,
+        }
+
+
+@_register_mge_module(LstmOpr)
+class LstmModuleGen:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def mge_module_gen(self, inputs_name, outputs_name, map_op_name_2_mge_module):
+        op_name = ""
+        for name in inputs_name:
+            op_name = op_name + name
+        for name in outputs_name:
+            op_name = op_name + name
+
+        op = self._opr
+        assert op.activation_alpha == None
+        assert op.activation_beta == None
+        assert op.activations == None
+        assert op.clip == None
+        assert op.input_forget == None
+        assert op.output_sequence == None
+        assert op.sequence_lens == None
+        assert op.p == None
+
+        if mge_version > "1.7.0":
+            module = M.rnn.LSTM(
+                op.input_size,
+                op.hidden_size,
+                op.num_layers,
+                op.bias,
+                op.batch_first,
+                op.dropout,
+                op.direction == "bidirectional",
+                op.proj_size,
+            )
+        else:
+            raise Exception("LSTM is supported begin MegEngine V1.8.0")
+
+        parameter = list(module.named_parameters())
+        assert (
+            parameter[0][0] == "_flatten_weights"
+        ), "First parameter of LSTM should be flatten weights"
+
+        # fill parameters
+        datas = [np.empty((4 * op.hidden_size, 0))]
+        for k in range(op.num_layers):
+            datas.append(op.bias_hh_l[k])
+            datas.append(op.bias_ih_l[k])
+            datas.append(op.weight_hh_l[k])
+            datas.append(op.weight_ih_l[k])
+            datas[0] = np.append(datas[0], op.weight_ih_l[k].flatten())
+            datas[0] = np.append(datas[0], op.weight_hh_l[k].flatten())
+            datas[0] = np.append(datas[0], op.bias_ih_l[k].flatten())
+            datas[0] = np.append(datas[0], op.bias_hh_l[k].flatten())
+            if op.direction == "bidirectional":
+                datas.append(op.bias_hh_l_reverse[k])
+                datas.append(op.bias_ih_l_reverse[k])
+                datas.append(op.weight_hh_l_reverse[k])
+                datas.append(op.weight_ih_l_reverse[k])
+                datas[0] = np.append(datas[0], op.weight_ih_l_reverse[k].flatten())
+                datas[0] = np.append(datas[0], op.weight_hh_l_reverse[k].flatten())
+                datas[0] = np.append(datas[0], op.bias_ih_l_reverse[k].flatten())
+                datas[0] = np.append(datas[0], op.bias_hh_l_reverse[k].flatten())
+
+        for d, p in zip(datas, parameter):
+            p[1]._reset(d)
+
+        map_op_name_2_mge_module[op_name] = module
+
+
+@_register_op(LstmOpr)
+class LstmConvert(OperatorBaseConverter):
+    def convert(
+        self,
+        inputs,
+        dtypes,
+        shapes,
+        datas,
+        outputs,
+        map_ir_tensor_2_mge_tensor,
+        map_op_name_2_mge_module,
+    ):
+        """
+        Do check, find, forward and set with Mge Tensors
+        """
+        self.check_valid(inputs, outputs)
+        inps = self.get_inputs(
+            map_ir_tensor_2_mge_tensor, inputs, dtypes, shapes, datas
+        )
+        op_name = ""
+        for name in inputs:
+            op_name = op_name + name
+        for name in outputs:
+            op_name = op_name + name
+
+        nr_inp = len(inps)
+        if nr_inp == 1:
+            x, _ = map_op_name_2_mge_module[op_name](inps[0])
+        else:
+            assert nr_inp == 3, "LSTM Opr's inps should be 1 or 3"
+            x, _ = map_op_name_2_mge_module[op_name](inps[0], hx=[inps[1], inps[2]])
+
+        if self.param["batch_first"]:
+            target_shape = [
+                self.param["batch"],
+                -1,
+                self.param["num_directions"],
+                self.param["hidden_size"],
+            ]
+            pattern = [1, 2, 0, 3]
+        else:
+            target_shape = [
+                -1,
+                self.param["batch"],
+                self.param["num_directions"],
+                self.param["hidden_size"],
+            ]
+            pattern = [0, 2, 1, 3]
+
+        x = F.reshape(x, target_shape)
+        x = F.transpose(x, pattern)
+
+        self.set_outputs(map_ir_tensor_2_mge_tensor, x, outputs)
+        return x
