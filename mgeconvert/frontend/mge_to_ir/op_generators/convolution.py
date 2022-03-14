@@ -43,11 +43,11 @@ class GenConv2dOpr(OpGenBase):
         self.op.add_inp_tensors(
             self.resolver.get_ir_tensor(mge_opr.inputs[0], user_opr=self.op)
         )
-        self.op.add_inp_tensors(
-            self.resolver.get_ir_tensor(
-                mge_opr.inputs[1], user_opr=self.op, axis_order=AxisOrder.OIHW
-            )
+        weight_tensor = self.resolver.get_ir_tensor(
+            mge_opr.inputs[1], user_opr=self.op, axis_order=AxisOrder.OIHW
         )
+        weight_tensor.axis_order = AxisOrder.OIHW
+        self.op.add_inp_tensors(weight_tensor)
         if len(mge_opr.inputs) > 2:
             self.op.add_inp_tensors(
                 self.resolver.get_ir_tensor(mge_opr.inputs[2], user_opr=self.op)
@@ -90,11 +90,11 @@ class GenDeconv2dOpr(OpGenBase):
         self.op.add_inp_tensors(
             self.resolver.get_ir_tensor(mge_opr.inputs[1], user_opr=self.op)
         )
-        self.op.add_inp_tensors(
-            self.resolver.get_ir_tensor(
-                mge_opr.inputs[0], user_opr=self.op, axis_order=AxisOrder.IOHW
-            )
+        weight_tensor = self.resolver.get_ir_tensor(
+            mge_opr.inputs[0], user_opr=self.op, axis_order=AxisOrder.IOHW
         )
+        weight_tensor.axis_order = AxisOrder.IOHW
+        self.op.add_inp_tensors(weight_tensor)
         if len(mge_opr.inputs) > 2:
             self.op.add_inp_tensors(
                 self.resolver.get_ir_tensor(mge_opr.inputs[2], user_opr=self.op)
