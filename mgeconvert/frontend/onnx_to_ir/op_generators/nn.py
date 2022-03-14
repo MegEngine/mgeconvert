@@ -13,8 +13,10 @@ from .base import OpGenBase, _register_op
 
 @_register_op("Conv")
 class GenConv2dOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
+
         stride = (1, 1)
         padding = (0, 0)
         dilation = (1, 1)
@@ -38,8 +40,10 @@ class GenConv2dOpr(OpGenBase):
 
 @_register_op("MaxPool", "GlobalMaxPool", "GlobalAveragePool", "AveragePool")
 class GenMaxPoolOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
+
         auto_pad = "NOTSET"
         ceil_mode = 0
         strides = (1, 1)
@@ -104,7 +108,8 @@ class GenMaxPoolOpr(OpGenBase):
 
 @_register_op("LSTM")
 class GenLSTMOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         activation_alpha = None

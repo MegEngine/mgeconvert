@@ -18,6 +18,7 @@ from ...converter_ir.ir_op import (
     Conv2dOpr,
     DropoutOpr,
     FlattenOpr,
+    GatherOpr,
     GetSubTensorOpr,
     LstmOpr,
     MatMulOpr,
@@ -211,14 +212,24 @@ class ReluConverter(SISOConvert):
         return F.nn.relu(inps[0])
 
 
+@_register_param_extract(ReshapeOpr)
+class ReshapeExtractor:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def extract(self):
+        if self._opr.allowzero:
+            for dim in self._opr.out_shape:
+                assert dim != 0, "MegEngine did not support empty shape when Reshape"
+        param = {}
+        param["out_shape"] = self._opr.out_shape
+        return param
+
+
 @_register_op(ReshapeOpr)
-class ReshapeConverter(TISOConvert):
+class ReshapeConverter(SISOConvert):
     def forward(self, inps):
-        target_shape = inps[1].numpy()
-        valid_test = [i for i, k in enumerate(target_shape) if k == -1]
-        assert (
-            len(valid_test) <= 1
-        ), "Target Shape of ReShape Opr only contains '-1' Once At Most"
+        target_shape = self.param["out_shape"]
         if 0 not in target_shape and -1 not in target_shape:
             return F.reshape(inps[0], target_shape)
         else:
@@ -238,29 +249,23 @@ class SubTensorExtractor:
         self._opr = opr
 
     def extract(self):
-        param = {}
-        param["begin_param"] = np.array(self._opr.begin_params, dtype=np.int32)
-        param["end_param"] = np.array(self._opr.end_params, dtype=np.int32)
-        param["step_param"] = np.array(self._opr.step_params, dtype=np.int32)
-        param["axis_param"] = np.array(self._opr.axis, dtype=np.int32)
-        return param
-
-
-@_register_op(GetSubTensorOpr)
-class SubtensorConverter(SISOConvert):
-    def forward(self, inps):
-        begin_param = self.param["begin_param"]
-        end_param = self.param["end_param"]
-        step_param = self.param["step_param"]
-        axis_param = self.param["axis_param"]
+        begin_param = self._opr.begin_params
+        end_param = self._opr.end_params
+        step_param = self._opr.step_params
+        axis_param = self._opr.axis
         slices = [slice(None, None, None)] * (max(axis_param) + 1)
         for i, axis in enumerate(axis_param):
             try:
                 slices[axis] = slice(begin_param[i], end_param[i], step_param[i])
             except IndexError:
                 slices[axis] = slice(begin_param[i], end_param[i], None)
-        index = tuple(slices)
-        return inps[0][index]
+        return {"index": tuple(slices)}
+
+
+@_register_op(GetSubTensorOpr)
+class SubtensorConverter(SISOConvert):
+    def forward(self, inps):
+        return inps[0][self.param["index"]]
 
 
 @_register_param_extract(TransposeOpr)
@@ -706,3 +711,28 @@ class LstmConvert(OperatorBaseConverter):
 
         self.set_outputs(map_ir_tensor_2_mge_tensor, x, outputs)
         return x
+
+
+@_register_param_extract(GatherOpr)
+class GatherExtractor:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def extract(self):
+        opr = self._opr
+        return {"axis": opr.axis}
+
+
+@_register_op(GatherOpr)
+class GatherConvert(TISOConvert):
+    def forward(self, inps):
+        indices_shape = inps[1].shape.numpy()
+        if inps[0].ndim == 2 and inps[1].ndim == 1:
+            if self.param["axis"] == 0:
+                x = F.reshape(inps[1], [indices_shape[0], 1])
+            else:
+                assert self.param["axis"] == 1
+                x = F.reshape(inps[1], [1, indices_shape[0]])
+            return F.gather(inps[0], self.param["axis"], x)
+        else:
+            return F.gather(inps[0], self.param["axis"], inps[1])

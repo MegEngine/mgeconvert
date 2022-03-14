@@ -11,7 +11,8 @@ from .base import OpGenBase, _register_op
 
 @_register_op("Mul")
 class GenMulOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         self.op = MulOpr()
@@ -20,7 +21,8 @@ class GenMulOpr(OpGenBase):
 
 @_register_op("Add")
 class GenAddOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         self.op = AddOpr()
@@ -29,7 +31,8 @@ class GenAddOpr(OpGenBase):
 
 @_register_op("Sigmoid")
 class GenSigmoidOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         self.op = SigmoidOpr()
@@ -38,7 +41,8 @@ class GenSigmoidOpr(OpGenBase):
 
 @_register_op("Relu")
 class GenReluOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         self.op = ReluOpr()
@@ -47,7 +51,8 @@ class GenReluOpr(OpGenBase):
 
 @_register_op("Softmax")
 class GenSoftmaxOpr(OpGenBase):
-    def __init__(self, node, ir_graph, resolver):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         assert len(node.attribute) == 1, "Softmax's attribute should be only 1"

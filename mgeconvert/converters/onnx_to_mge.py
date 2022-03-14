@@ -6,6 +6,8 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
+import time
+
 from ..backend.ir_to_mge import MGEConverter
 from ..frontend.onnx_to_ir import ONNX_FrontEnd
 
@@ -19,7 +21,27 @@ def onnx_to_mge(onnx_fpath, output="out.mge"):
     :type output: str
     """
     assert isinstance(onnx_fpath, str), "onnx_fpath must be string"
-    ir_graph = ONNX_FrontEnd(onnx_fpath).resolve()
     assert isinstance(output, str), "mge_fpath must be string"
+
+    seed = int(time.time())
+    front = ONNX_FrontEnd(onnx_fpath)
+    ir_graph = front.resolve()
+    onnx_res = front.eval(seed)
+
     converter = MGEConverter(ir_graph)
+    mge_res = converter.eval(seed)
+
+    # check forwarding result
+    for onnx_data, mge_data in zip(onnx_res, mge_res):
+        if onnx_data.dtype in ["uint8", "int8"]:
+            eps = 1
+        else:
+            eps = 1e-3
+        onnx_data_f = onnx_data.flatten()
+        mge_data_f = mge_data.numpy().flatten()
+        for i, (i1, i2) in enumerate(zip(onnx_data_f, mge_data_f)):
+            assert (
+                abs(float(i1) - float(i2)) <= eps
+            ), f"Forward Result of ONNX and Mge Mismatch {i1}(ONNX) vs {i2}(Mge) with model at index {i}"
+
     converter.dump_mge_model(output)
