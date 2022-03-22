@@ -41,6 +41,7 @@ from .ir_op import (
     ReluOpr,
     ReshapeOpr,
     ResizeOpr,
+    SigmoidOpr,
     SoftmaxOpr,
     SqueezeOpr,
     SubOpr,
@@ -953,6 +954,44 @@ def _expand_add_relu(net: IRGraph):
         net.delete_ops(index)
         net.add_op(add_op, index)
         net.add_op(relu_op, index + 1)
+
+
+@_register_tranformation_rule(TransformerRule.EXPAND_ADD_SIGMOID)
+def _expand_add_sigmoid(net: IRGraph):
+
+    for op in net.all_oprs:
+        if op.activation != "SIGMOID":
+            continue
+        add_out_tensor = IRTensor(
+            name=op.out_tensors[0].name + "_add_out",
+            shape=op.out_tensors[0].shape,
+            dtype=op.out_tensors[0].dtype,
+            scale=op.out_tensors[0].scale,
+            zero_point=op.out_tensors[0].zero_point,
+            q_type=op.out_tensors[0].q_dtype,
+        )
+        new_tensor_id = max(net._tensor_ids) + 1
+        net.add_tensor(new_tensor_id, add_out_tensor)
+
+        add_op = AddOpr()
+        add_out_tensor.owner_opr = add_op
+        add_op.inp_tensors = op.inp_tensors[:2]
+        for o in add_op.inp_tensors:
+            index = o.user_opr.index(op)
+            o.user_opr[index] = add_op
+        add_op.out_tensors = [add_out_tensor]
+
+        sigmoid_op = SigmoidOpr()
+        sigmoid_op.inp_tensors = [add_out_tensor]
+        add_out_tensor.user_opr.append(sigmoid_op)
+        assert len(op.out_tensors) == 1
+        sigmoid_op.out_tensors = [op.out_tensors[0]]
+        op.out_tensors[0].owner_opr = sigmoid_op
+
+        index = net._opr_ids.index(id(op))
+        net.delete_ops(index)
+        net.add_op(add_op, index)
+        net.add_op(sigmoid_op, index + 1)
 
 
 @_register_tranformation_rule(TransformerRule.REPLACE_FLATTEN_TO_RESHAPE)

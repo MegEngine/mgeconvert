@@ -37,6 +37,7 @@ def mge_to_caffe(
     transformer_options = [
         TransformerRule.EXPAND_MUL_ADD3,
         TransformerRule.FUSE_FOR_LEAKY_RELU,
+        TransformerRule.EXPAND_ADD_SIGMOID,
     ]
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)

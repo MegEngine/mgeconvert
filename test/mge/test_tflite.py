@@ -98,6 +98,15 @@ def test_elemwise(mode):
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
+@pytest.mark.parametrize(
+    "mode", ["fuse_add_relu", "fuse_add_sigmoid",],
+)
+def test_expand_transform(mode):
+    net = ElemwiseOpr(mode)
+    mge_result = dump_mge_model(net, net.data, tmp_file, optimize_for_inference=True)
+    _test_convert_result(net.data, tmp_file, mge_result, max_error)
+
+
 def test_concat():
     net = ConcatOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
