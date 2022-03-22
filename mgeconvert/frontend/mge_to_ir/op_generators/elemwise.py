@@ -36,6 +36,7 @@ class GenFuseMulAdd3Oprs(OpGenBase):
 mode_opr_map = {
     "add": AddOpr,
     "fuse_add_relu": AddOpr,
+    "fuse_add_sigmoid": AddOpr,
     "sigmoid": SigmoidOpr,
     "mul": MulOpr,
     "abs": AbsOpr,
@@ -68,4 +69,6 @@ class GenElemwiseOpr(OpGenBase):
             self.op = mode_opr_map[self.mode.lower()]()
             if "RELU" in self.mode:
                 self.op.activation = "RELU"
+            elif "SIGMOID" in self.mode and not isinstance(self.op, SigmoidOpr):
+                self.op.activation = "SIGMOID"
             self.add_tensors(mge_opr)
