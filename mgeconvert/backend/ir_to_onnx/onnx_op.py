@@ -528,6 +528,14 @@ class AxisAddRemoveConverter(OperatorBaseConverter):
             )
             ret = [unsqueeze]
         elif len(remove_axis) > 0:
+            for i, axis in enumerate(remove_axis):
+                cnt = 0
+                # find how many axises is smaller than remove_axis[i] in the front
+                for j in range(i):
+                    if remove_axis[j] <= axis:
+                        cnt += 1
+                remove_axis[i] += cnt
+            remove_axis = sorted(remove_axis)
             squeeze = onnx.helper.make_node(
                 "Squeeze", inputs, outputs, axes=remove_axis
             )

@@ -118,7 +118,7 @@ def test_conv(mode):
     traced_module, tm_result = get_traced_module(net, data)
     print(traced_module.flatten().graph)
 
-    _test_convert_result(data, traced_module, tm_result)
+    _test_convert_result(data, traced_module, tm_result, max_err=1e-5)
 
 
 def test_convrelu():

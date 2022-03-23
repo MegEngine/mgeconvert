@@ -19,6 +19,7 @@ from ....converter_ir.ir_op import (
     PowOpr,
     ReluOpr,
     SigmoidOpr,
+    SoftmaxOpr,
     SubOpr,
     TanHOpr,
     TrueDivOpr,
@@ -72,3 +73,11 @@ class GenElemwiseOpr(OpGenBase):
             elif "SIGMOID" in self.mode and not isinstance(self.op, SigmoidOpr):
                 self.op.activation = "SIGMOID"
             self.add_tensors(mge_opr)
+
+
+@_register_op("SoftmaxForward")
+class GenSoftmaxForwardOpr(OpGenBase):
+    def __init__(self, mge_opr, irgraph):
+        super().__init__(mge_opr, irgraph)
+        self.op = SoftmaxOpr()
+        self.add_tensors(mge_opr)

@@ -403,7 +403,7 @@ class ReduceOpr(M.Module):
     def __init__(self, mode):
         super().__init__()
         self.mode = mode
-        self.data = np.random.random((1, 3, 1000)).astype(np.float32)
+        self.data = np.random.random((1, 3, 10)).astype(np.float32)
 
     def forward(self, a):
         if self.mode == "sum":
