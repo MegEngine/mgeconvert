@@ -52,6 +52,18 @@ from .ir_op import (
 from .ir_tensor import AxisOrder, IRTensor
 
 
+class IRConfig:
+    conv_prefer_same_pad_mode = False
+
+
+def set_conv_pad_perference(flag):
+    IRConfig.conv_prefer_same_pad_mode = flag
+
+
+def get_conv_pad_preference():
+    return IRConfig.conv_prefer_same_pad_mode
+
+
 class TransformerRule(Enum):
     # general rules
     NOPE = 1
@@ -143,18 +155,27 @@ def _register_tranformation_rule(transformer_option):
 
 
 def _use_same_pad_mode(input_size, filter_size, out_size, stride, dilation, padding):
-    for i in range(2):
-        output_size = (input_size[i] + stride[i] - 1) // stride[i]
-        if out_size[i] != output_size:
-            return False
-        effective_filter_size = (filter_size[i] - 1) * dilation[i] + 1
-        padding_needed = max(
-            0, (out_size[i] - 1) * stride[i] + effective_filter_size - input_size[i],
-        )
-        padding_before = padding_needed // 2
-        padding_after = padding_needed - padding_needed // 2
-        if padding_after != padding_before or padding_before != padding[i]:
-            return False
+    if get_conv_pad_preference():
+        # only consider whether the out shape maps
+        for i in range(2):
+            expected_out = input_size[i] // stride[i]
+            if expected_out != out_size[i]:
+                return False
+    else:
+        # besides shape, also consider the padding number for each side, which has higer accuracy
+        for i in range(2):
+            output_size = (input_size[i] + stride[i] - 1) // stride[i]
+            if out_size[i] != output_size:
+                return False
+            effective_filter_size = (filter_size[i] - 1) * dilation[i] + 1
+            padding_needed = max(
+                0,
+                (out_size[i] - 1) * stride[i] + effective_filter_size - input_size[i],
+            )
+            padding_before = padding_needed // 2
+            padding_after = padding_needed - padding_needed // 2
+            if padding_after != padding_before or padding_before != padding[i]:
+                return False
     return True
 
 

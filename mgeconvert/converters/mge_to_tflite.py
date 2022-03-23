@@ -7,7 +7,11 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from ..backend.ir_to_tflite import TFLiteConverter, set_platform
 from ..converter_ir.ir_quantizer import IRQuantizer
-from ..converter_ir.ir_transform import IRTransform, TransformerRule
+from ..converter_ir.ir_transform import (
+    IRTransform,
+    TransformerRule,
+    set_conv_pad_perference,
+)
 from ..frontend.mge_to_ir import MGE_FrontEnd
 
 
@@ -19,6 +23,7 @@ def mge_to_tflite(
     mtk=False,
     disable_nhwc=False,
     outspec=None,
+    prefer_same_pad_mode=False,
 ):
     """
     Convert megengine model to TFLite,
@@ -37,7 +42,7 @@ def mge_to_tflite(
     """
     assert isinstance(mge_fpath, str), "mge_fpath must be string"
     irgraph = MGE_FrontEnd(mge_fpath, outspec=outspec).resolve()
-
+    set_conv_pad_perference(prefer_same_pad_mode)
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,
         TransformerRule.PADDING_FOR_CONV_AND_POOLING,

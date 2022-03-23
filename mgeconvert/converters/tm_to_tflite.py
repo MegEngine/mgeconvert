@@ -14,7 +14,11 @@ from megengine.traced_module import TracedModule
 
 from ..backend.ir_to_tflite import TFLiteConverter, set_platform
 from ..converter_ir.ir_quantizer import IRQuantizer
-from ..converter_ir.ir_transform import IRTransform, TransformerRule
+from ..converter_ir.ir_transform import (
+    IRTransform,
+    TransformerRule,
+    set_conv_pad_perference,
+)
 from ..frontend.tm_to_ir import TM_FrontEnd
 from ..frontend.tm_to_ir.tm_utils import _update_inputs_qparams
 
@@ -33,6 +37,7 @@ def tracedmodule_to_tflite(
     mtk=False,
     outspec=None,
     remove_relu=False,
+    prefer_same_pad_mode=False,
 ):
     """
 	Convert traced model to TFLite,
@@ -56,6 +61,7 @@ def tracedmodule_to_tflite(
     tm_resolver = TM_FrontEnd(traced_module, outspec=outspec)
     irgraph = tm_resolver.resolve()
 
+    set_conv_pad_perference(prefer_same_pad_mode)
     transformer_options = [
         TransformerRule.REDUCE_AXIS_AS_INPUT,
         TransformerRule.PADDING_FOR_CONV_AND_POOLING,
