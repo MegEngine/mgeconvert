@@ -18,8 +18,8 @@ pip3 install scikit-image==0.17.2
 
 python3 test/gen_models.py
 
-python3 bin/convert tracedmodule_to_tflite -i float_model.tm -o out.tflite
-python3 bin/convert mge_to_tflite -i float_model.mge -o out.tflite
+python3 bin/convert tracedmodule_to_tflite -i float_model.tm -o out.tflite --prefer_same_pad_mode
+python3 bin/convert mge_to_tflite -i float_model.mge -o out.tflite --prefer_same_pad_mode
 
 python3 bin/convert tracedmodule_to_tflite -i qat_model.tm -o out.tflite --require_quantize
 python3 bin/convert tracedmodule_to_tflite -i qat_model.tm -o out.tflite --quantize_file_path quant_params.json
