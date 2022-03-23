@@ -730,8 +730,8 @@ def _fuse_softmax(net: IRGraph):
 @_register_tranformation_rule(TransformerRule.FUSE_FOR_LEAKY_RELU)
 def _fuse_leaky_relu(net: IRGraph):
     """
-	Elemwise(ADD) + Elemwise(MUL) + Elemwise(MAX) + Elemwise(MIN) -> LeakyRelu
-	"""
+ Elemwise(ADD) + Elemwise(MUL) + Elemwise(MAX) + Elemwise(MIN) -> LeakyRelu
+ """
     for opr in net.all_oprs:
         if (
             opr.name == "Add"
@@ -741,28 +741,43 @@ def _fuse_leaky_relu(net: IRGraph):
         ):
             max_op = net.find_inp_oprs(opr)[0]
             mul_op = net.find_inp_oprs(opr)[1]
-            if not mul_op.inp_tensors[1].shape == (1,):
+            if not (
+                mul_op.inp_tensors[0].shape == (1,)
+                or mul_op.inp_tensors[1].shape == (1,)
+            ):
                 continue
-            if not max_op.inp_tensors[1].shape == (1,):
+            mul_const_inp_idx = 0 if mul_op.inp_tensors[0].shape == (1,) else 1
+            if not (
+                max_op.inp_tensors[0].shape == (1,)
+                or max_op.inp_tensors[1].shape == (1,)
+            ):
                 continue
+            max_tensor_inp_idx = 1 if max_op.inp_tensors[0].shape == (1,) else 0
             if (
                 len(net.find_inp_oprs(mul_op)) != 1
                 or net.find_inp_oprs(mul_op)[0].name != "Min"
-                or net.find_inp_oprs(mul_op)[0].inp_tensors[1].shape != (1,)
             ):
                 continue
             min_op = net.find_inp_oprs(mul_op)[0]
-            if not min_op.inp_tensors[1].shape == (1,):
+            if not (
+                min_op.inp_tensors[0].shape == (1,)
+                or min_op.inp_tensors[1].shape == (1,)
+            ):
                 continue
-            if max_op.inp_tensors[0] != min_op.inp_tensors[0]:
+            min_const_inp_idx = 0 if min_op.inp_tensors[0].shape == (1,) else 1
+            min_tensor_inp_idx = 1 - min_const_inp_idx
+            if (
+                max_op.inp_tensors[max_tensor_inp_idx]
+                != min_op.inp_tensors[min_tensor_inp_idx]
+            ):
                 continue
             leaky_relu = LeakyReluOpr(
-                negative_slope=float(mul_op.inp_tensors[1].np_data)
+                negative_slope=float(mul_op.inp_tensors[mul_const_inp_idx].np_data)
             )
-            leaky_relu.inp_tensors = [max_op.inp_tensors[0]]
-            max_op.inp_tensors[0].user_opr.remove(max_op)
-            max_op.inp_tensors[0].user_opr.remove(min_op)
-            max_op.inp_tensors[0].user_opr.append(leaky_relu)
+            leaky_relu.inp_tensors = [max_op.inp_tensors[max_tensor_inp_idx]]
+            max_op.inp_tensors[max_tensor_inp_idx].user_opr.remove(max_op)
+            max_op.inp_tensors[max_tensor_inp_idx].user_opr.remove(min_op)
+            max_op.inp_tensors[max_tensor_inp_idx].user_opr.append(leaky_relu)
             leaky_relu.out_tensors = opr.out_tensors
             opr.out_tensors[0].owner_opr = leaky_relu
 
@@ -775,8 +790,8 @@ def _fuse_leaky_relu(net: IRGraph):
 @_register_tranformation_rule(TransformerRule.FUSE_FOR_CONV_BIAS)
 def _fuse_for_conv_bias(net: IRGraph):
     """
-	ConvolutionForward + Elemwise(ADD) -> ConvForwardBias
-	"""
+ ConvolutionForward + Elemwise(ADD) -> ConvForwardBias
+ """
     for opr in net.all_oprs:
         if (
             opr.name == "Conv2d"

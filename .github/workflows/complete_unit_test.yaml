@@ -1,0 +1,29 @@
+name: COMPLETE_UNIT_TEST
+
+on:
+  workflow_dispatch:
+
+jobs:
+  pytest-caffe-and-onnx-complete:
+    runs-on: ubuntu-latest
+    container:
+      image: enginesh233/mgeconvert_ci:v1.1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: test caffe and onnx
+        run: ./ci/pytest_caffe_and_onnx_complete.sh
+
+  pytest-tflite-complete:
+    runs-on: ubuntu-latest
+    container:
+      image: enginesh233/mgeconvert_ci:v1.1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: test tflite
+        run: ./ci/pytest_tflite_complete.sh
