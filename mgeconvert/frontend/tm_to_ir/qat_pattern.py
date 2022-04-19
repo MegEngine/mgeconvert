@@ -36,8 +36,16 @@ def gen_qat_conv_opr(module, conv_function_expr, qat_expr, irgraph, is_deconv=Fa
     )
     assert len(module.graph.inputs) == 2
 
-    act_qparams = module.act_fake_quant.get_qparams()
-    weight_qparams = module.weight_fake_quant.get_qparams()
+    act_qparams = (
+        module.act_fake_quant.get_qparams()
+        if module.act_observer is None
+        else module.act_observer.get_qparams()
+    )
+    weight_qparams = (
+        module.weight_fake_quant.get_qparams()
+        if module.weight_observer is None
+        else module.weight_observer.get_qparams()
+    )
 
     module.stride = conv_function_expr.args[3]
     module.padding = conv_function_expr.args[4]
@@ -54,17 +62,15 @@ def gen_qat_conv_opr(module, conv_function_expr, qat_expr, irgraph, is_deconv=Fa
         else GenDeconv2dOpr(qat_expr, irgraph).get_opr()
     )
 
-    op.inp_tensors[1].scale = float(weight_qparams.scale)
-    op.inp_tensors[1].zero_point = int(weight_qparams.zero_point)
-    op.inp_tensors[1].q_dtype = weight_qparams.dtype_meta.np_dtype_str
+    op.inp_tensors[1].set_qparams_from_mge_qparams(weight_qparams)
     if len(op.inp_tensors) == 3:
-        op.inp_tensors[2].scale = op.inp_tensors[0].scale * op.inp_tensors[1].scale
-        op.inp_tensors[2].q_dtype = "int32"
-        op.inp_tensors[2].zero_point = 0
-
-    op.out_tensors[0].scale = act_qparams.scale.numpy()[0]
-    op.out_tensors[0].zero_point = act_qparams.zero_point.numpy()[0]
-    op.out_tensors[0].q_dtype = act_qparams.dtype_meta.np_dtype_str
+        op.inp_tensors[2].set_qparams(
+            scale=op.inp_tensors[0].scale * op.inp_tensors[1].scale,
+            zero_point=0,
+            q_dtype="int32",
+            np_dtype="int32",
+        )
+    op.out_tensors[0].set_qparams_from_mge_qparams(act_qparams)
     return op
 
 
@@ -77,6 +83,17 @@ pat_conv_bias_relu = (
         F.relu,
         (F.conv2d, InputNode, QATModule._apply_fakequant_with_observer, MatchAnyNode),
     ),
+    MatchAnyNode,
+)
+
+pat_conv_bias_relu_1 = (
+    QATModule._apply_fakequant_with_observer,
+    MatchAnyNode,
+    (
+        F.relu,
+        (F.conv2d, InputNode, QATModule._apply_fakequant_with_observer, MatchAnyNode),
+    ),
+    MatchAnyNode,
     MatchAnyNode,
 )
 
@@ -121,7 +138,7 @@ pat_deconv_bias = (
 )
 
 
-@register_fusion_pattern(pat_conv_bias_relu)
+@register_fusion_pattern([pat_conv_bias_relu, pat_conv_bias_relu_1])
 def qat_conv_bias_relu(module, expr, call_expr, irgraph, _):
     relu = expr.inputs[1].expr
     op = gen_qat_conv_opr(module, relu.inputs[0].expr, call_expr, irgraph)
@@ -174,9 +191,7 @@ def qat_deconv_relu_bias(
     relu_op.out_tensors.append(resolver.resolve(call_expr.outputs[0], relu_op)[0])
     relu_op.out_tensors[0].name += "_relu"
 
-    relu_op.out_tensors[0].q_dtype = relu_op.inp_tensors[0].q_dtype
-    relu_op.out_tensors[0].scale = relu_op.inp_tensors[0].scale
-    relu_op.out_tensors[0].zero_point = relu_op.inp_tensors[0].zero_point
+    relu_op.out_tensors[0].set_qparams_from_other_tensor(relu_op.inp_tensors[0])
     irgraph.all_tensors[
         irgraph._tensor_ids.index(call_expr.outputs[0]._id)
     ] = relu_op.out_tensors[0]
@@ -186,6 +201,7 @@ def qat_deconv_relu_bias(
 
 MATCH_RULE[QATModule._apply_fakequant_with_observer] = [
     pat_conv_bias_relu,
+    pat_conv_bias_relu_1,
     pat_conv_bias,
     pat_deconv_relu,
     pat_conv_relu,

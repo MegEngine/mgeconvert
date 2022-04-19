@@ -75,3 +75,9 @@ class GenGetSubtensorOpr(OpGenBase):
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()
+        if (
+            hasattr(self.op.inp_tensors[0], "scale")
+            and self.op.inp_tensors[0].scale is not None
+        ):
+            for o in self.op.out_tensors:
+                o.set_qparams_from_other_tensor(self.op.inp_tensors[0])

@@ -16,6 +16,7 @@ from test.utils import (
     ElemwiseOpr,
     FConcatOpr,
     LinearOpr,
+    NCHW_SubtensorOpr,
     PadOpr,
     PoolOpr,
     ReduceOpr,
@@ -67,7 +68,10 @@ def _test_convert_result(
             inputs[i] = inp.transpose((0, 2, 3, 1))
 
     tracedmodule_to_tflite(
-        tm, output=tmp_file + ".tflite", require_quantize=require_quantize
+        tm,
+        output=tmp_file + ".tflite",
+        require_quantize=require_quantize,
+        disable_nhwc=not nhwc,
     )
 
     tfl_model = interpreter.Interpreter(model_path=tmp_file + ".tflite")
@@ -236,7 +240,9 @@ def test_squeeze():
     net = SqueezeOpr()
     traced_module, tm_result = get_traced_module(net, mge.tensor(net.data))
     print(traced_module.flatten().graph)
-    _test_convert_result(mge.tensor(net.data), traced_module, tm_result)
+    _test_convert_result(
+        mge.tensor(net.data), traced_module, tm_result, nhwc=False, nhwc2=False
+    )
 
 
 def test_slice():
@@ -244,6 +250,10 @@ def test_slice():
     tm, tm_result = get_traced_module(net, mge.tensor(net.data))
     print(tm.flatten().graph)
     _test_convert_result(mge.tensor(net.data), tm, tm_result, nhwc=False, nhwc2=False)
+    net1 = NCHW_SubtensorOpr()
+    tm, tm_result = get_traced_module(net1, mge.tensor(net1.data))
+    tm_result = mge.tensor(net1.data).transpose(0, 2, 3, 1)[1:3, 4:9, 2, 4:8]
+    _test_convert_result(mge.tensor(net1.data), tm, tm_result, nhwc=True, nhwc2=False)
 
 
 def test_typecvt():

@@ -52,10 +52,10 @@ class GenQConcatOpr(GenConcatOpr):
             self.module = expr.inputs[0].owner
         if hasattr(self.module.act_fake_quant, "get_qparams"):
             self.act_qparams = self.module.act_fake_quant.get_qparams()
-            self.act_dtype = self.act_qparams.dtype_meta.np_dtype_str
+            self.act_dtype = self.act_qparams.dtype_meta.name
         elif hasattr(self.module.act_observer, "get_qparams"):
             self.act_qparams = self.module.act_observer.get_qparams()
-            self.act_dtype = self.act_qparams.dtype_meta.np_dtype_str
+            self.act_dtype = self.act_qparams.dtype_meta.name
         else:
             logger.error("Observer and FakeQuantize do not have get_qparams().")
         super().__init__(expr, irgraph=irgraph)
@@ -63,10 +63,6 @@ class GenQConcatOpr(GenConcatOpr):
     def add_opr_out_tensors(self):
         for o in self.expr.outputs:
             t = self.resolver.get_ir_tensor(o, owner_opr=self.op)
-            t.set_qparams(
-                *self.resolver.resolve_qparams(
-                    self.act_qparams.scale, self.act_qparams.zero_point
-                )
-            )
+            t.set_qparams_from_mge_qparams(self.act_qparams)
             t.q_dtype = self.act_dtype
             self.op.add_out_tensors(t)

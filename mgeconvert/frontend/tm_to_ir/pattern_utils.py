@@ -61,7 +61,11 @@ class InputNode:
 
 def register_pattern(pattern, default_dict: OrderedDict):
     def insert(func):
-        default_dict[pattern] = func
+        if isinstance(pattern, list):
+            for p in pattern:
+                default_dict[p] = func
+        else:
+            default_dict[pattern] = func
         return func
 
     return insert

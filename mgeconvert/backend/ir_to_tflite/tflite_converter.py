@@ -32,6 +32,7 @@ from .tflite_op import (
     get_shape_param,
     mge2tflite_dtype_mapping,
     set_quantization,
+    set_tensor_format,
 )
 
 
@@ -53,6 +54,10 @@ class TFLiteConverter:
 
     def convert(self, disable_nhwc=False):
         # Note the 0th entry of this array must be an empty buffer (sentinel)
+        if disable_nhwc:
+            set_tensor_format("nchw")
+        else:
+            set_tensor_format("nhwc")
         Buffer.BufferStart(self._builder)
         buffer = Buffer.BufferEnd(self._builder)
         self._buffer_list.append(buffer)
@@ -106,7 +111,7 @@ class TFLiteConverter:
                     )
 
                     if isinstance(dtype, QuantDtypeMeta):
-                        dtype = dtype.np_dtype_str
+                        dtype = dtype.name
                 else:
                     dtype = tensor.dtype
 

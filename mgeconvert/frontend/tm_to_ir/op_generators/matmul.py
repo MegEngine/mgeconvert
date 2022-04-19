@@ -87,14 +87,14 @@ class GenQLinearOpr(GenLinearOpr):
         self.module = expr.inputs[0].owner
         if hasattr(self.module.weight_fake_quant, "get_qparams"):
             self.weight_qparams = self.module.weight_fake_quant.get_qparams()
-            self.weight_dtype = self.weight_qparams.dtype_meta.np_dtype_str
+            self.weight_dtype = self.weight_qparams.dtype_meta.name
             self.act_qparams = self.module.act_fake_quant.get_qparams()
-            self.act_dtype = self.act_qparams.dtype_meta.np_dtype_str
+            self.act_dtype = self.act_qparams.dtype_meta.name
         elif hasattr(self.module.weight_observer, "get_qparams"):
             self.weight_qparams = self.module.weight_observer.get_qparams()
-            self.weight_dtype = self.weight_qparams.dtype_meta.np_dtype_str
+            self.weight_dtype = self.weight_qparams.dtype_meta.name
             self.act_qparams = self.module.act_observer.get_qparams()
-            self.act_dtype = self.act_qparams.dtype_meta.np_dtype_str
+            self.act_dtype = self.act_qparams.dtype_meta.name
         else:
             logger.error("Observer and FakeQuantize do not have get_qparams().")
         super().__init__(expr, irgraph)
@@ -103,11 +103,7 @@ class GenQLinearOpr(GenLinearOpr):
         weight_tensor = self.resolver.get_ir_tensor(
             self.weight, user_opr=self.op, name=self.expr.inputs[0]._name + "_weight",
         )
-        weight_tensor.set_qparams(
-            *self.resolver.resolve_qparams(
-                self.weight_qparams.scale, self.weight_qparams.zero_point
-            )
-        )
+        weight_tensor.set_qparams_from_mge_qparams(self.weight_qparams)
         weight_tensor.q_dtype = self.weight_dtype
         self.op.add_inp_tensors(weight_tensor)
         if self.has_bias:
@@ -117,18 +113,15 @@ class GenQLinearOpr(GenLinearOpr):
                 name=self.expr.inputs[0]._name + "_bias",
             )
             bias_tensor.set_qparams(
-                self.op.inp_tensors[0].scale * weight_tensor.scale, 0
+                scale=self.op.inp_tensors[0].scale * weight_tensor.scale,
+                zero_point=0,
+                q_dtype="int32",
+                np_dtype="int32",
             )
-            bias_tensor.q_dtype = "int32"
             self.op.add_inp_tensors(bias_tensor)
 
     def add_opr_out_tensors(self):
         for o in self.expr.outputs:
             out_tensor = self.resolver.get_ir_tensor(o, owner_opr=self.op)
-            out_tensor.set_qparams(
-                *self.resolver.resolve_qparams(
-                    self.act_qparams.scale, self.act_qparams.zero_point
-                )
-            )
-            out_tensor.q_dtype = self.act_dtype
+            out_tensor.set_qparams_from_mge_qparams(self.act_qparams)
             self.op.add_out_tensors(out_tensor)

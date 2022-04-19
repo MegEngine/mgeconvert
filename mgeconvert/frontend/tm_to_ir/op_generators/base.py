@@ -67,7 +67,5 @@ class OpGenBase(ABC):
         for o in self.expr.outputs:
             t = self.resolver.get_ir_tensor(o, owner_opr=self.op)
             if is_qat:
-                t.scale = self.op.inp_tensors[0].scale
-                t.zero_point = self.op.inp_tensors[0].zero_point
-                t.q_dtype = self.op.inp_tensors[0].q_dtype
+                t.set_qparams_from_other_tensor(self.op.inp_tensors[0])
             self.op.add_out_tensors(t)
