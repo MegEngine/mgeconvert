@@ -38,6 +38,7 @@ def tracedmodule_to_tflite(
     outspec=None,
     remove_relu=False,
     prefer_same_pad_mode=False,
+    disable_nhwc=False,
 ):
     """
 	Convert traced model to TFLite,
@@ -78,6 +79,7 @@ def tracedmodule_to_tflite(
         TransformerRule.REMOVE_IDENTITY,
         TransformerRule.REPLACE_FLATTEN_TO_RESHAPE,
         TransformerRule.PAD_WIDTH_AS_INPUT,
+        TransformerRule.EXPAND_ADD_RELU,
     ]
     if mtk:
         # MTK devices only support batch_size 1
@@ -88,7 +90,6 @@ def tracedmodule_to_tflite(
 
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
-
     quantizer = IRQuantizer(
         require_quantize=require_quantize, param_fake_quant=param_fake_quant
     )
@@ -98,7 +99,7 @@ def tracedmodule_to_tflite(
         quantizer.dump_quant_param(path=quantize_file_path)
 
     converter = TFLiteConverter(transformed_irgraph, graph_name, quantizer=quantizer)
-    model = converter.convert()
+    model = converter.convert(disable_nhwc)
 
     assert isinstance(output, str), "tflite_fpath must be string"
     with open(output, "wb") as fout:

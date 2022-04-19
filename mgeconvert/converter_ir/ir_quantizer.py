@@ -35,16 +35,16 @@ class IRQuantizer:
             value = np.round(value)
         if tensor.zero_point:
             value += tensor.zero_point
-        dt = (
-            np.dtype(tensor.q_dtype)
-            if isinstance(tensor.q_dtype, str)
-            else tensor.q_dtype
-        )
-        if np.issubdtype(dt, np.integer):
+        np_dtype = tensor.np_dtype
+        dt = np.dtype(np_dtype)
+        if tensor.qmin is not None and tensor.qmax is not None:
+            v_min = tensor.qmin
+            v_max = tensor.qmax
+        elif np.issubdtype(dt, np.integer):
             v_min = np.iinfo(dt).min
             v_max = np.iinfo(dt).max
-            value = np.clip(value, v_min, v_max)
-        value = value.astype(tensor.q_dtype)
+        value = np.clip(value, v_min, v_max)
+        value = value.astype(np_dtype)
         return value
 
     def save_quantize_params(self, irgraph):
@@ -56,10 +56,20 @@ class IRQuantizer:
             self.parse_quant_info(t)
 
     def parse_quant_info(self, t: IRTensor):
-        dt = np.dtype(t.q_dtype)
+        if t.q_dtype is None:
+            return
+        np_dtype = t.np_dtype
+        try:
+            dt = np.dtype(np_dtype)
+        except TypeError:
+            dt = None
+
         v_max, v_min = None, None
         is_weight = bool(t.np_data is not None)
-        if np.issubdtype(dt, np.integer):
+        if t.qmin is not None and t.qmax is not None:
+            v_min = t.qmin
+            v_max = t.qmax
+        elif dt is not None and np.issubdtype(dt, np.integer):
             v_min = np.iinfo(dt).min
             v_max = np.iinfo(dt).max
         if self.param_fake_quant and is_weight:
@@ -78,11 +88,11 @@ class IRQuantizer:
                 )[0].numpy()
         else:
             param = {
-                "dtype": str(dt),
-                "qmin": str(v_min),
-                "qmax": str(v_max),
-                "scale": str(t.scale),
-                "zero_point": str(t.zero_point),
+                "dtype": np_dtype,
+                "qmin": v_min,
+                "qmax": v_max,
+                "scale": t.scale,
+                "zero_point": t.zero_point,
                 "is_weight": is_weight,
             }
             self.quant_params[t.name] = param

@@ -157,7 +157,13 @@ def test_slice():
     net = SubtensorOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(
-        net.data, tmp_file, mge_result, max_error, nhwc=False, nhwc2=False
+        net.data,
+        tmp_file,
+        mge_result,
+        max_error,
+        nhwc=False,
+        nhwc2=False,
+        disable_nhwc=True,
     )
 
 

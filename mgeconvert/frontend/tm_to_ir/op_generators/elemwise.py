@@ -94,9 +94,7 @@ class GenElemwiseOpr(OpGenBase, ABC):
             and self.op.inp_tensors[0].scale is not None
         ):
             for o in self.op.out_tensors:
-                o.scale = self.op.inp_tensors[0].scale
-                o.zero_point = self.op.inp_tensors[0].zero_point
-                o.dtype = self.op.inp_tensors[0].dtype
+                o.set_qparams_from_other_tensor(self.op.inp_tensors[0])
             # set dtype for const value
 
 
@@ -283,9 +281,6 @@ def get_elemwise_op(expr, net):
         else:
             qparams = module.act_observer.get_qparams()
         for o in op_gen.get_opr().out_tensors:
+            o.set_qparams_from_mge_qparams(qparams)
             o.scale = float(qparams.scale) if method != "sigmoid" else 1 / 256.0
-            o.zero_point = (
-                int(qparams.zero_point) if qparams.zero_point is not None else None
-            )
-            o.q_dtype = qparams.dtype_meta.np_dtype_str
     return op_gen

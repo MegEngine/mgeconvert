@@ -239,7 +239,8 @@ def _transpose_pattern_as_input(net):
             dtype=np.int32,
             np_data=np.array(op.pattern, dtype=np.int32),
             owner_opr=op,
-            q_type=np.int32,
+            q_type="int32",
+            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(perm_tensor)
@@ -267,7 +268,8 @@ def _pad_width_as_input(net):
             dtype=np.int32,
             np_data=padddings,
             owner_opr=op,
-            q_type=np.int32,
+            q_type="int32",
+            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(pad_tensor)
@@ -285,7 +287,8 @@ def _reduce_axis_as_input(net):
             dtype=np.int32,
             np_data=np.array(op.axis, dtype=np.int32),
             owner_opr=op,
-            q_type=np.int32,
+            q_type="int32",
+            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(axis_tensor)
@@ -329,7 +332,8 @@ def _make_padding(net: IRGraph):
                 dtype=np.int32,
                 owner_opr=None,
                 np_data=np_data,
-                q_type=np.int32,
+                q_type="int32",
+                np_dtype="int32",
                 axis=None,
             )
             net.add_tensor(new_tensor_id, pad_in_tensor)
@@ -350,8 +354,7 @@ def _make_padding(net: IRGraph):
                 hasattr(op.inp_tensors[0], "scale")
                 and op.inp_tensors[0].scale is not None
             ):
-                pad_out_tensor.scale = op.inp_tensors[0].scale
-                pad_out_tensor.q_dtype = op.inp_tensors[0].q_dtype
+                pad_out_tensor.set_qparams_from_other_tensor(op.inp_tensors[0])
             if hasattr(op.inp_tensors[0], "zero_point"):
                 pad_out_tensor.zero_point = op.inp_tensors[0].zero_point
             net.add_tensor(new_tensor_id, pad_out_tensor)
@@ -364,7 +367,6 @@ def _make_padding(net: IRGraph):
             pad_out_tensor.owner_opr = pad_opr
             op.inp_tensors = [pad_out_tensor] + op.inp_tensors[1:]
             pad_out_tensor.user_opr.append(op)
-
             index = net._opr_ids.index(id(op))
             insert_intended[index] = (id(pad_opr), pad_opr)
 
@@ -391,7 +393,8 @@ def _deconv_shape_as_input(net: IRGraph):
             dtype=np.int32,
             owner_opr=op,
             np_data=np_data,
-            q_type=np.int32,
+            q_type="int32",
+            np_dtype="int32",
             axis=None,
         )
         shape_tensor = net.get_tensor(new_tensor_id, shape_symvar)
@@ -424,7 +427,8 @@ def _resize_params_as_input(net):
             shape=(2,),
             dtype=np.int32,
             np_data=np.array(op.out_size, dtype=np.int32),
-            q_type=np.int32,
+            q_type="int32",
+            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(out_size_tensor)
@@ -455,9 +459,11 @@ def _add_bias_for_conv(net: IRGraph):
         )
         if op.inp_tensors[0].scale and op.inp_tensors[1].scale:
             bias_tensor.set_qparams(
-                op.inp_tensors[0].scale * op.inp_tensors[1].scale, 0
+                scale=op.inp_tensors[0].scale * op.inp_tensors[1].scale,
+                zero_point=0,
+                q_dtype="int32",
+                np_dtype="int32",
             )
-            bias_tensor.q_dtype = "int32"
         op.inp_tensors.append(bias_tensor)
 
 
@@ -486,9 +492,11 @@ def _add_bias_for_deconv(net: IRGraph):
         )
         if op.inp_tensors[0].scale and op.inp_tensors[1].scale:
             bias_tensor.set_qparams(
-                op.inp_tensors[0].scale * op.inp_tensors[1].scale, 0
+                scale=op.inp_tensors[0].scale * op.inp_tensors[1].scale,
+                zero_point=0,
+                q_dtype="int32",
+                np_dtype="int32",
             )
-            bias_tensor.q_dtype = "int32"
         op.inp_tensors.append(bias_tensor)
 
 
@@ -536,12 +544,15 @@ def _fuse_activation(net):
                 continue
             if prev_op.activation != "IDENTITY" or prev_op.name == "Deconv2d":
                 continue
-
+            prev_output = prev_op.out_tensors
             activation = op.name.upper()
             prev_op.activation = activation
             prev_op.out_tensors = op.out_tensors
             for t in prev_op.out_tensors:
                 t.owner_opr = prev_op
+            if prev_output[0] in net.graph_outputs:
+                out_idx = net.graph_outputs.index(prev_output[0])
+                net.graph_outputs[out_idx] = prev_op.out_tensors[0]
             delete_intended.append(net._opr_ids.index(op_id))
 
     for delete_idx in delete_intended[::-1]:
@@ -567,7 +578,8 @@ def _make_slice_as_inputs(net: IRGraph):
                 dtype=np.int32,
                 np_data=np.array(ret, dtype=np.int32),
                 owner_opr=op,  # pylint:disable=cell-var-from-loop
-                q_type=np.int32,
+                q_type="int32",
+                np_dtype="int32",
             )
             return ret
 
@@ -576,33 +588,34 @@ def _make_slice_as_inputs(net: IRGraph):
         steps_tensor = make_input(op.axis, op.step_params, 1)
 
         op.inp_tensors = [op.inp_tensors[0], begins_tensor, ends_tensor, steps_tensor]
+        if len(op.squeeze_axis) > 0:
+            # TFLite slice do not support squeeze axis, so insert a squeeze opr here.
+            # infer actual output shape of tflite slice
+            desired_out_shape = op.out_tensors[0].shape
+            actual_out_shape = [1] * ndim
+            idx = 0
+            for i in range(ndim):
+                if i in op.squeeze_axis:
+                    continue
+                actual_out_shape[i] = desired_out_shape[idx]
+                idx += 1
+            slice_out_tensor = IRTensor(
+                name=op.name + "fake_output",
+                shape=actual_out_shape,
+                dtype=op.out_tensors[0].dtype,
+                q_type=op.out_tensors[0].q_dtype,
+                np_dtype=op.out_tensors[0].np_dtype,
+                owner_opr=op,
+            )
+            old_out = op.out_tensors
+            op.out_tensors = [slice_out_tensor]
 
-        # TFLite slice do not support squeeze axis, so insert a squeeze opr here.
-        # infer actual output shape of tflite slice
-        desired_out_shape = op.out_tensors[0].shape
-        actual_out_shape = [1] * ndim
-        idx = 0
-        for i in range(ndim):
-            if i in op.squeeze_axis:
-                continue
-            actual_out_shape[i] = desired_out_shape[idx]
-            idx += 1
-        slice_out_tensor = IRTensor(
-            name=op.name + "fake_output",
-            shape=actual_out_shape,
-            dtype=op.out_tensors[0].dtype,
-            q_type=op.out_tensors[0].q_dtype,
-            owner_opr=op,
-        )
-        old_out = op.out_tensors
-        op.out_tensors = [slice_out_tensor]
+            squeeze = SqueezeOpr(op.squeeze_axis)
+            squeeze.inp_tensors = [slice_out_tensor]
+            squeeze.out_tensors = old_out
 
-        squeeze = SqueezeOpr(op.squeeze_axis)
-        squeeze.inp_tensors = [slice_out_tensor]
-        squeeze.out_tensors = old_out
-
-        idx = net._opr_ids.index(id(op)) + 1
-        net.add_op(squeeze, idx)
+            idx = net._opr_ids.index(id(op)) + 1
+            net.add_op(squeeze, idx)
 
 
 # caffe transormer rules
@@ -915,6 +928,7 @@ def _expand_mul_add3(net: IRGraph):
             scale=op.out_tensors[0].scale,
             zero_point=op.out_tensors[0].zero_point,
             q_type=op.out_tensors[0].q_dtype,
+            np_dtype=op.out_tensors[0].np_dtype,
         )
         new_tensor_id = max(net._tensor_ids) + 1
         net.add_tensor(new_tensor_id, mul_out_tensor)
@@ -952,6 +966,7 @@ def _expand_add_relu(net: IRGraph):
             scale=op.out_tensors[0].scale,
             zero_point=op.out_tensors[0].zero_point,
             q_type=op.out_tensors[0].q_dtype,
+            np_dtype=op.out_tensors[0].np_dtype,
         )
         new_tensor_id = max(net._tensor_ids) + 1
         net.add_tensor(new_tensor_id, add_out_tensor)
@@ -990,6 +1005,7 @@ def _expand_add_sigmoid(net: IRGraph):
             scale=op.out_tensors[0].scale,
             zero_point=op.out_tensors[0].zero_point,
             q_type=op.out_tensors[0].q_dtype,
+            np_dtype=op.out_tensors[0].np_dtype,
         )
         new_tensor_id = max(net._tensor_ids) + 1
         net.add_tensor(new_tensor_id, add_out_tensor)
@@ -1125,6 +1141,7 @@ def _add_fake_hsigmoid_tensor(net: IRGraph):
                 opr.inp_tensors[0].shape,
                 opr.inp_tensors[0].dtype,
                 q_type=opr.inp_tensors[0].q_dtype,
+                np_dtype=opr.inp_tensors[0].np_dtype,
                 scale=opr.inp_tensors[0].scale,
                 zero_point=opr.inp_tensors[0].zero_point,
             )
@@ -1134,6 +1151,7 @@ def _add_fake_hsigmoid_tensor(net: IRGraph):
                 opr.inp_tensors[0].shape,
                 opr.inp_tensors[0].dtype,
                 q_type=opr.inp_tensors[0].q_dtype,
+                np_dtype=opr.inp_tensors[0].np_dtype,
                 scale=opr.inp_tensors[0].scale,
                 zero_point=opr.inp_tensors[0].zero_point,
             )
@@ -1144,6 +1162,7 @@ def _add_fake_hsigmoid_tensor(net: IRGraph):
                     opr.inp_tensors[0].shape,
                     opr.inp_tensors[0].dtype,
                     q_type=opr.inp_tensors[0].q_dtype,
+                    np_dtype=opr.inp_tensors[0].np_dtype,
                     scale=opr.inp_tensors[0].scale,
                     zero_point=opr.inp_tensors[0].zero_point,
                 )
@@ -1243,9 +1262,12 @@ def _fuse_conv_bn(net: IRGraph):
                 )
                 if conv_op.inp_tensors[0].scale and conv_op.inp_tensors[1].scale:
                     conv_bias.set_qparams(
-                        conv_op.inp_tensors[0].scale * conv_op.inp_tensors[1].scale, 0
+                        scale=conv_op.inp_tensors[0].scale
+                        * conv_op.inp_tensors[1].scale,
+                        zero_point=0,
+                        q_dtype="int32",
+                        np_dtype="int32",
                     )
-                    conv_bias.q_dtype = "int32"
                 conv_op.inp_tensors.append(conv_bias)
             conv_bias = conv_op.inp_tensors[2].np_data.reshape(1, -1, 1, 1)
 
@@ -1344,10 +1366,12 @@ def _fuse_linear_bn(net: IRGraph):
                 )
                 if linear_op.inp_tensors[0].scale and linear_op.inp_tensors[1].scale:
                     linear_bias.set_qparams(
-                        linear_op.inp_tensors[0].scale * linear_op.inp_tensors[1].scale,
-                        0,
+                        scale=linear_op.inp_tensors[0].scale
+                        * linear_op.inp_tensors[1].scale,
+                        zero_point=0,
+                        q_dtype="int32",
+                        np_dtype="int32",
                     )
-                    linear_bias.q_dtype = "int32"
                 linear_op.inp_tensors.append(linear_bias)
             linear_bias = linear_op.inp_tensors[2].np_data.reshape(1, -1)
 
@@ -1415,6 +1439,7 @@ def _expand_conv_relu(net: IRGraph):
             scale=opr.out_tensors[0].scale,
             zero_point=opr.out_tensors[0].zero_point,
             q_type=opr.out_tensors[0].q_dtype,
+            np_dtype=opr.out_tensors[0].np_dtype,
             owner_opr=conv_op,
         )
         conv_op.out_tensors = [conv_out_tensor]

@@ -245,6 +245,20 @@ class SubtensorOpr(M.Module):
         return x
 
 
+class NCHW_SubtensorOpr(M.Module):
+    def __init__(self, fix_batch=False):
+        super().__init__()
+        self.fix_batch = fix_batch
+        self.data = np.random.random((5, 10, 20, 20)).astype(np.float32)
+
+    def forward(self, x):
+        if self.fix_batch:
+            x = x[:, 4:8, 4:9, 2]
+        else:
+            x = x[1:3, 4:8, 4:9, 2]
+        return x
+
+
 class TransposeOpr(M.Module):
     def __init__(self):
         super().__init__()

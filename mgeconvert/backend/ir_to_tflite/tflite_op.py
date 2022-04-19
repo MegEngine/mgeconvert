@@ -11,6 +11,7 @@ import collections
 from typing import List
 
 import numpy as np
+from megengine import get_logger
 from numpy import dtype
 
 from ...converter_ir.ir_op import (
@@ -85,10 +86,13 @@ from .tflite.BuiltinOptions import BuiltinOptions
 from .tflite.Padding import Padding
 from .tflite.TensorType import TensorType
 
+logger = get_logger(__name__)
+
 
 class Config:
     platform = "official"
     require_quantize = True
+    tensor_format = "nhwc"
 
 
 def set_platform(platform):
@@ -100,23 +104,26 @@ def set_quantization(require_quantize):
     Config.require_quantize = require_quantize
 
 
+def set_tensor_format(tensor_format):
+    assert tensor_format in ["nchw", "nhwc"]
+    Config.tensor_format = tensor_format
+
+
 def get_platform():
     return Config.platform
+
+
+def get_format():
+    return Config.tensor_format
 
 
 def get_quantization():
     return Config.require_quantize
 
 
-def get_shape_param(
-    tensor: IRTensor, mge_opr: OpBase, quantizer: IRQuantizer, disable_nhwc=False
-):
-    """
-    Return a tuple of shape and bytes(1dim) object for tflite operator, which will
-    restore its inp/out at runtime by the shape and bytes.
-    """
+def _get_tensor_shape(tensor, mge_opr, disable_nhwc):
     if isinstance(mge_opr, ReshapeOpr):
-        return tensor.shape, None
+        return tensor.shape
 
     shape = list(tensor.shape)
     if tensor.axis_order and tensor.ndim == 4:
@@ -135,9 +142,25 @@ def get_shape_param(
                 shape = tensor.axis_order.shape_to_NHWC(shape)
             elif isinstance(tensor.axis_order, IOHWFormat):
                 shape = tensor.axis_order.shape_to_OHWI(shape)
+    elif tensor.axis_order and mge_opr.name == "Squeeze":
+        if not disable_nhwc:
+            nhwc_aixs_order = [0, 3, 1, 2]
+            inp_shape = list(mge_opr.inp_tensors[0].shape)
+            assert len(inp_shape) == 4
+            out_shape = mge_opr.inp_tensors[0].axis_order.shape_to_NHWC(inp_shape)
+            squeeze_dims = [nhwc_aixs_order[i] for i in mge_opr.squeeze_dims[::-1]]
+            for i in squeeze_dims:
+                out_shape.pop(i)
+            shape = out_shape
+
     elif tensor.ndim > 4:
         assert False, "ERROR: output ndim {0} is not supported now".format(tensor.ndim)
+    return shape
 
+
+def _get_tensor_value(tensor, mge_opr, quantizer, disable_nhwc):
+    if isinstance(mge_opr, ReshapeOpr):
+        return None
     number_list: List[np.ndarray] = []
     if (
         quantizer.require_quantize
@@ -160,15 +183,34 @@ def get_shape_param(
                 value = tensor.axis_order.data_to_NHWC(value)
             elif isinstance(tensor.axis_order, IOHWFormat):
                 value = tensor.axis_order.data_to_OHWI(value)
+
+        if not disable_nhwc and mge_opr.name == "GetSubTensor" and value is not None:
+            assert value.shape == (
+                4,
+            ), "can't support Slice input ndim !=4 in nhwc mode "
+            value = np.array([value[0], value[2], value[3], value[1]])
         number_list = value.reshape(-1)
 
     if len(number_list) > 0:
         byte_list: List[bytes] = []
         for i in number_list:
             byte_list.extend(i.tobytes())
-        return shape, byte_list
+        return byte_list
     else:
-        return shape, None
+        return None
+
+
+def get_shape_param(
+    tensor: IRTensor, mge_opr: OpBase, quantizer: IRQuantizer, disable_nhwc=False
+):
+    """
+    Return a tuple of shape and bytes(1dim) object for tflite operator, which will
+    restore its inp/out at runtime by the shape and bytes.
+    """
+    return (
+        _get_tensor_shape(tensor, mge_opr, disable_nhwc),
+        _get_tensor_value(tensor, mge_opr, quantizer, disable_nhwc),
+    )
 
 
 mge2tflite_dtype_mapping = {
@@ -184,11 +226,14 @@ mge2tflite_dtype_mapping = {
     dtype("uint8"): TensorType.UINT8,
     dtype("int8"): TensorType.INT8,
     "quint8": TensorType.UINT8,
+    "qint8": TensorType.INT8,
     "qint32": TensorType.INT32,
+    "qint16": TensorType.INT16,
     "uint8": TensorType.UINT8,
     "int8": TensorType.INT8,
     "int16": TensorType.INT16,
     "int32": TensorType.INT32,
+    "qint8_narrow": TensorType.INT8,
 }
 
 
@@ -381,6 +426,11 @@ def _deconv(mge_opr, builder):
 
 @_register_op(ConcatOpr)
 def _concat(mge_opr, builder):
+    if len(set([t.scale for t in mge_opr.inp_tensors + mge_opr.out_tensors])) != 1:
+        logger.warning(
+            "tflite concat doesn't support inputs outputs with different scale!"
+        )
+
     ConcatenationOptions.ConcatenationOptionsStart(builder)
     ConcatenationOptions.ConcatenationOptionsAddFusedActivationFunction(
         builder, mge2tflite_activation_type[mge_opr.activation]
@@ -528,9 +578,17 @@ def _squeeze(mge_opr, builder):
     SqueezeOptions.SqueezeOptionsStartSqueezeDimsVector(
         builder, len(mge_opr.squeeze_dims)
     )
-    for i in mge_opr.squeeze_dims:
+    if get_format() == "nhwc":
+        assert (
+            mge_opr.inp_tensors[0].ndim == 4
+        ), "can't support Squeeze input ndim !=4 in nhwc mode"
+        nhwc_aixs_order = [0, 3, 1, 2]
+        squeeze_dims = [nhwc_aixs_order[i] for i in mge_opr.squeeze_dims]
+    else:
+        squeeze_dims = mge_opr.squeeze_dims
+    for i in squeeze_dims:
         builder.PrependInt32(i)
-    squeeze_dims = builder.EndVector(len(mge_opr.squeeze_dims))
+    squeeze_dims = builder.EndVector(len(squeeze_dims))
     SqueezeOptions.SqueezeOptionsStart(builder)
     SqueezeOptions.SqueezeOptionsAddSqueezeDims(builder, squeeze_dims)
     options = SqueezeOptions.SqueezeOptionsEnd(builder)

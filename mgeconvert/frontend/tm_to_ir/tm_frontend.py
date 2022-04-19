@@ -76,12 +76,8 @@ class TM_FrontEnd:
         for node in self.inputs:
             inp_tensor = self.tensor_resolver.get_ir_tensor(node, owner_opr=self)
             if node.qparams is not None:
-                inp_tensor.set_qparams(
-                    *self.tensor_resolver.resolve_qparams(
-                        node.qparams.scale, node.qparams.zero_point
-                    )
-                )
-                inp_tensor.q_dtype = node.qparams.dtype_meta.np_dtype_str
+                inp_tensor.set_qparams_from_mge_qparams(node.qparams)
+
             self.irgraph.add_net_inputs(inp_tensor)
 
     def get_all_oprs(self):
@@ -129,17 +125,12 @@ class TM_FrontEnd:
                         out_tensor = self.irgraph.get_tensor(
                             expr.outputs[0]._id, None, origin_tensor=inp_tensor
                         )
-                        qdtype = module.get_activation_dtype()
                         qparams = (
                             module.act_fake_quant.get_qparams()
                             if hasattr(module.act_fake_quant, "get_qparams")
                             else module.act_observer.get_qparams()
                         )
-                        scale = qparams.scale
-                        zero_point = qparams.zero_point
-                        out_tensor.q_dtype = qdtype
-                        out_tensor.scale = float(scale)
-                        out_tensor.zero_point = int(zero_point) if zero_point else None
+                        out_tensor.set_qparams_from_mge_qparams(qparams)
                     elif isinstance(m.owner, (FloatQuantStub, FloatDequantStub)):
                         module = m.owner
                         inp_tensor = self.tensor_resolver.get_ir_tensor(expr.inputs[1])
