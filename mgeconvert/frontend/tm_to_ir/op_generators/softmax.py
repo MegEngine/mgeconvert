@@ -47,9 +47,6 @@ class GenSoftmaxOpr(OpGenBase):
         if self.op.axis is None:
             self.op.axis = get_softmax_axis(self.op.inp_tensors[0].ndim)
 
-        if self.op.axis is None:
-            self.op.axis = get_softmax_axis(self.op.inp_tensors[0].ndim)
-
     def add_opr_vars(self):
         if isinstance(self.expr, CallMethod):
             inp_tensor = self.resolver.get_ir_tensor(self.args[1], user_opr=self.op)

@@ -5,6 +5,8 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+from typing import Sequence
+
 import numpy as np
 import onnx
 
@@ -338,26 +340,8 @@ class SoftmaxConverter(OperatorBaseConverter):
         outputs = self._get_outputs()
         nodes = []
         assert opr.inp_tensors[0].ndim == 2, "ONNX Softmax only support dim=2"
-        offset_name = inputs[0] + "_max_offset"
-        offset = onnx.helper.make_node(
-            "ReduceMax",
-            inputs=[inputs[0]],
-            outputs=[offset_name],
-            axes=[opr.axis],
-            keepdims=True,
-        )
-        shape = list(opr.inp_tensors[0].shape)
-        shape[opr.axis] = 1
-        self._parse_fake_tensor_info(offset_name, opr.inp_tensors[0], shape=shape)
-        nodes.append(offset)
-        sub_name = inputs[0] + "_sub_offset"
-        sub = onnx.helper.make_node(
-            "Sub", inputs=[inputs[0], offset_name], outputs=[sub_name],
-        )
-        self._parse_fake_tensor_info(sub_name, opr.inp_tensors[0])
-        nodes.append(sub)
         softmax = onnx.helper.make_node(
-            "Softmax", inputs=[sub_name], outputs=[outputs[0]], **self._get_attrs(),
+            "Softmax", inputs=[inputs[0]], outputs=[outputs[0]], **self._get_attrs(),
         )
         nodes.append(softmax)
         return nodes, self._net_sources, self._parameters
@@ -457,47 +441,34 @@ class MatrixMulConvert(OperatorBaseConverter):
     def convert(self):
         opr = self._opr
         nodes = []
-        const_0 = opr.out_tensors[0].name + "_const_0_onnx"
-        const_0_tensor = onnx.helper.make_tensor_value_info(
-            const_0, mge2onnx_dtype_mapping[np.float32], [1]
-        )
-        const_0_param = onnx.numpy_helper.from_array(
-            np.array([0]).astype("float32"), const_0
-        )
-        self._net_sources.append(const_0_tensor)
-        self._parameters.append(const_0_param)
         inputs = self._get_inputs()
         outputs = self._get_outputs()
-        if isinstance(opr, LinearOpr) and opr.has_bias:
-            temp_out = inputs[0] + "_mul" + inputs[1]
-            gemm = onnx.helper.make_node(
-                "Gemm",
-                [inputs[0], inputs[1], const_0],
-                [temp_out],
-                alpha=1.0,
-                beta=0.0,
-                transA=opr.transpose_a,
-                transB=opr.transpose_b,
-            )
-            self._parse_fake_tensor_info(
-                temp_out, opr.inp_tensors[0], shape=opr.out_tensors[0].shape
-            )
-            nodes.append(gemm)
-            add_bias = onnx.helper.make_node(
-                "Add", inputs=[temp_out, inputs[2]], outputs=[outputs[0]],
-            )
-            nodes.append(add_bias)
+        has_bias = isinstance(opr, LinearOpr) and opr.has_bias
+        if has_bias:
+            bias = inputs[2]
         else:
-            gemm = onnx.helper.make_node(
-                "Gemm",
-                [inputs[0], inputs[1], const_0],
-                [outputs[0]],
-                alpha=1.0,
-                beta=0.0,
-                transA=opr.transpose_a,
-                transB=opr.transpose_b,
+            channel = opr.out_tensors[0].shape[-1]
+            bias = opr.out_tensors[0].name + "_const_0_onnx"
+            dtype = opr.out_tensors[0].dtype
+            bias_tensor = onnx.helper.make_tensor_value_info(
+                bias, mge2onnx_dtype_mapping[dtype], [channel]
             )
-            nodes.append(gemm)
+            bias_param = onnx.numpy_helper.from_array(
+                np.array([0.0] * channel).astype(dtype), bias
+            )
+            self._net_sources.append(bias_tensor)
+            self._parameters.append(bias_param)
+
+        gemm = onnx.helper.make_node(
+            "Gemm",
+            [inputs[0], inputs[1], bias],
+            [outputs[0]],
+            alpha=1.0,
+            beta=1.0,
+            transA=opr.transpose_a,
+            transB=opr.transpose_b,
+        )
+        nodes.append(gemm)
 
         return (
             nodes,
@@ -948,17 +919,28 @@ class BatchnormConverter(OperatorBaseConverter):
 class ConcatConverter(OperatorBaseConverter):
     __opr_type__ = "Concat"
 
-    def __init__(self, opr, quantizer=None):
-        super().__init__(opr, quantizer)
-        if opset_version < 11:
-            assert (
-                self._opr.axis >= 0
-            ), "opset {} doesn't support negative aixs in concat opr".format(
-                opset_version
-            )
+    def convert(self):
+        opr = self._opr
 
-    def _get_attrs(self):
-        return {"axis": self._opr.axis}
+        shape = opr.out_tensors[0].shape
+        if not isinstance(shape, Sequence):
+            shape = [shape]
+        ndim = len(shape)
+        axis = opr.axis
+        if axis < 0:
+            axis = ndim + axis
+        assert axis < ndim
+
+        nodes = [
+            onnx.helper.make_node(
+                self.__opr_type__,
+                self._get_inputs(),
+                self._get_outputs(),
+                name=self._opr.out_tensors[0].name,
+                axis=axis,
+            )
+        ]
+        return nodes, self._net_sources, self._parameters
 
 
 @_register_op(ReduceOpr)

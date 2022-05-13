@@ -64,7 +64,7 @@ class GenConvBase(OpGenBase, ABC):
             self.op.add_inp_tensors(weight_tensor)
             if self.args[2] is not None:
                 bias = self.args[2]
-                bias.shape = bias.shape[1]
+                # bias.shape = bias.shape[1]
                 bias_tensor = self.resolver.get_ir_tensor(
                     bias, name=self.args[0]._name + "_bias", user_opr=self.op
                 )
