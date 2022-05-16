@@ -40,6 +40,7 @@ class TensorNodeResolver:
             ori_id = inp._id
         elif isinstance(inp, (int, float, list, np.ndarray)):
             np_data = np.array(inp)
+            np_data = np_data.astype(np_data.dtype.name.replace("64", "32"))
             dtype = np_data.dtype.type
             shape = np_data.shape
             name = (
