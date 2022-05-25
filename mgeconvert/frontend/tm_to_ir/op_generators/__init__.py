@@ -6,13 +6,14 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
-from .base import EXPR2OP
+from .base import EXPR2OP, _register_op
 from .batchnorm import GenBatchNormalizationOpr
 from .broadcast import GenBroadcastOpr
 from .concat import GenConcatOpr, GenQConcatOpr
 from .constant import ConstantOpr
 from .conv2d import GenConv2dOpr, GenQConv2dOpr
 from .conv_bn2d import *
+from .custom import *
 from .deconv import GenDeconv2dOpr, GenQDeconv2dOpr
 from .dropout import GenDropoutOpr
 from .elemwise import *

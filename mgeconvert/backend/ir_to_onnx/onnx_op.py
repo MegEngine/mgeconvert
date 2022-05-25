@@ -60,6 +60,7 @@ from ...converter_ir.ir_op import (
     TransposeOpr,
     TrueDivOpr,
     TypeCvtOpr,
+    CustomOpr,
 )
 from ...converter_ir.ir_tensor import IRTensor
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
@@ -322,6 +323,24 @@ class GetVarShapeConverter(OperatorBaseConverter):
         shape.np_data = get_symvar_value(shape._var).astype(np.int64)
         shape.dtype = np.int64
         return [], [], []
+
+
+@_register_op(CustomOpr)
+class CustomConverter(OperatorBaseConverter):
+    __opr_type__ = "Custom"
+
+    def convert(self):
+        nodes = [
+            onnx.helper.make_node(
+                self._opr.opr_type,
+                self._get_inputs(),
+                self._get_outputs(),
+                name=self._opr.out_tensors[0].name,
+                domain=self._opr.domain,
+                **self._opr.kwargs,
+            )
+        ]
+        return nodes, self._net_sources, self._parameters
 
 
 @_register_op(SoftmaxOpr)

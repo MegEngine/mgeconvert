@@ -64,11 +64,11 @@ class OnnxConverter:
         inputs.extend(tensor_sources)
 
         for opr in self.net.all_oprs:
-            if not need_convert(opr):
-                for tensor in opr.out_tensors:
-                    if hasattr(tensor, "_var"):
-                        tensor.np_data = get_symvar_value(tensor._var)
-                continue
+            # if not need_convert(opr):
+            #     for tensor in opr.out_tensors:
+            #         if hasattr(tensor, "_var"):
+            #             tensor.np_data = get_symvar_value(tensor._var)
+            #     continue
             converter_cls = MGE2ONNX.get(type(opr), None)
             if converter_cls is None:
                 unsupported_oprs.append(opr)
@@ -100,6 +100,7 @@ class OnnxConverter:
         onnx_graph = onnx.helper.make_graph(
             onnx_nodes, self.graph_name, inputs, outputs, initializer=parameters
         )
+        # print(onnx_graph)
         opset = onnx.helper.make_opsetid("", self.opset_version)
         model = onnx.helper.make_model(
             onnx_graph,

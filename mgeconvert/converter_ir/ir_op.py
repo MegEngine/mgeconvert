@@ -198,6 +198,16 @@ class ReduceOpr(OpBase):
         self.keep_dims = keep_dims
 
 
+class CustomOpr(OpBase):
+    name = "Custom"
+
+    def __init__(self, opr_type, domain, kwargs):
+        super().__init__()
+        self.opr_type = opr_type
+        self.domain = domain
+        self.kwargs = kwargs
+        
+
 class SoftmaxOpr(OpBase):
     name = "Softmax"
 

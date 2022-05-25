@@ -27,7 +27,7 @@ from megengine.traced_module.module_tracer import BUILTIN_ARRAY_METHOD
 from megengine.traced_module.node import ModuleNode, TensorNode
 
 from ...converter_ir.ir_graph import IRGraph
-from .op_generators import EXPR2OP
+from .op_generators import EXPR2OP, register_op
 from .pattern_utils import DEFAULT_FUSION_PATTERNS
 from .qat_pattern import find_match_pattern
 from .tm_tensor_resolver import TensorNodeResolver
