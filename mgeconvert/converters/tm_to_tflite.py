@@ -81,6 +81,8 @@ def tracedmodule_to_tflite(
         TransformerRule.PAD_WIDTH_AS_INPUT,
         TransformerRule.EXPAND_ADD_RELU,
     ]
+    if not disable_nhwc:
+        transformer_options.append(TransformerRule.TRANSPOSE_LINEAR_WEIGHT_TO_NHWC)
     if mtk:
         # MTK devices only support batch_size 1
         set_platform("mtk")
