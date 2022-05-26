@@ -118,6 +118,13 @@ pat_conv = (
     MatchAnyNode,
 )
 
+pat_deconv = (
+    QATModule._apply_fakequant_with_observer,
+    MatchAnyNode,
+    (F.nn.conv_transpose2d, InputNode, QATModule._apply_fakequant_with_observer),
+    MatchAnyNode,
+)
+
 pat_deconv_relu = (
     QATModule._apply_fakequant_with_observer,
     MatchAnyNode,
@@ -168,6 +175,13 @@ def qat_conv(module, expr, call_expr, net, _):
     return op
 
 
+@register_fusion_pattern(pat_deconv)
+def qat_deconv(module, expr, call_expr, net, _):
+    conv = expr.inputs[1].expr
+    op = gen_qat_conv_opr(module, conv, call_expr, net, is_deconv=True)
+    return op
+
+
 @register_fusion_pattern(pat_deconv_bias)
 def qat_deconv_bias(module, expr, call_expr, irgraph, _):
     conv = expr.inputs[1].expr
@@ -206,6 +220,7 @@ MATCH_RULE[QATModule._apply_fakequant_with_observer] = [
     pat_deconv_relu,
     pat_conv_relu,
     pat_conv,
+    pat_deconv,
     pat_deconv_bias,
 ]
 

@@ -426,9 +426,18 @@ def _deconv(mge_opr, builder):
 
 @_register_op(ConcatOpr)
 def _concat(mge_opr, builder):
-    if len(set([t.scale for t in mge_opr.inp_tensors + mge_opr.out_tensors])) != 1:
+    if (
+        mge_opr.inp_tensors[0].q_dtype == "int8"
+        and len({t.scale for t in mge_opr.inp_tensors + mge_opr.out_tensors}) != 1
+    ):
         logger.warning(
-            "tflite concat doesn't support inputs outputs with different scale!"
+            "tflite int8 concat doesn't support inputs outputs with different scale!"
+        )
+    if mge_opr.inp_tensors[0].q_dtype == "int16" and not all(
+        [t.zero_point == 0 for t in mge_opr.inp_tensors + mge_opr.out_tensors]
+    ):
+        logger.warning(
+            "tflite int16 concat doesn't support inputs outputs with zero point != 0!"
         )
 
     ConcatenationOptions.ConcatenationOptionsStart(builder)
