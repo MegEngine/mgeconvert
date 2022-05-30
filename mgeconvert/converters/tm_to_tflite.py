@@ -39,6 +39,7 @@ def tracedmodule_to_tflite(
     remove_relu=False,
     prefer_same_pad_mode=False,
     disable_nhwc=False,
+    use_int64_bias=False,
 ):
     """
 	Convert traced model to TFLite,
@@ -89,6 +90,8 @@ def tracedmodule_to_tflite(
         transformer_options.append(TransformerRule.DECONV_ADD_ZERO_BIAS,)
     if remove_relu:
         transformer_options.append(TransformerRule.REMOVE_TFLITE_RELU,)
+    if use_int64_bias:
+        transformer_options.append(TransformerRule.BIAS_ASTYPE_INT64)
 
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)

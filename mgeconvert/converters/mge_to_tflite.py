@@ -24,6 +24,7 @@ def mge_to_tflite(
     disable_nhwc=False,
     outspec=None,
     prefer_same_pad_mode=False,
+    use_int64_bias=False,
 ):
     """
     Convert megengine model to TFLite,
@@ -69,6 +70,9 @@ def mge_to_tflite(
         set_platform("mtk")
         transformer_options.append(TransformerRule.DECONV_ADD_ZERO_BIAS,)
         transformer_options.append(TransformerRule.FUSE_FOR_DECONV_BIAS,)
+
+    if use_int64_bias:
+        transformer_options.append(TransformerRule.BIAS_ASTYPE_INT64)
 
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
