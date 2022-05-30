@@ -48,6 +48,7 @@ from .ir_op import (
     TanHOpr,
     TransposeOpr,
     TrueDivOpr,
+    _ConvOpr,
     _PoolOpr,
 )
 from .ir_tensor import AxisOrder, IRTensor
@@ -121,6 +122,7 @@ class TransformerRule(Enum):
     TRANSPOSE_LINEAR_WEIGHT_TO_NHWC = 133
     # force fc with no trans for megengine
     FC_NO_TRANS = 134
+    BIAS_ASTYPE_INT64 = 135
 
 
 def cmp_rules(a, b):
@@ -1537,3 +1539,29 @@ def matmul_no_trans(graph: IRGraph):
             if opr.transpose_b and tensor_b.owner_opr == None:
                 opr.transpose_b = False
                 trans_tensor(tensor_b)
+
+
+@_register_tranformation_rule(TransformerRule.BIAS_ASTYPE_INT64)
+def _bias_astype_int64(net: IRGraph):
+    for opr in net.all_oprs:
+        if not isinstance(opr, (MatMulOpr, _ConvOpr)):
+            continue
+        bias = None
+        if isinstance(opr, MatMulOpr) and len(opr.inp_tensors) == 3:
+            bias = opr.inp_tensors[2]
+        elif isinstance(opr, Deconv2dOpr) and len(opr.inp_tensors) > 3:
+            if (
+                opr.inp_tensors[0].shape == [4] and len(opr.inp_tensors) == 4
+            ):  # shape as input
+                bias = opr.inp_tensors[-1]
+            if len(opr.inp_tensors) == 4:
+                bias = opr.inp_tensors[-1]
+        elif isinstance(opr, (Conv2dOpr, ConvRelu2dOpr)) and len(opr.inp_tensors) == 3:
+            bias = opr.inp_tensors[-1]
+        if bias is not None and bias.scale is not None:
+            bias.set_qparams(
+                scale=bias.scale,
+                zero_point=bias.zero_point,
+                q_dtype="int64",
+                np_dtype="int64",
+            )

@@ -233,6 +233,7 @@ mge2tflite_dtype_mapping = {
     "int8": TensorType.INT8,
     "int16": TensorType.INT16,
     "int32": TensorType.INT32,
+    "int64": TensorType.INT64,
     "qint8_narrow": TensorType.INT8,
 }
 

@@ -94,7 +94,7 @@ complete_str = """_mgeconvert(){
                     return
                     ;;
                 tracedmodule_to_tflite)
-                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec --remove_relu --prefer_same_pad_mode"
+                    words="-i --input -o --output --input_data_type --input_scales --input_zero_points --require_quantize --param_fake_quant --quantize_file_path --graph_name --mtk --end_point  --outspec --remove_relu --prefer_same_pad_mode --use_int64_bias"
                     COMPREPLY=( $(compgen -W "$words" -- $word) )
                     return
                     ;;
@@ -397,6 +397,7 @@ def init(subparsers):
                     outspec=args.outspec,
                     remove_relu=args.remove_relu,
                     prefer_same_pad_mode=args.prefer_same_pad_mode,
+                    use_int64_bias=args.use_int64_bias,
                 )
             else:
                 mgeconvert.mge_to_tflite(
@@ -406,6 +407,7 @@ def init(subparsers):
                     mtk=args.mtk,
                     outspec=args.outspec,
                     prefer_same_pad_mode=args.prefer_same_pad_mode,
+                    use_int64_bias=args.use_int64_bias,
                 )
 
         def tflite_parser(subparsers):
@@ -486,6 +488,12 @@ def init(subparsers):
                 "--prefer_same_pad_mode",
                 action="store_true",
                 help="whether prefer to use SAME pad mode for conv op",
+            )
+
+            p.add_argument(
+                "--use_int64_bias",
+                action="store_true",
+                help="whether use int64 as dtype of bias",
             )
 
         tflite_parser(subparsers)
