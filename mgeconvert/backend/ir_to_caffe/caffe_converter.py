@@ -131,8 +131,10 @@ class CaffeConverter:
         self.quantizer = quantizer
         self.convert_backend = convert_backend
 
-    def update_quantize_dict(self, tensor):
-        self.quantizer.parse_quant_info(tensor)
+    def update_quantize_dict(self, tensor, name=None):
+        if tensor.q_dtype is not None:
+            tname = name if name is not None else tensor.name
+            self.quantizer.set_quant_info(tname, tensor)
 
     def dump(self, proto_file, caffe_file=None):
         CaffeNet = cp.NetParameter(layer=self.layers)
