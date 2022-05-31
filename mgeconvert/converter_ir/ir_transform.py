@@ -239,8 +239,6 @@ def _transpose_pattern_as_input(net):
             dtype=np.int32,
             np_data=np.array(op.pattern, dtype=np.int32),
             owner_opr=op,
-            q_type="int32",
-            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(perm_tensor)
@@ -268,8 +266,6 @@ def _pad_width_as_input(net):
             dtype=np.int32,
             np_data=padddings,
             owner_opr=op,
-            q_type="int32",
-            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(pad_tensor)
@@ -287,8 +283,6 @@ def _reduce_axis_as_input(net):
             dtype=np.int32,
             np_data=np.array(op.axis, dtype=np.int32),
             owner_opr=op,
-            q_type="int32",
-            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(axis_tensor)
@@ -332,8 +326,6 @@ def _make_padding(net: IRGraph):
                 dtype=np.int32,
                 owner_opr=None,
                 np_data=np_data,
-                q_type="int32",
-                np_dtype="int32",
                 axis=None,
             )
             net.add_tensor(new_tensor_id, pad_in_tensor)
@@ -393,8 +385,6 @@ def _deconv_shape_as_input(net: IRGraph):
             dtype=np.int32,
             owner_opr=op,
             np_data=np_data,
-            q_type="int32",
-            np_dtype="int32",
             axis=None,
         )
         shape_tensor = net.get_tensor(new_tensor_id, shape_symvar)
@@ -427,8 +417,6 @@ def _resize_params_as_input(net):
             shape=(2,),
             dtype=np.int32,
             np_data=np.array(op.out_size, dtype=np.int32),
-            q_type="int32",
-            np_dtype="int32",
             axis=None,
         )
         op.add_inp_tensors(out_size_tensor)
@@ -578,8 +566,6 @@ def _make_slice_as_inputs(net: IRGraph):
                 dtype=np.int32,
                 np_data=np.array(ret, dtype=np.int32),
                 owner_opr=op,  # pylint:disable=cell-var-from-loop
-                q_type="int32",
-                np_dtype="int32",
             )
             return ret
 

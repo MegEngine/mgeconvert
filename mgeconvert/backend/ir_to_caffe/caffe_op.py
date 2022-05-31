@@ -858,6 +858,7 @@ def _reduce(opr, context):
         param = cp.ReshapeParameter(shape=cp.BlobShape(dim=opr.out_tensors[0].shape))
         bottom = top
         name = opr.out_tensors[0].name + context.gen_name
+        context.update_quantize_dict(opr.out_tensors[0], name=name)
         top = [context.reset_blob_name(opr.out_tensors[0], name)]
         context.add_layer(
             cp.LayerParameter(
@@ -882,6 +883,8 @@ def _reduce(opr, context):
                 ),
             )
         )
+        for tname in top:
+            context.update_quantize_dict(opr.inp_tensors[0], name=tname)
         bottom = top
         top = [context.set_blob_name(opr.out_tensors[0], opr.out_tensors[0].name)]
         context.add_layer(
@@ -900,6 +903,7 @@ def _reduce(opr, context):
             )
             bottom = top
             name = opr.out_tensors[0].name + context.gen_name
+            context.update_quantize_dict(opr.out_tensors[0], name=name)
             top = [context.reset_blob_name(opr.out_tensors[0], name)]
             context.add_layer(
                 cp.LayerParameter(
@@ -1143,15 +1147,8 @@ def silu(opr, context):
     inp = opr.inp_tensors[0]
     sigmoid_op = SigmoidOpr()
     sigmoid_op.add_inp_tensors(inp)
-    fake_sigmoid_out = IRTensor(
-        inp.name + "_sigmoid_out",
-        inp.shape,
-        inp.dtype,
-        scale=inp.scale,
-        zero_point=inp.zero_point,
-        q_type=inp.q_dtype,
-    )
-    context.update_quantize_dict(fake_sigmoid_out)
+    assert inp.scale is None, "Can not convert quantized silu"
+    fake_sigmoid_out = IRTensor(inp.name + "_sigmoid_out", inp.shape, inp.dtype,)
     sigmoid_op.add_out_tensors(fake_sigmoid_out)
     context.add_layer(_gen_layer(sigmoid_op, sigmoid_op.name, context))
     mul_op = MulOpr()
@@ -1265,10 +1262,8 @@ def _fake_repeat(opr, context):
         opr.inp_tensors[0].name + "_unsqueeze",
         unsqueeze_shape,
         opr.inp_tensors[0].dtype,
-        q_type=opr.inp_tensors[0].q_dtype,
-        scale=opr.inp_tensors[0].scale,
-        zero_point=opr.inp_tensors[0].zero_point,
     )
+    fake_unsqueeze_out.set_qparams_from_other_tensor(opr.inp_tensors[0])
     context.update_quantize_dict(fake_unsqueeze_out)
     param = cp.ReshapeParameter(shape=cp.BlobShape(dim=unsqueeze_shape))
     bottom = [context.get_blob_name(opr.inp_tensors[0])]
@@ -1288,10 +1283,8 @@ def _fake_repeat(opr, context):
         opr.inp_tensors[0].name + "_unsqueeze_tile",
         unsqueeze_shape,
         opr.inp_tensors[0].dtype,
-        q_type=opr.inp_tensors[0].q_dtype,
-        scale=opr.inp_tensors[0].scale,
-        zero_point=opr.inp_tensors[0].zero_point,
     )
+    fake_tile.set_qparams_from_other_tensor(opr.inp_tensors[0])
     context.update_quantize_dict(fake_tile)
     bottom = top
     top = [context.set_blob_name(fake_tile, fake_tile.name)]
