@@ -2,6 +2,7 @@
 
 set -e
 
+./mgeconvert/backend/ir_to_tflite/build_flatbuffer.sh
 ./mgeconvert/backend/ir_to_tflite/init.sh
 
 # try to find libflatbuffers.so

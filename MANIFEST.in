@@ -1,0 +1,1 @@
+recursive-include mgeconvert/backend *.sh *.cc *.h *.so *.so.1 flatc

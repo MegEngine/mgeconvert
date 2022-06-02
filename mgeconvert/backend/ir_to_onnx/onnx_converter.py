@@ -12,6 +12,7 @@ import onnx.checker
 import onnx.helper
 import onnx.numpy_helper
 import onnxoptimizer  # pylint: disable=import-error,no-name-in-module
+from tqdm import tqdm
 
 from ...converter_ir.ir_quantizer import IRQuantizer
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
@@ -63,7 +64,7 @@ class OnnxConverter:
         _, tensor_sources, _ = _add_input_tensors(self.net.graph_inputs)
         inputs.extend(tensor_sources)
 
-        for opr in self.net.all_oprs:
+        for opr in tqdm(self.net.all_oprs):
             if not need_convert(opr):
                 for tensor in opr.out_tensors:
                     if hasattr(tensor, "_var"):
