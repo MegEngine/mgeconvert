@@ -1,6 +1,12 @@
+import ctypes
 import json
+import os
 
-from .fbconverter import (  # pylint: disable=import-error,no-name-in-module
+libflatbuffer = os.path.join(os.path.dirname(__file__), "lib", "libflatbuffers.so.1")
+ctypes.cdll.LoadLibrary(libflatbuffer)
+
+# pylint: disable=import-error,no-name-in-module,wrong-import-position
+from .fbconverter import (  # isort:skip
     from_json,
     to_json,
 )

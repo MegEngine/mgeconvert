@@ -2,8 +2,6 @@
 basepath=$(cd `dirname $0`; pwd)
 
 
-which flatc  && FLATC_VERSION="$(flatc --version)" || FLATC_VERSION=""
-echo ${FLATC_VERSION}
 if python3 -c "import flatbuffers">/dev/null 2>&1; then
     FLAT_BUFFER_VERSION="$(python3 -m pip show flatbuffers | grep Version)"
 else
@@ -11,25 +9,15 @@ else
 fi
 echo ${FLAT_BUFFER_VERSION}
 
+# install flatbuffers
+if [[ "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
+    python3 -m pip uninstall flatbuffers -y
+    echo "install flatbuffers..."
+    python3 -m pip install flatbuffers==1.12 --user
+fi
+
 if [ ! -d /tmp/mgeconvert ]; then
     mkdir /tmp/mgeconvert
-fi
-
-TMP_DIR="/tmp/mgeconvert/flatbuffers"
-
-if [[ ! -L "$HOME/.local/lib/libflatbuffers.so" || "$FLATC_VERSION" != "flatc version 1.12.0" || "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
-    rm -rf $TMP_DIR
-    git clone https://github.com/google/flatbuffers.git -b v1.12.0 $TMP_DIR
-fi
-
-if [[ ! -L "$HOME/.local/lib/libflatbuffers.so" || "$FLATC_VERSION" != "flatc version 1.12.0" ]]; then
-    rm -rf $HOME/.local/bin/flatc
-    rm -rf $HOME/.local/lib/libflatbuffers*
-    # build flatbuffers
-    echo "building flatbuffers..."
-    cd $TMP_DIR
-    cmake -G "Unix Makefiles" -DCMAKE_BUILD_TYPE=Release -DFLATBUFFERS_BUILD_SHAREDLIB=on -DCMAKE_INSTALL_PREFIX=$HOME/.local
-    make -j; make install
 fi
 
 
@@ -44,18 +32,9 @@ if [ ! -n "$1" ] ;then
 fi
 echo "Use TFLite $tf_version!"
 wget https://raw.githubusercontent.com/tensorflow/tensorflow/$tf_version/tensorflow/lite/schema/schema.fbs
-flatc --python schema.fbs
+$basepath/pyflexbuffers/bin/flatc --python schema.fbs
 chmod 777 /tmp/mgeconvert/tflite
 cp -r /tmp/mgeconvert/tflite $basepath
-
-# build pyflatbuffers
-if [[ "$FLAT_BUFFER_VERSION" != "Version: 1.12" ]]; then
-    python3 -m pip uninstall flatbuffers -y
-    echo "building pyflexbuffers..."
-    export VERSION=1.12
-    cd $TMP_DIR/python
-    python3 setup.py install --user
-fi
 
 
 python3 -m pip install pybind11==2.6.2 --user
@@ -66,6 +45,6 @@ PYBIND11_HEADER=$(python3 -c "import pybind11; print(pybind11.get_include())")
 PYTHON_INCLUDE=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['include'])")
 PYTHON_STDLIB=$(python3 -c "import sysconfig; print(sysconfig.get_paths()['stdlib'])")
 
-g++ fbconverter.cc --std=c++14 -fPIC --shared -I$HOME/.local/include -I${PYBIND11_HEADER} -I${PYTHON_INCLUDE} -L${PYTHON_STDLIB} -L$HOME/.local/lib  -lflatbuffers -o fbconverter.so
+g++ fbconverter.cc --std=c++14 -fPIC --shared -I$basepath/pyflexbuffers/include -I${PYBIND11_HEADER} -I${PYTHON_INCLUDE} -L${PYTHON_STDLIB} -L$basepath/pyflexbuffers/lib  -lflatbuffers -o fbconverter.so
 
 rm -rf /tmp/mgeconvert
