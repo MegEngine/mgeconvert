@@ -23,6 +23,11 @@ from megengine.traced_module.fake_quant import FakeQuantize
 
 from .tm_utils import get_traced_module
 
+if mge.__version__ > "1.7.0":
+    from megengine.traced_module.tm_config import disable_default_checker
+
+    disable_default_checker()
+
 max_error = 1e-4
 tmp_file = "test_model"
 

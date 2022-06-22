@@ -282,6 +282,7 @@ ImportError: /home//lib/python3.6/site-packages/mgeconvert/backend/ir_to_tflite/
 | matrix mul               | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | max pool2d               | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | mul                      | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
+| pad                      | ✓<br/>× | ×<br/>× | ×<br/>× |
 | pow                      | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | reduce max               | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | reduce min               | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
@@ -314,6 +315,7 @@ ImportError: /home//lib/python3.6/site-packages/mgeconvert/backend/ir_to_tflite/
 | Concat                   | ✓<br/>✓ |
 | Dropout                  | ✓<br/>✓ |
 | Flatten                  | ✓<br/>✓ |
+| Gather                   | ✓<br/>✓ |
 | Gemm                     | ✓<br/>✓ |
 | GlobalAveragePool        | ✓<br/>✓ |
 | GlobalMaxPool            | ✓<br/>✓ |

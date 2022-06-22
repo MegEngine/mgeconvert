@@ -3,7 +3,7 @@
 set -e
 
 ./mgeconvert/backend/ir_to_tflite/build_flatbuffer.sh
-./mgeconvert/backend/ir_to_tflite/init.sh
+./mgeconvert/backend/ir_to_tflite/init.sh False /usr/bin/python3
 
 # try to find libflatbuffers.so
 export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH:

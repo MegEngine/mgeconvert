@@ -3,7 +3,7 @@
 set -e
 
 ./mgeconvert/backend/ir_to_tflite/build_flatbuffer.sh
-./mgeconvert/backend/ir_to_tflite/init.sh
+./mgeconvert/backend/ir_to_tflite/init.sh False /usr/bin/python3
 
 sudo python3 -m pip uninstall flatbuffers -y
 sudo python3 -m pip install tensorflow==2.5.0
