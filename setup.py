@@ -15,6 +15,9 @@ __version__ = re.search(r"__version__ = \"(.*)\"", __version_py__).group(1)
 
 targets = []
 tfversion = None
+IS_VENV = hasattr(sys, "real_prefix") or (
+    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+)
 
 
 def write_init(targets, tflite_schema_version=None):
@@ -97,9 +100,11 @@ class build_ext(_build_ext):
     def build_all(self, ext):
         if ext.script:
             if ext.name == "tflite" and tfversion is not None:
-                subprocess.check_call([ext.script, tfversion])
+                subprocess.check_call(
+                    [ext.script, str(IS_VENV), sys.executable, tfversion]
+                )
             else:
-                subprocess.check_call(ext.script)
+                subprocess.check_call([ext.script, str(IS_VENV), sys.executable])
         if ext.artifacts is not None:
             self.copy_tree(ext.artifacts, os.path.join(self.build_lib, ext.artifacts))
 

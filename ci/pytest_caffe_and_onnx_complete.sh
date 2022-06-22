@@ -8,7 +8,7 @@ python3 -m pip install --no-binary=protobuf protobuf==3.11.1
 
 apt install -y protobuf-compiler
 
-./mgeconvert/backend/ir_to_caffe/init.sh
+./mgeconvert/backend/ir_to_caffe/init.sh False /usr/bin/python3
 
 pip3 install scikit-image==0.17.2 onnx onnxruntime
 

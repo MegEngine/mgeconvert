@@ -1,6 +1,13 @@
 #!/bin/bash -e
 
-python3 -m pip install --no-binary=protobuf "protobuf>=3.11.1" --user
+ADD_USER=""
+if [[ $1 == "False" ]]; then
+    ADD_USER="--user"
+fi
+
+PYTHON3=$2
+
+$PYTHON3 -m pip install --no-binary=protobuf "protobuf>=3.11.1" $ADD_USER
 
 hash wget || (echo "please install wget package" && exit -1)
 hash protoc || (echo "please install protobuf-compiler package" && exit -1)

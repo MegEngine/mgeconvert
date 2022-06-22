@@ -40,7 +40,7 @@ from megengine.traced_module import trace_module
 from mgeconvert.converters.tm_to_tflite import tracedmodule_to_tflite
 from tensorflow.lite.python import interpreter  # pylint: disable=import-error
 
-max_error = 1e-6
+max_error = 1e-4
 tmp_file = "test_model"
 
 

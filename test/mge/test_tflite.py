@@ -32,7 +32,7 @@ import pytest
 from mgeconvert.converters.mge_to_tflite import mge_to_tflite
 from tensorflow.lite.python import interpreter  # pylint: disable=import-error
 
-max_error = 1e-6
+max_error = 1e-4
 tmp_file = "test_model"
 
 
