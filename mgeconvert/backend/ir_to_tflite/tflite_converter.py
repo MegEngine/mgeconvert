@@ -105,7 +105,7 @@ class TFLiteConverter:
                         has_qparams = True
                     if hasattr(tensor, "zero_point") and tensor.zero_point is not None:
                         zero_point = int(tensor.zero_point)
-                    dtype = tensor.q_dtype if has_qparams else tensor.dtype
+                    dtype = tensor.np_dtype if has_qparams else tensor.dtype
                     from megengine.core.tensor.dtype import (  # pylint: disable=import-outside-toplevel,no-name-in-module
                         QuantDtypeMeta,
                     )
