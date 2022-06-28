@@ -65,6 +65,8 @@ def tracedmodule_to_onnx(
         TransformerRule.REMOVE_UNRELATED_IROP,
         TransformerRule.EXPAND_CONVRELU,
         TransformerRule.REMOVE_IDENTITY,
+        TransformerRule.FUSE_LINEAR_BN,
+        TransformerRule.FUSE_CONV_BN
     ]
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
