@@ -15,8 +15,11 @@ __version__ = re.search(r"__version__ = \"(.*)\"", __version_py__).group(1)
 
 targets = []
 tfversion = None
-IS_VENV = hasattr(sys, "real_prefix") or (
-    hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix
+IS_VENV = (
+    hasattr(sys, "real_prefix")
+    or (hasattr(sys, "base_prefix") and sys.base_prefix != sys.prefix)
+    or os.path.exists(os.path.join(sys.prefix, "conda-meta"))
+    or (("Continuum Analytics" in sys.version) or ("Anaconda" in sys.version))
 )
 
 
