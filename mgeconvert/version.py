@@ -5,7 +5,7 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 # required megengine version range
 MEGENGINE_LOWER = "1.0.0"
