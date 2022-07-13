@@ -13,7 +13,7 @@ with open(os.path.join("./mgeconvert", "version.py")) as f:
 __version__ = re.search(r"__version__ = \"(.*)\"", __version_py__).group(1)
 
 
-targets = []
+targets = set()
 tfversion = None
 IS_VENV = (
     hasattr(sys, "real_prefix")
@@ -38,8 +38,9 @@ def write_init(targets, tflite_schema_version=None):
         if "onnx" in targets:
             init_file.write("from .converters.onnx_to_mge import onnx_to_mge\n")
             init_file.write("from .converters.onnx_to_tm import onnx_to_tracedmodule\n")
-        if tflite_schema_version:
-            init_file.write(f"tflite_schema_version={tflite_schema_version}\n")
+        if not tflite_schema_version:
+            tflite_schema_version = "r2.3"
+        init_file.write(f'tflite_schema_version="{tflite_schema_version}"\n')
 
 
 class install(_install):
@@ -58,13 +59,17 @@ class install(_install):
 
     def run(self):
         options = ["caffe", "onnx", "tflite"]
-        if self.targets == "all":
-            targets.extend(options)
+        if self.targets.find("all") >= 0:
+            targets.update(set(options))
         elif self.targets is None:
             pass
         else:
-            targets.extend(i for i in options if self.targets.find(i) >= 0)
-        write_init(targets, self.tfversion)
+            targets.update(set(i for i in options if self.targets.find(i) >= 0))
+
+        global tfversion
+        if self.tfversion:
+            tfversion = self.tfversion
+        write_init(targets, tfversion)
 
         if "tflite" in targets:
             tflite_path = os.path.join(
@@ -82,9 +87,6 @@ class install(_install):
                 ret = os.system(f"{tflite_path}/build_flatbuffer.sh")
                 if ret:
                     raise RuntimeError("build flatbuffer failed!")
-
-        global tfversion
-        tfversion = self.tfversion
 
         _install.run(self)
 
@@ -148,29 +150,22 @@ if __name__ == "__main__":
     }
     pkg_name = "mgeconvert"
     if len(sys.argv) >= 2:
-        if sys.argv[1] == "bdist_wheel":
-            if len(sys.argv) == 2:
-                targets.extend(["onnx", "caffe", "tflite"])
-            else:
-                assert sys.argv[2] in ["onnx", "caffe", "tflite"]
-                targets.append(sys.argv[2])
-                pkg_name += "-" + sys.argv[2]
-                sys.argv = sys.argv[:2]
-            for t in targets:
-                if t in requires_mapping:
-                    install_requires.extend(requires_mapping[t])
-        elif sys.argv[1] == "install":
+        if sys.argv[1] == "install":
             assert (
                 len(sys.argv) > 2
             ), 'use "--targets=[eg, tflite,caffe,onnx,all]" to indicate converters to install'
             for v in sys.argv[2:]:
                 if v.startswith("--targets="):
-                    target_cvts = v.split("=")[1].split(",")
+                    install_opts = v.split(" ")
+                    target_cvts = install_opts[0].split("=")[1].split(",")
                     for opt in target_cvts:
-                        assert opt in requires_mapping
+                        assert opt in requires_mapping, f"opt={opt}, {sys.argv}"
                         install_requires.extend(requires_mapping[opt])
+                    if len(install_opts) > 1 and install_opts[1].startswith(
+                        "--tfversion="
+                    ):
+                        tfversion = install_opts[1].split("=")[1].strip()
                     break
-    write_init(targets)
 
     setup(
         name=pkg_name,
