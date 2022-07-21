@@ -41,8 +41,6 @@ class TensorNodeResolver:
         elif isinstance(inp, (int, float, list, np.ndarray)):
             np_data = np.array(inp)
             np_data = np_data.astype(np_data.dtype.name.replace("64", "32"))
-            dtype = np_data.dtype.type
-            shape = np_data.shape
             name = (
                 param_name
                 if param_name
@@ -52,10 +50,16 @@ class TensorNodeResolver:
             ori_id = None
         elif isinstance(inp, mge.Tensor):
             name = param_name
-            shape = inp.shape
-            dtype = inp.dtype
             np_data = inp.numpy()
             ori_id = None
+
+        if np_data is not None:
+            dtype = np_data.dtype.type
+            shape = np_data.shape
+
+        assert (
+            shape or dtype
+        ), f"could not get the shape and dtype of the tensor named '{name}'"
 
         return (
             IRTensor(
