@@ -154,18 +154,30 @@ if __name__ == "__main__":
             assert (
                 len(sys.argv) > 2
             ), 'use "--targets=[eg, tflite,caffe,onnx,all]" to indicate converters to install'
+            targets_cache = set()
             for v in sys.argv[2:]:
-                if v.startswith("--targets="):
-                    install_opts = v.split(" ")
-                    target_cvts = install_opts[0].split("=")[1].split(",")
-                    for opt in target_cvts:
+                targets_args = re.findall(
+                    "--targets\s*=\s*['\"]?([\w,\s]+)['\"]?\s*", str(v)
+                )
+                tfversion_args = re.findall("--tfversion\s*=\s*([\w\.\d]+)\s*", str(v))
+
+                if targets_args:
+                    targets_args = (",".join(targets_args)).replace(" ", "").split(",")
+                    for opt in targets_args:
                         assert opt in requires_mapping, f"opt={opt}, {sys.argv}"
-                        install_requires.extend(requires_mapping[opt])
-                    if len(install_opts) > 1 and install_opts[1].startswith(
-                        "--tfversion="
-                    ):
-                        tfversion = install_opts[1].split("=")[1].strip()
-                    break
+                        if opt not in targets_cache:
+                            install_requires.extend(requires_mapping[opt])
+                            targets_cache.add(opt)
+
+                if tfversion_args:
+                    tfversion = tfversion_args[0]
+
+                if "targets" in v or "tfversion" in v:
+                    assert targets_args or tfversion_args, (
+                        f"cant parse option={v}."
+                        "please use '--targets=[eg, tflite,caffe,onnx,all]' to indicate converters to install "
+                        "and `--tfversion=[eg, r2.6]` to indicate the tflite version."
+                    )
 
     setup(
         name=pkg_name,
