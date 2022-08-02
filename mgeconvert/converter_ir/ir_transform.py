@@ -119,6 +119,8 @@ class TransformerRule(Enum):
     RENAME_CAFFE_LAYER_TENSOR = 132
 
     TRANSPOSE_LINEAR_WEIGHT_TO_NHWC = 133
+    # force fc with no trans for megengine
+    FC_NO_TRANS = 134
 
 
 def cmp_rules(a, b):
@@ -1510,3 +1512,28 @@ def _convert_linear_weight_to_NHWC(net: IRGraph):
             # flatten weight
             data = np.reshape(data, [data.shape[0], -1])
             weight.np_data = data
+
+
+# FIXME: change onnx fe ir np_data use np.array from bytes
+@_register_tranformation_rule(TransformerRule.FC_NO_TRANS)
+def matmul_no_trans(graph: IRGraph):
+    def get_numpy(tensor):
+        return np.frombuffer(tensor.np_data, dtype=tensor.dtype).reshape(tensor.shape)
+
+    def trans_tensor(tensor):
+        np_data = get_numpy(tensor)
+        np_data = np.ascontiguousarray(np_data.transpose([1, 0]))
+        tensor.shape = np_data.shape
+        tensor.np_data = np_data.tobytes()
+
+    for opr in graph.all_oprs:
+        if isinstance(opr, MatMulOpr):
+            tensor_a = opr.inp_tensors[0]
+            tensor_b = opr.inp_tensors[1]
+            if opr.transpose_a and tensor_a.owner_opr == None:
+                opr.transpose_a = False
+                trans_tensor(tensor_a)
+
+            if opr.transpose_b and tensor_b.owner_opr == None:
+                opr.transpose_b = False
+                trans_tensor(tensor_b)
