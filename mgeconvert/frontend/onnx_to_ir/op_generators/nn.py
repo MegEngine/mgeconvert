@@ -103,6 +103,7 @@ class GenMaxPoolOpr(OpGenBase):
         self.add_tensors()
         if "Global" in node.op_type:
             shape = self.op.inp_tensors[0].shape
+            assert len(shape) == 4, "bad shape {}".format(shape)
             self.op.kernel_size = [shape[2], shape[3]]
 
 

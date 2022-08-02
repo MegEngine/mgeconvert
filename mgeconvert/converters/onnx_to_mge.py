@@ -9,6 +9,7 @@
 import time
 
 from ..backend.ir_to_mge import MGEConverter
+from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.onnx_to_ir import ONNX_FrontEnd
 
 
@@ -27,7 +28,11 @@ def onnx_to_mge(onnx_fpath, output="out.mge"):
     front = ONNX_FrontEnd(onnx_fpath)
     ir_graph = front.resolve()
     onnx_res = front.eval(seed)
-
+    transformer_options = [
+        TransformerRule.FC_NO_TRANS,
+    ]
+    transformer = IRTransform(transformer_options)
+    ir_graph = transformer.transform(ir_graph)
     converter = MGEConverter(ir_graph)
     mge_res = converter.eval(seed)
 

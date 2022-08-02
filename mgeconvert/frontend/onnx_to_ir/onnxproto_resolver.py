@@ -28,14 +28,19 @@ onnx2np_dtype_mapping = {
 class ONNXProtoResolver:
     def __init__(self, onnx_model):
         self.onnx_model = onnx_model
+        self.tensor_value_cache = {}
 
     def get_ir_tensor_from_valueinfo(self, value_info, owner_opr=None):
-        type_proto = value_info.type
-        dtype = onnx2np_dtype_mapping[type_proto.tensor_type.elem_type]
-        shape = []
-        for n in type_proto.tensor_type.shape.dim:
-            shape.append(n.dim_value)
-        return IRTensor(value_info.name, shape, dtype, owner_opr=owner_opr)
+        tensor = self.tensor_value_cache.get(value_info.name, None)
+        if tensor is None:
+            type_proto = value_info.type
+            dtype = onnx2np_dtype_mapping[type_proto.tensor_type.elem_type]
+            shape = []
+            for n in type_proto.tensor_type.shape.dim:
+                shape.append(n.dim_value)
+            tensor = IRTensor(value_info.name, shape, dtype, owner_opr=owner_opr)
+            self.tensor_value_cache[value_info.name] = tensor
+        return tensor
 
     def get_ir_tensor_from_initializer(self, initializer, owner_opr=None):
         dtype = onnx2np_dtype_mapping[initializer.data_type]
@@ -72,5 +77,5 @@ class ONNXProtoResolver:
                 return self.get_ir_tensor_from_valueinfo(output)
         for v in self.onnx_model.graph.value_info:
             if v.name == name:
-                return self.get_ir_tensor_from_valueinfo(v)
+                return self.get_ir_tensor_from_valueinfo(v, owner_opr)
         return IRTensor(name, shape=[], dtype=None, owner_opr=owner_opr)
