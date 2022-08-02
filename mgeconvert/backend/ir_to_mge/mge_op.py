@@ -20,6 +20,7 @@ from ...converter_ir.ir_op import (
     FlattenOpr,
     GatherOpr,
     GetSubTensorOpr,
+    HardSigmoidOpr,
     LstmOpr,
     MatMulOpr,
     MaxPool2dOpr,
@@ -204,6 +205,12 @@ class AddConverter(TISOConvert):
 class SigmoidConverter(SISOConvert):
     def forward(self, inps):
         return F.nn.sigmoid(inps[0])
+
+@_register_op(HardSigmoidOpr)
+class HardSigmoidConverter(SISOConvert):
+    def forward(self, inps):
+        return F.nn.hsigmoid(inps[0])
+
 
 
 @_register_op(ReluOpr)

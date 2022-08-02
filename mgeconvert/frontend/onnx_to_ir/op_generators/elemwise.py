@@ -5,7 +5,7 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-from ....converter_ir.ir_op import AddOpr, MulOpr, ReluOpr, SigmoidOpr, SoftmaxOpr
+from ....converter_ir.ir_op import AddOpr, MulOpr, ReluOpr, SigmoidOpr, SoftmaxOpr, HardSigmoidOpr
 from .base import OpGenBase, _register_op
 
 
@@ -36,6 +36,15 @@ class GenSigmoidOpr(OpGenBase):
         super().__init__(node, ir_graph, resolver)
 
         self.op = SigmoidOpr()
+        self.add_tensors()
+
+@_register_op("HardSigmoid")
+class GenHardSigmoidOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+
+        self.op = HardSigmoidOpr()
         self.add_tensors()
 
 
