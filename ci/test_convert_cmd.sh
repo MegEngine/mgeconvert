@@ -17,6 +17,8 @@ pip3 install scikit-image==0.17.2
 
 
 python3 test/gen_models.py
+python3 test/onnx_model/resnet18.py
+python3 test/onnx_model/mobilenetv2.py
 
 python3 bin/convert tracedmodule_to_tflite -i float_model.tm -o out.tflite --prefer_same_pad_mode
 python3 bin/convert mge_to_tflite -i float_model.mge -o out.tflite --prefer_same_pad_mode
@@ -41,3 +43,6 @@ python3 bin/convert mge_to_onnx -i float_model.mge -o out.onnx
 
 python3 bin/convert onnx_to_tracedmodule -i out.onnx -o out.tm
 python3 bin/convert onnx_to_mge -i out.onnx -o out.mge
+
+python3 bin/convert onnx_to_mge -i resnet18.onnx -o resnet18_onnx.mge
+python3 bin/convert onnx_to_mge -i mobilenetv2.onnx -o mobilenetv2_onnx.mge
