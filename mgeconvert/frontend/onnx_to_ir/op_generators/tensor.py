@@ -6,6 +6,7 @@
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
+from typing import Iterable
 import numpy as np
 
 from ....converter_ir.ir_op import (
@@ -24,6 +25,11 @@ from ....converter_ir.ir_op import (
 from ..onnxproto_resolver import onnx2np_dtype_mapping
 from .base import OpGenBase, _register_op
 
+def get_first_arg(x):
+    if hasattr(x, '__getitem__'):
+        return x[0]
+    else:
+        return x
 
 @_register_op("Reshape")
 class GenReshapeOpr(OpGenBase):
@@ -245,9 +251,9 @@ class GenDropoutOpr(OpGenBase):
                     self.op.inp_tensors[2].np_data, dtype=self.op.inp_tensors[2].dtype
                 )
             self.op.inp_tensors = [self.op.inp_tensors[0]]
-
-        self.op.ratio_prob = ratio[0]
-        self.op.training = training_mode[0]
+        
+        self.op.ratio_prob = get_first_arg(ratio)
+        self.op.training = get_first_arg(training_mode)
 
 
 @_register_op("Resize")
