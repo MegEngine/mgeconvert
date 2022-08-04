@@ -13,7 +13,7 @@ from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.onnx_to_ir import ONNX_FrontEnd
 
 
-def onnx_to_mge(onnx_fpath, output="out.mge"):
+def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False):
     """
     Convert ONNX model to MGE model and save the MGE model to file `output`.
     :param onnx_fpath: the file path of onnx model.
@@ -49,4 +49,4 @@ def onnx_to_mge(onnx_fpath, output="out.mge"):
                 abs(float(i1) - float(i2)) <= eps
             ), f"Forward Result of ONNX and Mge Mismatch {i1}(ONNX) vs {i2}(Mge) with model at index {i}"
 
-    converter.dump_mge_model(output)
+    converter.dump_mge_model(output, optimize_for_inference)
