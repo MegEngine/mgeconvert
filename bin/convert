@@ -287,6 +287,13 @@ def init(subparsers):
                     opset=args.opset,
                     outspec=outspec,
                 )
+            elif "onnx_to_mge" in target:
+                converter_map[target](
+                    args.input,
+                    args.output,
+                    optimize_for_inference=args.optimize_for_inference
+                )
+
             else:
                 converter_map[target](
                     args.input,
@@ -322,6 +329,10 @@ def init(subparsers):
                 type=str,
                 help="end_point is used to specify which part of the mge model should be converted",
             )
+            if "mge" in target:
+                p.add_argument(
+                    "--optimize-for-inference", action="store_true", help="output model optimize for inference"
+                )
 
             if "tracedmodule" in target:
 

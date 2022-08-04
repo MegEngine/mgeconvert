@@ -187,7 +187,7 @@ class MGEConverter:
         self.tm = tm.trace_module(module, *self.inp_data)
         return self.tm
 
-    def dump_mge_model(self, mge_path):
+    def dump_mge_model(self, mge_path, optimize_for_inference):
         traced_module = self._construct_tm()
 
         @jit.trace(symbolic=True, capture_as_const=True)
@@ -196,7 +196,7 @@ class MGEConverter:
 
         _ = infer_func(*self.inp_data)
         infer_func.dump(
-            mge_path, arg_names=self.arg_names, optimize_for_inference=False
+            mge_path, arg_names=self.arg_names, optimize_for_inference=optimize_for_inference
         )
 
     def dump_tm_model(self, tm_path):
