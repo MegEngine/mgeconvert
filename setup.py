@@ -28,6 +28,7 @@ def write_init(targets, tflite_schema_version=None):
         [
             init_file.write("from .converters.mge_to_%s import mge_to_%s\n" % (i, i))
             for i in targets
+            if i not in ["torchscript"]
         ]
         [
             init_file.write(
@@ -58,9 +59,9 @@ class install(_install):
         _install.finalize_options(self)
 
     def run(self):
-        options = ["caffe", "onnx", "tflite"]
-        if self.targets.find("all") >= 0:
-            targets.update(set(options))
+        options = ["caffe", "onnx", "tflite", "torchscript"]
+        if self.targets == "all":
+            targets.update(options)
         elif self.targets is None:
             pass
         else:
@@ -94,13 +95,15 @@ class install(_install):
 class build_ext(_build_ext):
     def run(self):
         for target in targets:
-            self.build_all(self.find_extension(target))
+            ext = self.find_extension(target)
+            if ext is not None:
+                self.build_all(ext)
 
     def find_extension(self, name):
         for ext in self.extensions:
             if ext.name == name:
                 return ext
-        raise TypeError("can not build %s" % name)
+        return None
 
     def build_all(self, ext):
         if ext.script:
@@ -141,11 +144,13 @@ if __name__ == "__main__":
         "onnx": ["onnx>=1.8.0", "onnx-simplifier>=0.3.6", "protobuf",],
         "caffe": ["protobuf>=3.11.1"],
         "tflite": ["flatbuffers==1.12.0", "pybind11==2.6.2"],
+        "torchscript": ["torch>=1.10"],
         "all": [
             "onnx>=1.8.0",
             "onnx-simplifier>=0.3.6",
             "protobuf>=3.11.1",
             "flatbuffers==1.12.0",
+            "torch>=1.10",
         ],
     }
     pkg_name = "mgeconvert"
@@ -153,7 +158,7 @@ if __name__ == "__main__":
         if sys.argv[1] == "install":
             assert (
                 len(sys.argv) > 2
-            ), 'use "--targets=[eg, tflite,caffe,onnx,all]" to indicate converters to install'
+            ), 'use "--targets=[eg, tflite,caffe,onnx,torchscript,all]" to indicate converters to install'
             targets_cache = set()
             for v in sys.argv[2:]:
                 targets_args = re.findall(

@@ -196,7 +196,6 @@ def qat_deconv_relu_bias(
     relu = expr.inputs[1].expr
     deconv = relu.inputs[0].expr
     op = gen_qat_conv_opr(module, deconv, call_expr, irgraph, is_deconv=True)
-    op.activation = "RELU"
 
     relu_op = ReluOpr()
     relu_op.inp_tensors = []

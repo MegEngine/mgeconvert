@@ -526,7 +526,7 @@ def _add_bias_for_deconv(net: IRGraph):
 @_register_tranformation_rule(TransformerRule.RESHAPE_BIAS_TO_1DIM)
 def _reshape_bias_to_1dim(net: IRGraph):
     for op in net.all_oprs:
-        if not isinstance(op, (Deconv2dOpr, Conv2dOpr)):
+        if not isinstance(op, (Deconv2dOpr, Conv2dOpr, ConvRelu2dOpr)):
             continue
         if len(op.inp_tensors) == 2:
             continue

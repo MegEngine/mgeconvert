@@ -38,11 +38,11 @@ MgeConvert转换器的结构包含前端、中间表示（IR）、后端三个�
 - :memo: 未支持，或尚未测试完全
 - :boom: 明确不支持
 
-| TracedModule        | tflite             | caffe              | onnx               |
-|---------------------|--------------------|--------------------|--------------------|
-| QAT                 | :white_check_mark: | :white_check_mark: | :memo:             |
-| Quantized           | :white_check_mark: | :boom:             | :memo:             |
-| Float32             | :white_check_mark: | :white_check_mark: | :white_check_mark: |
+| TracedModule        | tflite             | caffe              | onnx               |torchscript|
+|---------------------|--------------------|--------------------|--------------------|-----------|
+| QAT                 | :white_check_mark: | :white_check_mark: | :memo:             |:white_check_mark:|
+| Quantized           | :white_check_mark: | :boom:             | :memo:             | :boom: |
+| Float32             | :white_check_mark: | :white_check_mark: | :white_check_mark: |:white_check_mark:|
 
 | Mge                 | tflite             | caffe              | onnx               |
 |---------------------|--------------------|--------------------|--------------------|
@@ -67,6 +67,10 @@ MgeConvert 基于 MegEngine 工作，因此确保您的电脑已经安装 MegEng
 
  - Python packages: pybind11==2.6.2
  - third party: [flatbuffers](https://github.com/google/flatbuffers.git)==1.12.0
+
+4. torchscript
+
+ - torch >= 1.10
 
 > :warning: 安装时以上依赖覆盖本地版本
 
@@ -264,7 +268,9 @@ ImportError: /home//lib/python3.6/site-packages/mgeconvert/backend/ir_to_tflite/
 
 ## 算子支持列表
 
-| tracemodule:rocket:<br/>mgo:fire:      | TFLite  | Caffe   | ONNX    |
+### tracedmodule -> {tflite, caffe, onnx}
+
+| tracedmodule:rocket:<br/>mgo:fire:      | TFLite  | Caffe   | ONNX    |
 |--------------------------|---------|---------|---------|
 | abs                      | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
 | average pool2d           | ✓<br/>✓ | ✓<br/>✓ | ✓<br/>✓ |
@@ -304,8 +310,9 @@ ImportError: /home//lib/python3.6/site-packages/mgeconvert/backend/ir_to_tflite/
 | AdaptiveAvgPool2d        | ×<br/>× | ✓<br/>✓ | ✓<br/>✓ |
 | flatten                  | ×<br/>× | ×<br/>× | ✓<br/>✓ |
 
+### onnx -> {tracedmodule, mge}
 
-| ONNX                     | tracemodule:rocket:<br/>mge:fire:  |
+| ONNX                     | tracedmodule:rocket:<br/>mge:fire:  |
 |--------------------------|---------|
 | Abs                      | ✓<br/>✓ |
 | AveragePool              | ✓<br/>✓ |
