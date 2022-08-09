@@ -11,7 +11,7 @@ apt install -y protobuf-compiler
 ./mgeconvert/backend/ir_to_caffe/init.sh False /usr/bin/python3
 
 pip3 install scikit-image==0.17.2 onnx onnxruntime
-
+pip3 install torch>=1.10
 export USE_CAFFE_PROTO=1
 
 function version_gt() { test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"; }

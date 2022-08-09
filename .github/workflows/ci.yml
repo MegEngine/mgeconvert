@@ -52,6 +52,18 @@ jobs:
       - name: test tflite
         run: ./ci/pytest_tflite.sh
 
+  pytest-torchscript:
+    runs-on: ubuntu-latest
+    container:
+      image: enginesh233/mgeconvert_ci:v1.1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: test torchscipt
+        run: ./ci/pytest_torchscript.sh
+
   test-convert-cmd:
     runs-on: ubuntu-latest
     container:
