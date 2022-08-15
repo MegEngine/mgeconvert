@@ -7,11 +7,17 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 from ....converter_ir.ir_op import (
     AddOpr,
+    DivOpr,
     HardSigmoidOpr,
+    MatMulOpr,
     MulOpr,
+    PowOpr,
+    ReduceOpr,
     ReluOpr,
     SigmoidOpr,
     SoftmaxOpr,
+    SqrtOpr,
+    SubOpr,
 )
 from .base import OpGenBase, _register_op
 
@@ -33,6 +39,73 @@ class GenAddOpr(OpGenBase):
         super().__init__(node, ir_graph, resolver)
 
         self.op = AddOpr()
+        self.add_tensors()
+
+
+@_register_op("Sub")
+class GenSubOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+
+        self.op = SubOpr()
+        self.add_tensors()
+
+
+@_register_op("Pow")
+class GenPowOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        super().__init__(node, ir_graph, resolver)
+
+        self.op = PowOpr()
+        self.add_tensors()
+        # print("self.op.inp_tensors pow", self.op.inp_tensors[1].shape)
+
+
+@_register_op("Sqrt")
+class GenSqrtOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+
+        self.op = SqrtOpr()
+        self.add_tensors()
+
+
+@_register_op("Div")
+class GenDivOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+
+        self.op = DivOpr()
+        self.add_tensors()
+
+
+@_register_op("MatMul")
+class GenMatMulOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+
+        self.op = MatMulOpr()
+        self.add_tensors()
+
+
+@_register_op("ReduceMean")
+class GenReduceMeanOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+        # print("前端", self.op.inp_tensors)
+        self.mode = "MEAN"
+        self.keepdims = True
+        for attr in node.attribute:
+            if attr.name == "axes":
+                self.axis = attr.ints
+            elif attr.name == "keepdims":
+                self.keepdims = True if attr.i == 1 else False
+        self.op = ReduceOpr(self.axis, self.mode, self.keepdims)
         self.add_tensors()
 
 

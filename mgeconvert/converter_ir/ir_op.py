@@ -389,6 +389,14 @@ class PowOpr(ElemwiseOpr):
     name = "Pow"
 
 
+class SqrtOpr(ElemwiseOpr):
+    name = "Sqrt"
+
+
+class DivOpr(ElemwiseOpr):
+    name = "Div"
+
+
 class ExpOpr(ElemwiseOpr):
     name = "Exp"
 
