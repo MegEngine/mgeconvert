@@ -16,6 +16,7 @@ from ...converter_ir.ir_op import (
     ClipOpr,
     ConcatOpr,
     Conv2dOpr,
+    DivOpr,
     DropoutOpr,
     FlattenOpr,
     GatherOpr,
@@ -25,11 +26,15 @@ from ...converter_ir.ir_op import (
     MatMulOpr,
     MaxPool2dOpr,
     MulOpr,
+    PowOpr,
+    ReduceOpr,
     ReluOpr,
     ReshapeOpr,
     ResizeOpr,
     SigmoidOpr,
     SoftmaxOpr,
+    SqrtOpr,
+    SubOpr,
     TransposeOpr,
     TypeCvtOpr,
     GetVarShapeOpr,
@@ -202,6 +207,65 @@ class MulConverter(TISOConvert):
 class AddConverter(TISOConvert):
     def forward(self, inps):
         return F.add(inps[0], inps[1])
+
+
+@_register_op(SubOpr)
+class SubConverter(TISOConvert):
+    def forward(self, inps):
+        return F.sub(inps[0], inps[1])
+
+
+@_register_op(PowOpr)
+class PowConverter(TISOConvert):
+    def forward(self, inps):
+        return F.pow(inps[0], inps[1])
+
+
+@_register_op(SqrtOpr)
+class SqrtConverter(SISOConvert):
+    def forward(self, inps):
+        return F.sqrt(inps[0])
+
+
+@_register_op(DivOpr)
+class DivConverter(TISOConvert):
+    def forward(self, inps):
+        return F.div(inps[0], inps[1])
+
+
+@_register_op(MatMulOpr)
+class MatMulConverter(TISOConvert):
+    def forward(self, inps):
+        return F.matmul(inps[0], inps[1])
+
+
+@_register_param_extract(ReduceOpr)
+class ReduceExtractor:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def extract(self):
+        param = {}
+        param["mode"] = self._opr.mode
+        param["axis"] = self._opr.axis
+        param["keepdims"] = self._opr.keep_dims
+        return param
+
+
+@_register_op(ReduceOpr)
+class ReduceConverer(SISOConvert):
+    def forward(self, inps):
+        func_mode_map = {
+            "MAX": F.max,
+            "MIN": F.min,
+            "MEAN": F.mean,
+            "SUM": F.sum,
+        }
+        op = func_mode_map[self.param["mode"]]
+        axes = self.param["axis"]
+        if len(axes) == 1:
+            axes = axes[0]
+        return op(inps[0], axis=axes, keepdims=self.param["keepdims"])
 
 
 @_register_op(SigmoidOpr)
