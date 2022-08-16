@@ -312,6 +312,7 @@ class SqueezeOpr(OpBase):
         super().__init__()
         self.squeeze_dims = squeeze_dims
 
+
 class UnsqueezeOpr(OpBase):
     name = "Unsqueeze"
 

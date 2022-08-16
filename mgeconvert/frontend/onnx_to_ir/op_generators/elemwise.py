@@ -102,7 +102,7 @@ class GenReduceMeanOpr(OpGenBase):
         self.keepdims = True
         for attr in node.attribute:
             if attr.name == "axes":
-                self.axis = attr.ints
+                self.axis = tuple(attr.ints)
             elif attr.name == "keepdims":
                 self.keepdims = True if attr.i == 1 else False
         self.op = ReduceOpr(self.axis, self.mode, self.keepdims)

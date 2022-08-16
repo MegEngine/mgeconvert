@@ -196,7 +196,9 @@ class MGEConverter:
 
         _ = infer_func(*self.inp_data)
         infer_func.dump(
-            mge_path, arg_names=self.arg_names, optimize_for_inference=optimize_for_inference
+            mge_path,
+            arg_names=self.arg_names,
+            optimize_for_inference=optimize_for_inference,
         )
 
     def dump_tm_model(self, tm_path):
