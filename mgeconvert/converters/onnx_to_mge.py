@@ -52,7 +52,9 @@ def onnx_to_mge(
         mge_data_f = mge_data.numpy().flatten()
         for i, (i1, i2) in enumerate(zip(onnx_data_f, mge_data_f)):
             assert (
-                abs(float(i1) - float(i2)) / (abs(float(i1)) + abs(float(i2))) <= eps
+                abs(float(i1) - float(i2)) / (abs(float(i1)) + abs(float(i2) + 1e-9))
+                <= eps
+                or abs(float(i1) - float(i2)) <= eps
             ), f"Forward Result of ONNX and Mge Mismatch {i1}(ONNX) vs {i2}(Mge) with model at index {i}"
 
     converter.dump_mge_model(output, optimize_for_inference)
