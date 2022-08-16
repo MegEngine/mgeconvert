@@ -312,6 +312,13 @@ class SqueezeOpr(OpBase):
         super().__init__()
         self.squeeze_dims = squeeze_dims
 
+class UnsqueezeOpr(OpBase):
+    name = "Unsqueeze"
+
+    def __init__(self, squeeze_dims):
+        super().__init__()
+        self.squeeze_dims = squeeze_dims
+
 
 class GetSubTensorOpr(OpBase):
     name = "GetSubTensor"

@@ -25,8 +25,8 @@ ONNXDTYPE2NUMPY = {
 
 
 class ONNX_FrontEnd:
-    def __init__(self, onnx_model_path):
-        self.onnx_model, _ = onnxsim.simplify(onnx_model_path)
+    def __init__(self, onnx_model_path,*, dynamic_input_shape=False):
+        self.onnx_model, _ = onnxsim.simplify(onnx_model_path, dynamic_input_shape=dynamic_input_shape)
         self.onnx_model = onnx.shape_inference.infer_shapes(self.onnx_model)
         print(f"ONNX Model Producer : {self.onnx_model.producer_name}")
         print(f"ONNX Model Producer Version: {self.onnx_model.producer_version}")
