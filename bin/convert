@@ -291,7 +291,8 @@ def init(subparsers):
                 converter_map[target](
                     args.input,
                     args.output,
-                    optimize_for_inference=args.optimize_for_inference
+                    optimize_for_inference=args.optimize_for_inference,
+                    frozen_input_shape=args.frozen_input_shape
                 )
 
             else:
@@ -328,6 +329,11 @@ def init(subparsers):
                 default=None,
                 type=str,
                 help="end_point is used to specify which part of the mge model should be converted",
+            )
+            p.add_argument(
+                "--frozen_input_shape",
+                action="store_true",
+                help="when enable, onnxsim use dynamic_input_shape=False to optimize model for current shape, it will frozen shape",
             )
             if "mge" in target:
                 p.add_argument(

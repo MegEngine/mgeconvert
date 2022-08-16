@@ -7,6 +7,7 @@
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 
 from typing import Iterable
+
 import numpy as np
 
 from ....converter_ir.ir_op import (
@@ -17,21 +18,23 @@ from ....converter_ir.ir_op import (
     GatherOpr,
     GetSubTensorOpr,
     GetVarShapeOpr,
-    UnsqueezeOpr,
     MatMulOpr,
     ReshapeOpr,
     ResizeOpr,
     TransposeOpr,
     TypeCvtOpr,
+    UnsqueezeOpr,
 )
 from ..onnxproto_resolver import onnx2np_dtype_mapping
 from .base import OpGenBase, _register_op
 
+
 def get_first_arg(x):
-    if hasattr(x, '__getitem__'):
+    if hasattr(x, "__getitem__"):
         return x[0]
     else:
         return x
+
 
 @_register_op("Reshape")
 class GenReshapeOpr(OpGenBase):
@@ -43,7 +46,7 @@ class GenReshapeOpr(OpGenBase):
         if opset < 5:
             for attr in node.attribute:
                 if attr.name == "shape":
-                    out_shape = attr.ints
+                    out_shape = tuple(attr.ints)
         else:
             ir_outshape_tensor = self.op.inp_tensors[1]
             if self.op.inp_tensors[1].np_data is not None:
@@ -278,7 +281,7 @@ class GenDropoutOpr(OpGenBase):
                     self.op.inp_tensors[2].np_data, dtype=self.op.inp_tensors[2].dtype
                 )
             self.op.inp_tensors = [self.op.inp_tensors[0]]
-        
+
         self.op.ratio_prob = get_first_arg(ratio)
         self.op.training = get_first_arg(training_mode)
 
@@ -347,4 +350,3 @@ class GenGatherOpr(OpGenBase):
                 axis = attr.i
         self.op = GatherOpr(axis)
         self.add_tensors()
-

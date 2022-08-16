@@ -21,6 +21,7 @@ from ...converter_ir.ir_op import (
     FlattenOpr,
     GatherOpr,
     GetSubTensorOpr,
+    GetVarShapeOpr,
     HardSigmoidOpr,
     LstmOpr,
     MatMulOpr,
@@ -37,7 +38,6 @@ from ...converter_ir.ir_op import (
     SubOpr,
     TransposeOpr,
     TypeCvtOpr,
-    GetVarShapeOpr,
     UnsqueezeOpr,
 )
 
@@ -126,7 +126,10 @@ class OperatorBaseConverter:
         ):
             if name in map_ir_tensor_2_mge_tensor:
                 inp.append(map_ir_tensor_2_mge_tensor[name])
-                if shape is not None and len(map_ir_tensor_2_mge_tensor[name].shape)>0:
+                if (
+                    shape is not None
+                    and len(map_ir_tensor_2_mge_tensor[name].shape) > 0
+                ):
                     mge_shape = map_ir_tensor_2_mge_tensor[name].shape.numpy()
                     if shape:
                         assert (
@@ -187,8 +190,12 @@ class OperatorBaseConverter:
 
 class SISOConvert(OperatorBaseConverter):
     def check_valid(self, inputs, outputs):
-        assert len(inputs) == 1, "{} Length of inputs should be 1, but {}".format(self, len(inputs))
-        assert len(outputs) == 1, "{} Length of outptus should be 1, but {}".format(self, len(outputs))
+        assert len(inputs) == 1, "{} Length of inputs should be 1, but {}".format(
+            self, len(inputs)
+        )
+        assert len(outputs) == 1, "{} Length of outptus should be 1, but {}".format(
+            self, len(outputs)
+        )
 
 
 class TISOConvert(OperatorBaseConverter):
@@ -263,8 +270,6 @@ class ReduceConverer(SISOConvert):
         }
         op = func_mode_map[self.param["mode"]]
         axes = self.param["axis"]
-        if len(axes) == 1:
-            axes = axes[0]
         return op(inps[0], axis=axes, keepdims=self.param["keepdims"])
 
 
@@ -284,6 +289,7 @@ class HardSigmoidConverter(SISOConvert):
 class ReluConverter(SISOConvert):
     def forward(self, inps):
         return F.nn.relu(inps[0])
+
 
 @_register_op(GetVarShapeOpr)
 class GetVarShapeConverter(SISOConvert):
@@ -804,6 +810,7 @@ class GatherExtractor:
         opr = self._opr
         return {"axis": opr.axis}
 
+
 @_register_param_extract(UnsqueezeOpr)
 class UnsqueezeOprExtractor:
     def __init__(self, opr):
@@ -814,11 +821,13 @@ class UnsqueezeOprExtractor:
         param["squeeze_dims"] = self._opr.squeeze_dims
         return param
 
+
 @_register_op(UnsqueezeOpr)
 class UnsqueezeOprConvert(SISOConvert):
     def forward(self, inps):
         dims = self.param["squeeze_dims"]
         return F.expand_dims(inps[0], dims)
+
 
 @_register_op(GatherOpr)
 class GatherConvert(TISOConvert):
@@ -826,6 +835,14 @@ class GatherConvert(TISOConvert):
         indics = inps[1].numpy()
         axes = self.param["axis"]
         assert len(indics.shape) == 0
-        assert axes == 0
-        x = inps[0][indics]
+        x = inps[0]
+        dims = len(x._tuple_shape)
+        index = int(indics)
+        sub_indics = [
+            slice(index, index + 1, None) if i == axes else slice(None, None, None)
+            for i in range(dims)
+        ]
+        sub_indics = tuple(sub_indics)
+        x = inps[0][sub_indics]
+        x = F.squeeze(x, axis=axes)
         return x

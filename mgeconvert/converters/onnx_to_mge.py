@@ -13,7 +13,13 @@ from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.onnx_to_ir import ONNX_FrontEnd
 
 
-def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False, dynamic_input_shape = True):
+def onnx_to_mge(
+    onnx_fpath,
+    output="out.mge",
+    *,
+    optimize_for_inference=False,
+    frozen_input_shape=False,
+):
     """
     Convert ONNX model to MGE model and save the MGE model to file `output`.
     :param onnx_fpath: the file path of onnx model.
@@ -25,7 +31,7 @@ def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False, d
     assert isinstance(output, str), "mge_fpath must be string"
 
     seed = int(time.time())
-    front = ONNX_FrontEnd(onnx_fpath, dynamic_input_shape=dynamic_input_shape)
+    front = ONNX_FrontEnd(onnx_fpath, dynamic_input_shape=not frozen_input_shape)
     ir_graph = front.resolve()
     onnx_res = front.eval(seed)
     transformer_options = [
@@ -46,7 +52,7 @@ def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False, d
         mge_data_f = mge_data.numpy().flatten()
         for i, (i1, i2) in enumerate(zip(onnx_data_f, mge_data_f)):
             assert (
-                abs(float(i1) - float(i2)) <= eps
+                abs(float(i1) - float(i2)) / (abs(float(i1)) + abs(float(i2))) <= eps
             ), f"Forward Result of ONNX and Mge Mismatch {i1}(ONNX) vs {i2}(Mge) with model at index {i}"
 
     converter.dump_mge_model(output, optimize_for_inference)
