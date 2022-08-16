@@ -55,11 +55,11 @@ class GenSubOpr(OpGenBase):
 @_register_op("Pow")
 class GenPowOpr(OpGenBase):
     def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
 
         self.op = PowOpr()
         self.add_tensors()
-        # print("self.op.inp_tensors pow", self.op.inp_tensors[1].shape)
 
 
 @_register_op("Sqrt")
@@ -97,14 +97,13 @@ class GenReduceMeanOpr(OpGenBase):
     def __init__(self, node, ir_graph, resolver, opset):
         # pylint: disable=W0612,W0613
         super().__init__(node, ir_graph, resolver)
-        # print("前端", self.op.inp_tensors)
         self.mode = "MEAN"
         self.keepdims = True
         for attr in node.attribute:
             if attr.name == "axes":
                 self.axis = tuple(attr.ints)
             elif attr.name == "keepdims":
-                self.keepdims = True if attr.i == 1 else False
+                self.keepdims = attr.i == 1
         self.op = ReduceOpr(self.axis, self.mode, self.keepdims)
         self.add_tensors()
 

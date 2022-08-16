@@ -44,5 +44,10 @@ python3 bin/convert onnx_to_mge -i out.onnx -o out.mge
 
 python3 test/onnx_model/resnet18.py
 python3 test/onnx_model/mobilenetv2.py
+python3 test/onnx_model/efficientnet.py
+python3 test/onnx_model/mobilenetv3.py
+python3 test/onnx_model/mobileone.py
 python3 bin/convert onnx_to_mge -i resnet18.onnx -o resnet18_onnx.mge
 python3 bin/convert onnx_to_mge -i mobilenetv2.onnx -o mobilenetv2_onnx.mge
+python3 bin/convert onnx_to_mge -i efficientnet_b0.onnx -o efficientnet_b0.mge
+python3 bin/convert onnx_to_mge -i mobilenetv3.onnx -o mobilenetv3.mge
