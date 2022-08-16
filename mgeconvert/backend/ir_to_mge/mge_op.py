@@ -32,6 +32,8 @@ from ...converter_ir.ir_op import (
     SoftmaxOpr,
     TransposeOpr,
     TypeCvtOpr,
+    GetVarShapeOpr,
+    UnsqueezeOpr,
 )
 
 mge_version = mge.__version__
@@ -119,11 +121,12 @@ class OperatorBaseConverter:
         ):
             if name in map_ir_tensor_2_mge_tensor:
                 inp.append(map_ir_tensor_2_mge_tensor[name])
-                if shape is not None:
+                if shape is not None and len(map_ir_tensor_2_mge_tensor[name].shape)>0:
                     mge_shape = map_ir_tensor_2_mge_tensor[name].shape.numpy()
-                    assert (
-                        shape == mge_shape
-                    ).all(), f"ONNX shape Infer mismatch with Mge : {shape}(ONNX) vs {mge_shape}Mge"
+                    if shape:
+                        assert (
+                            shape == mge_shape
+                        ).all(), f"ONNX shape Infer mismatch with Mge : {shape}(ONNX) vs {mge_shape}Mge"
             else:
                 assert (
                     data is not None
@@ -179,8 +182,8 @@ class OperatorBaseConverter:
 
 class SISOConvert(OperatorBaseConverter):
     def check_valid(self, inputs, outputs):
-        assert len(inputs) == 1, "Length of inputs should be 1"
-        assert len(outputs) == 1, "Length of outptus should be 1"
+        assert len(inputs) == 1, "{} Length of inputs should be 1, but {}".format(self, len(inputs))
+        assert len(outputs) == 1, "{} Length of outptus should be 1, but {}".format(self, len(outputs))
 
 
 class TISOConvert(OperatorBaseConverter):
@@ -218,6 +221,11 @@ class ReluConverter(SISOConvert):
     def forward(self, inps):
         return F.nn.relu(inps[0])
 
+@_register_op(GetVarShapeOpr)
+class GetVarShapeConverter(SISOConvert):
+    def forward(self, inps):
+        return inps[0].shape
+
 
 @_register_param_extract(ReshapeOpr)
 class ReshapeExtractor:
@@ -234,10 +242,12 @@ class ReshapeExtractor:
 
 
 @_register_op(ReshapeOpr)
-class ReshapeConverter(SISOConvert):
+class ReshapeConverter(OperatorBaseConverter):
     def forward(self, inps):
         target_shape = self.param["out_shape"]
-        if 0 not in target_shape and -1 not in target_shape:
+        if target_shape is None:
+            return F.reshape(inps[0], inps[1])
+        elif 0 not in target_shape and -1 not in target_shape:
             return F.reshape(inps[0], target_shape)
         else:
             tshape = []
@@ -510,7 +520,8 @@ class ConcatExtractor:
 @_register_op(ConcatOpr)
 class ConcatConvert(OperatorBaseConverter):
     def forward(self, inps):
-        return F.concat(inps, self.param["axis"])
+        x = F.concat(inps, self.param["axis"])
+        return x
 
 
 @_register_param_extract(DropoutOpr)
@@ -729,17 +740,28 @@ class GatherExtractor:
         opr = self._opr
         return {"axis": opr.axis}
 
+@_register_param_extract(UnsqueezeOpr)
+class UnsqueezeOprExtractor:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def extract(self):
+        param = {}
+        param["squeeze_dims"] = self._opr.squeeze_dims
+        return param
+
+@_register_op(UnsqueezeOpr)
+class UnsqueezeOprConvert(SISOConvert):
+    def forward(self, inps):
+        dims = self.param["squeeze_dims"]
+        return F.expand_dims(inps[0], dims)
 
 @_register_op(GatherOpr)
 class GatherConvert(TISOConvert):
     def forward(self, inps):
-        indices_shape = inps[1].shape.numpy()
-        if inps[0].ndim == 2 and inps[1].ndim == 1:
-            if self.param["axis"] == 0:
-                x = F.reshape(inps[1], [indices_shape[0], 1])
-            else:
-                assert self.param["axis"] == 1
-                x = F.reshape(inps[1], [1, indices_shape[0]])
-            return F.gather(inps[0], self.param["axis"], x)
-        else:
-            return F.gather(inps[0], self.param["axis"], inps[1])
+        indics = inps[1].numpy()
+        axes = self.param["axis"]
+        assert len(indics.shape) == 0
+        assert axes == 0
+        x = inps[0][indics]
+        return x

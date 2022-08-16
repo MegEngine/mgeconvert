@@ -16,6 +16,8 @@ from ....converter_ir.ir_op import (
     FlattenOpr,
     GatherOpr,
     GetSubTensorOpr,
+    GetVarShapeOpr,
+    UnsqueezeOpr,
     MatMulOpr,
     ReshapeOpr,
     ResizeOpr,
@@ -44,17 +46,23 @@ class GenReshapeOpr(OpGenBase):
                     out_shape = attr.ints
         else:
             ir_outshape_tensor = self.op.inp_tensors[1]
-            out_shape = np.frombuffer(
-                ir_outshape_tensor.np_data, ir_outshape_tensor.dtype
-            )
-            self.op.inp_tensors = [self.op.inp_tensors[0]]
+            if self.op.inp_tensors[1].np_data is not None:
+                out_shape = np.frombuffer(
+                    ir_outshape_tensor.np_data, ir_outshape_tensor.dtype
+                )
+                self.op.inp_tensors = [self.op.inp_tensors[0]]
+                valid_test = [i for i, k in enumerate(out_shape) if k == -1]
+                assert (
+                    len(valid_test) <= 1
+                ), "Target Shape of ReShape Opr only contains '-1' Once At Most"
+            else:
+                # dynamic shape case
+                out_shape = None
+                self.op.inp_tensors = [self.op.inp_tensors[0], ir_outshape_tensor]
+
             for attr in node.attribute:
                 if attr.name == "allowzero":
                     self.op.allowzero = attr.i
-        valid_test = [i for i, k in enumerate(out_shape) if k == -1]
-        assert (
-            len(valid_test) <= 1
-        ), "Target Shape of ReShape Opr only contains '-1' Once At Most"
 
         self.op.out_shape = out_shape
 
@@ -165,6 +173,25 @@ class GenCastOpr(OpGenBase):
         assert node.attribute[0].name == "to"
         out_dtype = onnx2np_dtype_mapping[node.attribute[0].i]
         self.op = TypeCvtOpr(out_dtype)
+        self.add_tensors()
+
+
+@_register_op("Shape")
+class GenShapeOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+        self.op = GetVarShapeOpr()
+        self.add_tensors()
+
+
+@_register_op("Unsqueeze")
+class GenUnsqueezeOpr(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+        axes = node.attribute[0].i
+        self.op = UnsqueezeOpr(axes)
         self.add_tensors()
 
 
@@ -315,11 +342,9 @@ class GenGatherOpr(OpGenBase):
         super().__init__(node, ir_graph, resolver)
 
         axis = 0
-        self.op = GatherOpr(axis)
-        self.add_tensors()
-
         for attr in node.attribute:
             if attr.name == "axis":
                 axis = attr.i
+        self.op = GatherOpr(axis)
+        self.add_tensors()
 
-        self.op.axis = axis

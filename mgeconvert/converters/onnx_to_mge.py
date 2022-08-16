@@ -13,7 +13,7 @@ from ..converter_ir.ir_transform import IRTransform, TransformerRule
 from ..frontend.onnx_to_ir import ONNX_FrontEnd
 
 
-def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False):
+def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False, dynamic_input_shape = True):
     """
     Convert ONNX model to MGE model and save the MGE model to file `output`.
     :param onnx_fpath: the file path of onnx model.
@@ -25,7 +25,7 @@ def onnx_to_mge(onnx_fpath, output="out.mge", *, optimize_for_inference=False):
     assert isinstance(output, str), "mge_fpath must be string"
 
     seed = int(time.time())
-    front = ONNX_FrontEnd(onnx_fpath)
+    front = ONNX_FrontEnd(onnx_fpath, dynamic_input_shape=dynamic_input_shape)
     ir_graph = front.resolve()
     onnx_res = front.eval(seed)
     transformer_options = [
