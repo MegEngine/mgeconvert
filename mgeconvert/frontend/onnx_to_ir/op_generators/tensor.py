@@ -60,7 +60,7 @@ class GenReshapeOpr(OpGenBase):
         self.op.out_shape = out_shape
 
 
-@_register_op("Gemm")
+@_register_op("Gemm", "MatMul")
 class GenMatrixMulOpr(OpGenBase):
     def __init__(self, node, ir_graph, resolver, opset):
         # pylint: disable=W0612,W0613
