@@ -47,7 +47,8 @@ class Conv2dOpr(_ConvOpr):
 class Deconv2dOpr(_ConvOpr):
     name = "Deconv2d"
 
-
+class DeconvRelu2dOpr(_ConvOpr):
+    name = "Deconv2d"
 class ConvRelu2dOpr(_ConvOpr):
     name = "ConvRelu2d"
 

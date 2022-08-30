@@ -12,11 +12,12 @@ import megengine.functional as F
 import megengine.module as M
 import megengine.module.qat as QAT
 
-from ....converter_ir.ir_op import Deconv2dOpr
+from ....converter_ir.ir_op import Deconv2dOpr, DeconvRelu2dOpr
 from ....converter_ir.ir_tensor import AxisOrder
 from ..tm_utils import get_logger
 from .base import _register_op
 from .conv2d import GenConvBase, GenQConvBase
+from .conv_bn2d import GenQConvBnBase
 
 logger = get_logger(__name__)
 
@@ -32,4 +33,10 @@ class GenDeconv2dOpr(GenConvBase):
 class GenQDeconv2dOpr(GenQConvBase):
     def __init__(self, expr, irgraph):
         super().__init__(expr, irgraph, Deconv2dOpr)
+        self.add_opr_vars(AxisOrder.IOHW)
+
+@_register_op(QAT.ConvTranspose2dBnRelu2d)
+class GenQDeconv2dOpr(GenQConvBnBase):
+    def __init__(self, expr, irgraph):
+        super().__init__(expr, irgraph, DeconvRelu2dOpr)
         self.add_opr_vars(AxisOrder.IOHW)

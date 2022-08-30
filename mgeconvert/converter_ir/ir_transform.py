@@ -22,6 +22,7 @@ from .ir_op import (
     Conv2dOpr,
     ConvRelu2dOpr,
     Deconv2dOpr,
+    DeconvRelu2dOpr,
     DropoutOpr,
     ExpOpr,
     FlattenOpr,
@@ -78,6 +79,7 @@ class TransformerRule(Enum):
     # FUSE_FOR_RELU6 pass should happen before FUSE_ACTIVATION
     FUSE_FOR_RELU6 = 102  ##
     EXPAND_CONVRELU = 102.1
+    EXPAND_DECONVRELU = 102.2
     CONV_ADD_ZERO_BIAS = 103
     FUSE_FOR_CONV_BIAS = 103.1
     FUSE_CONV_BN = 104
@@ -1420,6 +1422,8 @@ def _remove_identity(net: IRGraph):
             except:  # pylint: disable=bare-except
                 opr.inp_tensors[0].user_opr.append(user)
         delete_intended.append(net._opr_ids.index(op_id))
+        if opr.out_tensors[0] in net.graph_outputs:
+            net.graph_outputs[net.graph_outputs.index(opr.out_tensors[0])] = opr.inp_tensors[0]
 
     for delete_idx in delete_intended[::-1]:
         net.delete_ops(delete_idx)
@@ -1432,6 +1436,48 @@ def _expand_conv_relu(net: IRGraph):
             continue
 
         conv_op = Conv2dOpr(
+            stride=opr.stride,
+            padding=opr.padding,
+            dilation=opr.dilation,
+            groups=opr.groups,
+        )
+        conv_op.inp_tensors = opr.inp_tensors
+        for t in conv_op.inp_tensors:
+            idx = t.user_opr.index(opr)
+            t.user_opr[idx] = conv_op
+        conv_out_tensor = IRTensor(
+            name=opr.out_tensors[0].name + "_conv_out",
+            shape=opr.out_tensors[0].shape,
+            dtype=opr.out_tensors[0].dtype,
+            scale=opr.out_tensors[0].scale,
+            zero_point=opr.out_tensors[0].zero_point,
+            q_type=opr.out_tensors[0].q_dtype,
+            np_dtype=opr.out_tensors[0].np_dtype,
+            owner_opr=conv_op,
+        )
+        conv_op.out_tensors = [conv_out_tensor]
+        conv_out_tensor.owner_opr = conv_op
+
+        idx = net.all_oprs.index(opr)
+        net.add_op(conv_op, idx)
+
+        relu_op = ReluOpr()
+        relu_op.inp_tensors = conv_op.out_tensors
+        conv_out_tensor.user_opr.append(relu_op)
+        relu_op.out_tensors = opr.out_tensors
+        for t in relu_op.out_tensors:
+            t.owner_opr = relu_op
+
+        net.replace_op(opr, relu_op)
+
+
+@_register_tranformation_rule(TransformerRule.EXPAND_DECONVRELU)
+def _expand_deconv_relu(net: IRGraph):
+    for opr in net.all_oprs:
+        if not isinstance(opr, DeconvRelu2dOpr):
+            continue
+
+        conv_op = Deconv2dOpr(
             stride=opr.stride,
             padding=opr.padding,
             dilation=opr.dilation,

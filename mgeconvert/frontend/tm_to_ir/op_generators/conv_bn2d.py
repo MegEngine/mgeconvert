@@ -28,7 +28,10 @@ class GenConvBnBase(GenConvBase):
     def __init__(self, expr, irgraph, op_cls):
         OpGenBase.__init__(self, expr, irgraph)
         assert isinstance(expr, CallMethod)
-        conv_module = expr.inputs[0].owner.conv
+        if hasattr(expr.inputs[0].owner, "conv"):
+           conv_module = expr.inputs[0].owner.conv
+        else:
+            conv_module = expr.inputs[0].owner.conv_transpose2d
         self.weight = conv_module.weight
         self.bias = conv_module.bias
         self.stride = _unexpand(conv_module.stride)
