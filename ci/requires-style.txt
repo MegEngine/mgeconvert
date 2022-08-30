@@ -5,6 +5,7 @@ mypy==0.750
 numpy>=1.17
 onnx==1.8.0
 onnxruntime
+onnx-simplifier==0.3.6
 onnxoptimizer
 protobuf>=3.11.3
 pytest>=5.3.0
