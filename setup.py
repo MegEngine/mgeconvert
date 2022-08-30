@@ -138,7 +138,7 @@ ext_modules = [
 if __name__ == "__main__":
     install_requires = ["numpy", "tqdm"]
     requires_mapping = {
-        "onnx": ["onnx>=1.8.0", "onnx-simplifier>=0.3.6", "protobuf",],
+        "onnx": ["onnx>=1.8.0", "onnx-simplifier>=0.3.6", "protobuf", "onnxoptimizer"],
         "caffe": ["protobuf>=3.11.1"],
         "tflite": ["flatbuffers==1.12.0", "pybind11==2.6.2"],
         "all": [
