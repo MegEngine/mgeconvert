@@ -50,7 +50,7 @@ from ...converter_ir.ir_op import (
 )
 from ...converter_ir.ir_quantizer import IRQuantizer
 from ...converter_ir.ir_tensor import IOHWFormat, IRTensor, NCHWFormat, OIHWFormat
-from ...converter_ir.ir_transform import cal_pad_mode
+from ...converter_ir.ir_transform import cal_conv_pad_mode, cal_pool_pad_mode
 from .pyflexbuffers import dumps
 from .tflite import (
     AbsOptions,
@@ -315,7 +315,7 @@ def _div(mge_opr, builder):
 
 
 def _padding_mode_conv(mge_opr):
-    if cal_pad_mode(mge_opr) == "VALID":
+    if cal_conv_pad_mode(mge_opr) == "VALID":
         return Padding.VALID
     else:
         return Padding.SAME
@@ -538,7 +538,8 @@ def _getsubtensor(_, builder):
 @_register_op(MaxPool2dOpr, AvgPool2dOpr)
 def _pooling(mge_opr, builder):
     Pool2DOptions.Pool2DOptionsStart(builder)
-    Pool2DOptions.Pool2DOptionsAddPadding(builder, Padding.VALID)
+    pad_mode = Padding.SAME if cal_pool_pad_mode(mge_opr) == "SAME" else Padding.VALID
+    Pool2DOptions.Pool2DOptionsAddPadding(builder, pad_mode)
     shape = mge_opr.inp_tensors[0].shape
     if (
         get_platform() == "mtk"
