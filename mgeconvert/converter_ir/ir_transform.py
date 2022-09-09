@@ -163,13 +163,21 @@ def _register_tranformation_rule(transformer_option):
     return callback
 
 
+def is_satisfy_tflite_same_pad_mode(input_sizes, strides, output_sizes):
+    assert isinstance(input_sizes, Sequence) and len(input_sizes) == 2
+    assert isinstance(strides, Sequence) and len(strides) == 2
+    assert isinstance(output_sizes, Sequence) and len(output_sizes) == 2
+    for inp_shape, s, out_shape in zip(input_sizes, strides, output_sizes):
+        expected_out = (inp_shape + s - 1) // s
+        if expected_out != out_shape:
+            return False
+    return True
+
+
 def _use_same_pad_mode(input_size, filter_size, out_size, stride, dilation, padding):
     if get_conv_pad_preference():
         # only consider whether the out shape maps
-        for i in range(2):
-            expected_out = input_size[i] // stride[i]
-            if expected_out != out_size[i]:
-                return False
+        return is_satisfy_tflite_same_pad_mode(input_size, stride, out_size)
     else:
         # besides shape, also consider the padding number for each side, which has higer accuracy
         for i in range(2):
@@ -188,7 +196,7 @@ def _use_same_pad_mode(input_size, filter_size, out_size, stride, dilation, padd
     return True
 
 
-def cal_pad_mode(tm_opr):
+def cal_conv_pad_mode(tm_opr):
     assert isinstance(tm_opr.out_tensors[0].axis_order, NCHWFormat)
     assert isinstance(tm_opr.inp_tensors[1].axis_order, (OIHWFormat, IOHWFormat))
     kernel_shape = tm_opr.inp_tensors[1].shape[2:]
@@ -220,6 +228,26 @@ def cal_pad_mode(tm_opr):
     if _use_same_pad_mode(
         inp_shape, kernel_shape, out_shape, stride, dilation, padding
     ):
+        return "SAME"
+    else:
+        return "VALID"
+
+
+def cal_pool_pad_mode(opr):
+    assert isinstance(opr.inp_tensors[0].axis_order, NCHWFormat)
+    assert isinstance(opr.out_tensors[0].axis_order, NCHWFormat)
+    out_shape = opr.out_tensors[0].shape[2:]
+    inp_shape = opr.inp_tensors[0].shape[2:]
+    stride = opr.stride if isinstance(opr.stride, Sequence) else (opr.stride,) * 2
+    kernel_size = (
+        opr.kernel_size
+        if isinstance(opr.kernel_size, Sequence)
+        else (opr.kernel_size,) * 2
+    )
+    padding = opr.padding if isinstance(opr.padding, Sequence) else (opr.padding,) * 2
+    assert len(inp_shape) == len(out_shape) == len(stride) == len(padding) == 2
+
+    if _use_same_pad_mode(inp_shape, kernel_size, out_shape, stride, (0, 0), padding):
         return "SAME"
     else:
         return "VALID"
@@ -300,10 +328,9 @@ def _reduce_axis_as_input(net):
 def _make_padding(net: IRGraph):
     def have_padding(opr):
         if isinstance(opr, Conv2dOpr):
-            if cal_pad_mode(opr) == "SAME":
-                return False
-        if hasattr(opr, "padding") and (opr.padding[0] > 0 or opr.padding[1] > 0):
-            return True
+            return cal_conv_pad_mode(opr) != "SAME"
+        elif isinstance(opr, _PoolOpr):
+            return cal_pool_pad_mode(opr) != "SAME"
         return False
 
     insert_intended = OrderedDict()  # type: OrderedDict
