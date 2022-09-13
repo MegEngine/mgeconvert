@@ -20,7 +20,9 @@ class GenMatMulOpr(OpGenBase):
             self.transpose_a = self.args[2]
             self.transpose_b = self.args[3]
             self.compute_mode = self.args[4]
-            self.format = self.args[5]
+            self.format = None
+            if len(self.args) > 5:
+                self.format = self.args[5]
             self.op = MatMulOpr(
                 self.transpose_a, self.transpose_b, self.compute_mode, self.format
             )

@@ -199,6 +199,8 @@ def test_elemwise_broadcast(mode):
 
 
 def test_softmax():
+    if megengine.__version__ == "1.11.1":
+        return
     net = SoftmaxOpr()
     mge_result = dump_mge_model(net, net.data, tmp_file)
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
@@ -219,7 +221,7 @@ def test_bn():
 
 
 def test_xornet():
-    if megengine.__version__ < "1.1.0":
+    if megengine.__version__ < "1.1.0" or megengine.__version__ == "1.11.1":
         return
     net = XORNet("tflite")
     net.eval()
