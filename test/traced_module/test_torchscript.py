@@ -5,21 +5,9 @@
 # Unless required by applicable law or agreed to in writing,
 # software distributed under the License is distributed on an
 # "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-import sys
-
-import megengine as mge
-import megengine.hub
-import numpy as np
-import pytest
-import torch
-from mgeconvert.converters.tm_to_torchscript import tracedmodule_to_torchscript
-
-from .tm_utils import get_traced_module
-
-from test.utils import (  # AdaptiveAvgPool2dOpr,; DropoutOpr,; ElemwiseOpr,; FlattenOpr,; PoolOpr,; RepeatOpr,
+from test.utils import (
     ActiveOpr,
     BnOpr,
-    BroadcastOpr,
     ConvBn2dOpr,
     ConvBnRelu2dOpr,
     ConvOpr,
@@ -38,6 +26,14 @@ from test.utils import (  # AdaptiveAvgPool2dOpr,; DropoutOpr,; ElemwiseOpr,; Fl
     TypeCvtOpr,
 )
 
+import megengine as mge
+import megengine.hub
+import numpy as np
+import pytest
+import torch
+from mgeconvert.converters.tm_to_torchscript import tracedmodule_to_torchscript
+
+from .tm_utils import get_traced_module
 
 max_error = 1e-6
 tmp_file = "test_model"

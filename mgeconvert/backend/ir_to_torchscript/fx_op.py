@@ -1,15 +1,7 @@
-# MegEngine is Licensed under the Apache License, Version 2.0 (the "License")
-#
-# Copyright (c) 2014-2020 Megvii Inc. All rights reserved.
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-
-# pylint: disable=import-error,no-name-in-module,no-member
+# pylint: disable=import-error,no-name-in-module,no-member,unused-argument
 import builtins
 import operator
-from typing import Any, Callable, List, Optional, Tuple, Union
+from typing import Callable, List, Optional, Tuple
 
 import numpy as np
 import torch
@@ -21,30 +13,24 @@ from ...converter_ir.ir_op import (
     AddOpr,
     AvgPool2dOpr,
     BatchNormalizationOpr,
-    BroadcastOpr,
     CeilOpr,
     ConcatOpr,
     ConstantOpr,
     Conv2dOpr,
     ConvRelu2dOpr,
     Deconv2dOpr,
-    ElemwiseOpr,
     ExpOpr,
     FlattenOpr,
     FloorDivOpr,
     FloorOpr,
-    FuseMulAdd3Opr,
     GetSubTensorOpr,
     GetVarShapeOpr,
     LeakyReluOpr,
     LinearOpr,
     LogOpr,
-    MatMulOpr,
     MaxOpr,
     MaxPool2dOpr,
-    MinOpr,
     MulOpr,
-    OpBase,
     PadOpr,
     PixelShuffle,
     PowOpr,

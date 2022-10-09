@@ -1,10 +1,3 @@
-# MegEngine is Licensed under the Apache License, Version 2.0 (the "License")
-#
-# Copyright (c) 2014-2020 Megvii Inc. All rights reserved.
-#
-# Unless required by applicable law or agreed to in writing,
-# software distributed under the License is distributed on an
-# "AS IS" BASIS, WITHOUT ARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 import megengine as mge
 import numpy as np
 from megengine import get_logger as mge_get_logger
@@ -22,9 +15,8 @@ else:
     import megengine.utils.comp_graph_tools as cgtools
 
     if mge_version <= "1.1.0":
-        from megengine.core.tensor.raw_tensor import (
-            as_raw_tensor as Tensor,  # pylint: disable=no-name-in-module,import-error
-        )
+        # pylint: disable=no-name-in-module,import-error
+        from megengine.core.tensor.raw_tensor import as_raw_tensor as Tensor
     else:
         from megengine.tensor import Tensor
 
