@@ -176,3 +176,6 @@ class IRTensor:
         self.np_dtype = np_dtype
         self.qmin = qmin
         self.qmax = qmax
+
+    def __repr__(self):
+        return self.name
