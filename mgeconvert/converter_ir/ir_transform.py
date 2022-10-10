@@ -587,6 +587,8 @@ def _fuse_activation(net):
                 continue
             if prev_op.activation != "IDENTITY" or prev_op.name == "Deconv2d":
                 continue
+            if len(net.find_out_oprs(prev_op)) > 1:
+                continue
             prev_output = prev_op.out_tensors
             activation = op.name.upper()
             prev_op.activation = activation
@@ -1467,7 +1469,10 @@ def _remove_identity(net: IRGraph):
             except:  # pylint: disable=bare-except
                 opr.inp_tensors[0].user_opr.append(user)
         delete_intended.append(net._opr_ids.index(op_id))
-
+        if opr.out_tensors[0] in net.graph_outputs:
+            net.graph_outputs[
+                net.graph_outputs.index(opr.out_tensors[0])
+            ] = opr.inp_tensors[0]
     for delete_idx in delete_intended[::-1]:
         net.delete_ops(delete_idx)
 

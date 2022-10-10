@@ -63,6 +63,18 @@ jobs:
       - uses: actions/checkout@v2
       - name: test torchscipt
         run: ./ci/pytest_torchscript.sh
+  
+  pytest-transform:
+    runs-on: ubuntu-latest
+    container:
+      image: enginesh233/mgeconvert_ci:v1.1
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v2
+      - name: test transform
+        run: ./ci/pytest_transform.sh
 
   test-convert-cmd:
     runs-on: ubuntu-20.04
