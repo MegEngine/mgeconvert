@@ -25,6 +25,7 @@ def tracedmodule_to_onnx(
     require_quantize=False,
     param_fake_quant=False,
     quantize_file_path="quant_params.json",
+    convert_backend = None,
 ):
     """
 	Convert megengine model to ONNX,
@@ -58,6 +59,8 @@ def tracedmodule_to_onnx(
         TransformerRule.EXPAND_CONVRELU,
         TransformerRule.REMOVE_IDENTITY,
     ]
+    if convert_backend == "trt":
+        transformer_options.append(TransformerRule.RESHAPE_BIAS_TO_1DIM)
     transformer = IRTransform(transformer_options)
     transformed_irgraph = transformer.transform(irgraph)
 
