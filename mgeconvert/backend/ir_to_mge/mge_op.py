@@ -9,6 +9,7 @@ from ...converter_ir.ir_op import (
     ClipOpr,
     ConcatOpr,
     Conv2dOpr,
+    ConvTransposeOpr,
     DivOpr,
     DropoutOpr,
     FlattenOpr,
@@ -380,7 +381,7 @@ class TypeCvtOprConverter(SISOConvert):
         return inps[0].astype(self.param["out_dtype"])
 
 
-@_register_param_extract(Conv2dOpr)
+@_register_param_extract(Conv2dOpr, ConvTransposeOpr)
 class Conv2dExtractor:
     def __init__(self, opr):
         self._opr = opr
@@ -436,6 +437,58 @@ class Conv2dOprConverter(OperatorBaseConverter):
             dilation=self.param["dilation"],
             groups=self.param["groups"],
         )
+
+
+@_register_op(ConvTransposeOpr)
+class ConvTransposeOprConverter(OperatorBaseConverter):
+    def forward(self, inps):
+        src = inps[0]
+        weight = inps[1]
+        try:
+            bias = inps[2]
+        except IndexError:
+            bias = None
+
+        if bias is not None:
+            if bias.shape.ndim == 3:
+                bias = F.expand_dims(bias, axis=0)
+            elif bias.shape.ndim == 1:
+                bias = F.expand_dims(bias, axis=[0, 2, 3])
+            else:
+                raise Exception(f"Invalid ConvTranspose bias's shape {bias.shape}")
+
+        if self.param["groups"] != 1:
+            groups = self.param["groups"]
+            IC = src.shape.numpy()[1]
+            OC = weight.shape.numpy()[0]
+            FH = weight.shape.numpy()[2]
+            FW = weight.shape.numpy()[3]
+            target_shape = [groups, int(OC / groups), int(IC / groups), FH, FW]
+            weight = F.reshape(weight, target_shape)
+        if src.ndim == 4:
+            return F.conv_transpose2d(
+                src,
+                weight,
+                bias,
+                stride=self.param["stride"],
+                padding=self.param["padding"],
+                dilation=self.param["dilation"],
+                groups=self.param["groups"],
+            )
+        elif src.ndim == 5:
+            return F.conv_transpose3d(
+                src,
+                weight,
+                bias,
+                stride=self.param["stride"],
+                padding=self.param["padding"],
+                dilation=self.param["dilation"],
+                groups=self.param["groups"],
+            )
+        else:
+            raise Exception(
+                f"ConvTranspose src ndim should be 4 or 5, but get {src.ndim}"
+            )
 
 
 @_register_param_extract(MaxPool2dOpr, AvgPool2dOpr)

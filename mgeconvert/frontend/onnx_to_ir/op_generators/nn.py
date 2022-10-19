@@ -1,6 +1,12 @@
 import numpy as np
 
-from ....converter_ir.ir_op import AvgPool2dOpr, Conv2dOpr, LstmOpr, MaxPool2dOpr
+from ....converter_ir.ir_op import (
+    AvgPool2dOpr,
+    Conv2dOpr,
+    ConvTransposeOpr,
+    LstmOpr,
+    MaxPool2dOpr,
+)
 from .base import OpGenBase, _register_op
 
 
@@ -28,6 +34,37 @@ class GenConv2dOpr(OpGenBase):
                 auto_pad = attr.strings
 
         self.op = Conv2dOpr(stride, padding, dilation, groups, auto_pad)
+        self.add_tensors()
+
+
+@_register_op("ConvTranspose")
+class GenConvTranspose(OpGenBase):
+    def __init__(self, node, ir_graph, resolver, opset):
+        # pylint: disable=W0612,W0613
+        super().__init__(node, ir_graph, resolver)
+
+        stride = (1, 1)
+        padding = (0, 0)
+        dilation = (1, 1)
+        groups = 1
+        kernel_shape = (1, 1)
+        auto_pad = "NOTSET"
+        for attr in node.attribute:
+            if attr.name == "strides":
+                stride = tuple(attr.ints)
+            elif attr.name == "pads":
+                padding = attr.ints
+            elif attr.name == "dilations":
+                dilation = tuple(attr.ints)
+            elif attr.name == "group":
+                groups = attr.i
+            elif attr.name == "kernel_shape":
+                kernel_shape = tuple(attr.ints)
+            elif attr.name == "auto_pad":
+                auto_pad = attr.strings
+        self.op = ConvTransposeOpr(
+            stride, padding, dilation, groups, kernel_shape, auto_pad
+        )
         self.add_tensors()
 
 
