@@ -37,6 +37,17 @@ class Conv2dOpr(_ConvOpr):
         self.auto_pad = auto_pad
 
 
+class ConvTransposeOpr(_ConvOpr):
+    name = "ConvTranspose"
+
+    def __init__(
+        self, stride, padding, dilation, groups, kernel_shape, auto_pad="NOTSET"
+    ):
+        super().__init__(stride, padding, dilation, groups)
+        self.kernel_shape = kernel_shape
+        self.auto_pad = auto_pad
+
+
 class Deconv2dOpr(_ConvOpr):
     name = "Deconv2d"
 
