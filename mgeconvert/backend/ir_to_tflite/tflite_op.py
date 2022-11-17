@@ -85,6 +85,7 @@ class Config:
     platform = "official"
     require_quantize = True
     tensor_format = "nhwc"
+    enable_4d_reshape_nhwc = False
 
 
 def set_platform(platform):
@@ -101,6 +102,10 @@ def set_tensor_format(tensor_format):
     Config.tensor_format = tensor_format
 
 
+def set_enable_4d_reshape_nhwc(enable):
+    Config.enable_4d_reshape_nhwc = enable
+
+
 def get_platform():
     return Config.platform
 
@@ -113,8 +118,16 @@ def get_quantization():
     return Config.require_quantize
 
 
+def get_enable_4d_reshape_nhwc():
+    return Config.enable_4d_reshape_nhwc
+
+
 def _get_tensor_shape(tensor, mge_opr, disable_nhwc):
-    if isinstance(mge_opr, ReshapeOpr):
+    if (
+        isinstance(mge_opr, ReshapeOpr)
+        and get_enable_4d_reshape_nhwc()
+        and len(tensor.shape) != 4
+    ):
         return tensor.shape
 
     shape = list(tensor.shape)
@@ -151,8 +164,13 @@ def _get_tensor_shape(tensor, mge_opr, disable_nhwc):
 
 
 def _get_tensor_value(tensor, mge_opr, quantizer, disable_nhwc):
-    if isinstance(mge_opr, ReshapeOpr):
+    if (
+        isinstance(mge_opr, ReshapeOpr)
+        and get_enable_4d_reshape_nhwc()
+        and len(tensor.shape) != 4
+    ):
         return None
+
     number_list: List[np.ndarray] = []
     if (
         quantizer.require_quantize
@@ -481,6 +499,13 @@ def _min(_, builder):
 
 @_register_op(ReshapeOpr, AxisAddRemoveOpr)
 def _reshape(mge_opr, builder):
+    if len(mge_opr.out_shape) == 4:
+        mge_opr.out_shape = (
+            mge_opr.out_shape[0],
+            mge_opr.out_shape[2],
+            mge_opr.out_shape[3],
+            mge_opr.out_shape[1],
+        )
     ReshapeOptions.ReshapeOptionsStartNewShapeVector(builder, len(mge_opr.out_shape))
     for i in reversed(list(mge_opr.out_shape)):
         builder.PrependInt32(i)

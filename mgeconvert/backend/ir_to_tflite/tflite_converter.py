@@ -7,6 +7,7 @@ from ...converter_ir.ir_op import (
     ConstantOpr,
     LinspaceOpr,
     MultipleDeviceTensorHolderOpr,
+    ReshapeOpr,
     SharedDeviceTensorOpr,
 )
 from .tflite import (
@@ -23,6 +24,7 @@ from .tflite_op import (
     MGE2TFLITE,
     get_shape_param,
     mge2tflite_dtype_mapping,
+    set_enable_4d_reshape_nhwc,
     set_quantization,
     set_tensor_format,
 )
@@ -44,12 +46,14 @@ class TFLiteConverter:
         self._builder = flatbuffers.Builder(1024)
         set_quantization(require_quantize=quantizer.require_quantize)
 
-    def convert(self, disable_nhwc=False):
+    def convert(self, disable_nhwc=False, enable_4d_reshape_nhwc=False):
         # Note the 0th entry of this array must be an empty buffer (sentinel)
         if disable_nhwc:
             set_tensor_format("nchw")
         else:
             set_tensor_format("nhwc")
+        set_enable_4d_reshape_nhwc(enable_4d_reshape_nhwc)
+
         Buffer.BufferStart(self._builder)
         buffer = Buffer.BufferEnd(self._builder)
         self._buffer_list.append(buffer)

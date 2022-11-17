@@ -32,6 +32,7 @@ def tracedmodule_to_tflite(
     prefer_same_pad_mode=False,
     disable_nhwc=False,
     use_int64_bias=False,
+    enable_4d_reshape_nhwc=False,
 ):
     """
 	Convert traced model to TFLite,
@@ -96,7 +97,7 @@ def tracedmodule_to_tflite(
         quantizer.dump_quant_param(path=quantize_file_path)
 
     converter = TFLiteConverter(transformed_irgraph, graph_name, quantizer=quantizer)
-    model = converter.convert(disable_nhwc)
+    model = converter.convert(disable_nhwc, enable_4d_reshape_nhwc)
 
     assert isinstance(output, str), "tflite_fpath must be string"
     with open(output, "wb") as fout:

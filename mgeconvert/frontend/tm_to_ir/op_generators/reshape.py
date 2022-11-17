@@ -26,11 +26,6 @@ class GenReshapeOpr(OpGenBase):
         inp = self.args[0]
         inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
         self.op.add_inp_tensors(inp_tensor)
-        if isinstance(self.expr, CallMethod):
-            if len(self.args) > 1:
-                for inp in self.args[1:]:
-                    inp_tensor = self.resolver.get_ir_tensor(inp, user_opr=self.op)
-                    self.op.add_inp_tensors(inp_tensor)
         self.add_opr_out_tensors()
 
 
