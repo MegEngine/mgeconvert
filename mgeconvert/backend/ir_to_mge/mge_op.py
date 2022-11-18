@@ -337,7 +337,10 @@ class SubTensorExtractor:
         slices = [slice(None, None, None)] * (max(axis_param) + 1)
         for i, axis in enumerate(axis_param):
             try:
-                slices[axis] = slice(begin_param[i], end_param[i], step_param[i])
+                end = (
+                    2147483647 if end_param[i] == 9223372036854775807 else end_param[i]
+                )
+                slices[axis] = slice(begin_param[i], end, step_param[i])
             except IndexError:
                 slices[axis] = slice(begin_param[i], end_param[i], None)
         return {"index": tuple(slices)}
