@@ -1,3 +1,4 @@
+import math
 from collections import OrderedDict
 from enum import Enum
 from functools import cmp_to_key
@@ -433,13 +434,39 @@ def _deconv_shape_as_input(net: IRGraph):
 
 @_register_tranformation_rule(TransformerRule.RESIZE_PARAMS_AS_INPUT)
 def _resize_params_as_input(net):
+    def get_dest_size(scale_factor, mode, inp_h, inp_w):
+        if isinstance(scale_factor, (float, int)):
+            scale_factor = float(scale_factor)
+            if mode == "linear":
+                scale_factor = (scale_factor, float(1))
+            else:
+                scale_factor = (scale_factor, scale_factor)
+        else:
+            if mode == "linear":
+                raise ValueError(
+                    "under linear mode, scale_factor can only be single value"
+                )
+        assert len(scale_factor) == 2, "shape of scale_factor must be equal to (2, )"
+        dsize = tuple(
+            (math.floor(scale_factor[0] * inp_h), math.floor(scale_factor[1] * inp_w))
+        )
+        return dsize
+
     for op in net.all_oprs:
         if not isinstance(op, ResizeOpr):
             continue
 
         if len(op.inp_tensors) == 2:
             continue
-
+        if op.out_size is None:
+            assert op.scale_factor is not None
+            if not isinstance(op.scale_factor, Sequence):
+                op.out_size = get_dest_size(
+                    op.scale_factor,
+                    op.mode,
+                    op.inp_tensors[0].shape[2],
+                    op.inp_tensors[0].shape[3],
+                )
         out_size_tensor = IRTensor(
             name=op.inp_tensors[0].name + "_out_size",
             shape=(2,),

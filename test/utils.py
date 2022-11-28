@@ -433,12 +433,12 @@ class ResizeOpr(M.Module):
         super().__init__()
         self.data = np.random.random((1, 2, 3, 4)).astype(np.float32)
         self.out_shape = [6, 8]
-        self.out_shape2 = [3, 4]
+        self.scale_factor = 0.5
         self.mode = mode
 
     def forward(self, x):
         x = F.vision.interpolate(x, size=self.out_shape, mode=self.mode)
-        x = F.vision.interpolate(x, size=self.out_shape2, mode=self.mode)
+        x = F.vision.interpolate(x, scale_factor=self.scale_factor, mode=self.mode)
         return x
 
 
