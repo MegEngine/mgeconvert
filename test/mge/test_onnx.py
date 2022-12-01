@@ -28,7 +28,6 @@ from test.utils import (
 
 import megengine as mge
 import megengine.functional as F
-import megengine.hub
 import numpy as np
 import onnxruntime as ort  # pylint: disable=import-error
 import pytest
@@ -66,7 +65,7 @@ def test_conv2d(mode):
 
 
 def test_conv_functional():
-    if megengine.__version__ < "1.2.0":
+    if mge.__version__ < "1.2.0":
         return
 
     def convf(x, kernel):
@@ -86,7 +85,7 @@ def test_conv_functional():
 
     inpx = np.random.random((1, 48, 100, 100)).astype("float32")
     inpk = np.random.random((1, 48, 64, 64)).astype("float32")
-    expect = inference(megengine.tensor(inpx), megengine.tensor(inpk)).numpy()
+    expect = inference(mge.tensor(inpx), mge.tensor(inpk)).numpy()
     inference.dump(
         tmp_file + ".mge", arg_names=["x", "kernel"], optimize_for_inference=False,
     )
@@ -237,29 +236,30 @@ def test_xornet():
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize(
-    "model",
-    [
-        "shufflenet_v2_x0_5",
-        "shufflenet_v2_x1_0",
-        "resnet18",
-        "resnet50",
-        "resnet101",
-        "resnext50_32x4d",
-    ],
-)
-def test_model(model):
-    data = (
-        np.random.randint(0, 255, 3 * 224 * 224)
-        .reshape((1, 3, 224, 224))
-        .astype(np.float32)
-    )
-    if mge.__version__ < "1.1.0":
-        commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
-    else:
-        commit_id = None
-    net = megengine.hub.load(
-        "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
-    )
-    mge_result = dump_mge_model(net, data, tmp_file)
-    _test_convert_result(data, tmp_file, mge_result, 1e-3)
+# skip
+# @pytest.mark.parametrize(
+#     "model",
+#     [
+#         "shufflenet_v2_x0_5",
+#         "shufflenet_v2_x1_0",
+#         "resnet18",
+#         "resnet50",
+#         "resnet101",
+#         "resnext50_32x4d",
+#     ],
+# )
+# def test_model(model):
+#     data = (
+#         np.random.randint(0, 255, 3 * 224 * 224)
+#         .reshape((1, 3, 224, 224))
+#         .astype(np.float32)
+#     )
+#     if mge.__version__ < "1.1.0":
+#         commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
+#     else:
+#         commit_id = None
+#     net = megengine.hub.load(
+#         "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
+#     )
+#     mge_result = dump_mge_model(net, data, tmp_file)
+#     _test_convert_result(data, tmp_file, mge_result, 1e-3)

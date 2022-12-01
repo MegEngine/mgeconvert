@@ -12,6 +12,11 @@ apt install -y protobuf-compiler
 
 pip3 install scikit-image==0.17.2 onnx onnxruntime
 pip3 install torch>=1.10
+
+# hack for megengine.hub
+# https://github.com/MegEngine/Models/blame/master/requirements.txt
+pip3 install ftfy imageio youtokentome regex==2020.10.15
+
 export USE_CAFFE_PROTO=1
 
 function version_gt() { test "$(echo "$@" | tr " " "\n" | sort -V | head -n 1)" != "$1"; }

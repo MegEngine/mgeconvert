@@ -11,7 +11,7 @@ on:
 
 jobs:
   format:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
@@ -29,7 +29,7 @@ jobs:
       run: ./ci/lint.sh
 
   pytest-caffe-and-onnx:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
       image: enginesh233/mgeconvert_ci:v1.1
     defaults:
@@ -41,7 +41,7 @@ jobs:
         run: ./ci/pytest_caffe_and_onnx.sh
 
   pytest-tflite:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
       image: enginesh233/mgeconvert_ci:v1.1
     defaults:
@@ -53,7 +53,7 @@ jobs:
         run: ./ci/pytest_tflite.sh
 
   pytest-torchscript:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
       image: enginesh233/mgeconvert_ci:v1.1
     defaults:
@@ -65,7 +65,7 @@ jobs:
         run: ./ci/pytest_torchscript.sh
 
   test-convert-cmd:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     container:
       image: enginesh233/mgeconvert_ci:v1.1
     defaults:
