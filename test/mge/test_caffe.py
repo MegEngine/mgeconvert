@@ -26,7 +26,6 @@ from test.utils import (
 
 import caffe  # pylint: disable=import-error
 import megengine
-import megengine.hub
 import numpy as np
 import pytest
 from mgeconvert.converters.mge_to_caffe import mge_to_caffe
@@ -165,32 +164,33 @@ def test_broadcast():
     _test_convert_result(net.data, tmp_file, mge_result, max_error)
 
 
-@pytest.mark.parametrize(
-    "model",
-    [
-        "shufflenet_v2_x0_5",
-        "shufflenet_v2_x1_0",
-        "resnet18",
-        "resnet50",
-        "resnet101",
-        "resnext50_32x4d",
-    ],
-)
-def test_model(model):
-    data = (
-        np.random.randint(0, 255, 3 * 224 * 224)
-        .reshape((1, 3, 224, 224))
-        .astype(np.float32)
-    )
-    if megengine.__version__ < "1.1.0":
-        commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
-    else:
-        commit_id = None
-    net = megengine.hub.load(
-        "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
-    )
-    mge_result = dump_mge_model(net, data, tmp_file)
-    _test_convert_result(data, tmp_file, mge_result, 1e-2)
+# skip
+# @pytest.mark.parametrize(
+#     "model",
+#     [
+#         "shufflenet_v2_x0_5",
+#         "shufflenet_v2_x1_0",
+#         "resnet18",
+#         "resnet50",
+#         "resnet101",
+#         "resnext50_32x4d",
+#     ],
+# )
+# def test_model(model):
+#     data = (
+#         np.random.randint(0, 255, 3 * 224 * 224)
+#         .reshape((1, 3, 224, 224))
+#         .astype(np.float32)
+#     )
+#     if megengine.__version__ < "1.1.0":
+#         commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
+#     else:
+#         commit_id = None
+#     net = megengine.hub.load(
+#         "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
+#     )
+#     mge_result = dump_mge_model(net, data, tmp_file)
+#     _test_convert_result(data, tmp_file, mge_result, 1e-2)
 
 
 def test_xornet():

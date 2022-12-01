@@ -8,6 +8,10 @@ apt install -y protobuf-compiler
 
 pip3 install . --user --install-option="--targets=all"
 
+# hack for megengine.hub
+# https://github.com/MegEngine/Models/blame/master/requirements.txt
+pip3 install ftfy imageio youtokentome regex==2020.10.15
+
 export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH:
 
 sudo python3 -m pip uninstall flatbuffers -y

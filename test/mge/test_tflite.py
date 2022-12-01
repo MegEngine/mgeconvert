@@ -26,7 +26,6 @@ from test.utils import (
 )
 
 import megengine
-import megengine.hub
 import numpy as np
 import pytest
 from mgeconvert.converters.mge_to_tflite import mge_to_tflite
@@ -182,20 +181,21 @@ def test_elemwise_broadcast(mode):
     )
 
 
-@pytest.mark.parametrize(
-    "model", ["resnet18",],
-)
-def test_model(model):
-    data = np.ones((1, 3, 224, 224)).astype(np.float32)
-    if megengine.__version__ < "1.1.0":
-        commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
-    else:
-        commit_id = None
-    net = megengine.hub.load(
-        "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
-    )
-    mge_result = dump_mge_model(net, data, tmp_file)
-    _test_convert_result(data, tmp_file, mge_result, 1e-4)
+# skip
+# @pytest.mark.parametrize(
+#     "model", ["resnet18",],
+# )
+# def test_model(model):
+#     data = np.ones((1, 3, 224, 224)).astype(np.float32)
+#     if megengine.__version__ < "1.1.0":
+#         commit_id = "dc2f2cfb228a135747d083517b98aea56e7aab92"
+#     else:
+#         commit_id = None
+#     net = megengine.hub.load(
+#         "megengine/models", model, use_cache=False, commit=commit_id, pretrained=True
+#     )
+#     mge_result = dump_mge_model(net, data, tmp_file)
+#     _test_convert_result(data, tmp_file, mge_result, 1e-4)
 
 
 def test_softmax():
