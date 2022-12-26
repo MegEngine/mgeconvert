@@ -128,7 +128,8 @@ class GenSliceOpr(OpGenBase):
             steps = np.ones(rank)
         else:
             nr_inputs = len(self.op.inp_tensors)
-            rank = len(self.op.inp_tensors[0].shape)
+            # WARNING: the size of axes starts ends and steps should be the same
+            rank = len(self.op.inp_tensors[1].shape)
             axes = np.arange(0, rank)
             steps = np.ones(rank)
 

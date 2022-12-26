@@ -29,6 +29,7 @@ from ...converter_ir.ir_op import (
     SigmoidOpr,
     SoftmaxOpr,
     SqrtOpr,
+    SqueezeOpr,
     SubOpr,
     TransposeOpr,
     TypeCvtOpr,
@@ -873,6 +874,24 @@ class UnsqueezeOprConvert(SISOConvert):
     def forward(self, inps):
         dims = self.param["squeeze_dims"]
         return F.expand_dims(inps[0], dims)
+
+
+@_register_param_extract(SqueezeOpr)
+class SqueezeOprExtractor:
+    def __init__(self, opr):
+        self._opr = opr
+
+    def extract(self):
+        param = {}
+        param["squeeze_dims"] = self._opr.squeeze_dims
+        return param
+
+
+@_register_op(SqueezeOpr)
+class SqueezeOprConvert(SISOConvert):
+    def forward(self, inps):
+        dims = self.param["squeeze_dims"]
+        return F.squeeze(inps[0], axis=dims)
 
 
 @_register_op(GatherOpr)
