@@ -554,7 +554,7 @@ def _reshape_bias_to_1dim(net: IRGraph):
         bias = op.inp_tensors[2]
         if bias.ndim == 4:
             bias.shape = (bias.shape[1],)
-            bias.np_data = bias.np_data.reshape(-1)
+            bias.np_data = bias.np_data.reshape((-1, ))
 
 
 @_register_tranformation_rule(TransformerRule.DEPTHWISE_CONV_RESHAPE_WEIGHT)
