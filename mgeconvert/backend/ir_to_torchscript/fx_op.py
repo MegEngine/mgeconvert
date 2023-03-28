@@ -51,13 +51,23 @@ from ...converter_ir.ir_op import (
 
 MGE2FX = {}
 
-DTYPE_MAPPING = {
-    np.float32: torch.float32,
-    np.int32: torch.int32,
-    np.float16: torch.float16,
-    np.int8: torch.int8,
-    np.int32: torch.int32,
-}
+
+def to_torch_dtype(dtype: np.dtype):
+    if dtype == np.float32:
+        return torch.float32
+    if dtype == np.float16:
+        return torch.float16
+    if dtype == np.int64:
+        return torch.int64
+    if dtype == np.int32:
+        return torch.int32
+    if dtype == np.int16:
+        return torch.int16
+    if dtype == np.int8:
+        return torch.int8
+    if dtype == np.uint8:
+        return torch.uint8
+    raise ValueError(f"not support this dtype: {dtype}")
 
 
 def _register_op(*oprs):
@@ -447,7 +457,7 @@ def astype(opr: TypeCvtOpr, graph: torch.fx.Graph, load_arg: Callable, name: str
         graph=graph,
         name=name,
         func="type",
-        args=(load_arg(opr.inp_tensors[0]), DTYPE_MAPPING[opr.out_dtype]),
+        args=(load_arg(opr.inp_tensors[0]), to_torch_dtype(opr.out_dtype)),
     )
     return [node]
 

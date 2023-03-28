@@ -56,16 +56,26 @@ from ...converter_ir.ir_op import (
 )
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
 
-mge2onnx_dtype_mapping = {
-    # pylint: disable=no-member
-    np.float32: onnx.TensorProto.FLOAT,
-    np.float16: onnx.TensorProto.FLOAT16,
-    np.int8: onnx.TensorProto.INT8,
-    np.int16: onnx.TensorProto.INT16,
-    np.int32: onnx.TensorProto.INT32,
-    np.int64: onnx.TensorProto.INT64,
-    np.uint8: onnx.TensorProto.UINT8,
-}
+# pylint: disable=no-member
+
+
+def to_onnx_dtype(dtype):
+    if dtype == np.float32:
+        return onnx.TensorProto.FLOAT
+    if dtype == np.float16:
+        return onnx.TensorProto.FLOAT16
+    if dtype == np.int64:
+        return onnx.TensorProto.INT64
+    if dtype == np.int32:
+        return onnx.TensorProto.INT32
+    if dtype == np.int16:
+        return onnx.TensorProto.INT16
+    if dtype == np.int8:
+        return onnx.TensorProto.INT8
+    if dtype == np.uint8:
+        return onnx.TensorProto.UINT8
+    raise ValueError(f"not support this dtype: {dtype}")
+
 
 MGE2ONNX = {}
 
@@ -98,22 +108,10 @@ def expand(x):
         )
 
 
-mge2onnx_dtype_mapping = {
-    # pylint: disable=no-member
-    np.float32: onnx.TensorProto.FLOAT,
-    np.float16: onnx.TensorProto.FLOAT16,
-    np.int8: onnx.TensorProto.INT8,
-    np.int16: onnx.TensorProto.INT16,
-    np.int32: onnx.TensorProto.INT32,
-    np.int64: onnx.TensorProto.INT64,
-    np.uint8: onnx.TensorProto.UINT8,
-}
-
-
 def _add_input_tensors(inputs):
     inp_tensor_list = [
         onnx.helper.make_tensor_value_info(
-            tensor.name, mge2onnx_dtype_mapping[tensor.dtype], tensor.shape
+            tensor.name, to_onnx_dtype(tensor.dtype), tensor.shape
         )
         for tensor in inputs
     ]
@@ -163,7 +161,7 @@ class OperatorBaseConverter:
             if idx not in exclude_idx:
                 if self._opr.inp_tensors[idx].np_data is not None:
                     inp_tensor = onnx.helper.make_tensor_value_info(
-                        inp.name, mge2onnx_dtype_mapping[inp.dtype], inp.shape
+                        inp.name, to_onnx_dtype(inp.dtype), inp.shape
                     )
                     param = onnx.numpy_helper.from_array(inp.np_data, inp.name)
                     self._net_sources.append(inp_tensor)
@@ -275,7 +273,7 @@ class ElemwiseConverter(OperatorBaseConverter):
                 [],
                 [const_1],
                 value=onnx.helper.make_tensor(
-                    const_1, mge2onnx_dtype_mapping[opr.inp_tensors[0].dtype], [], [1.0]
+                    const_1, to_onnx_dtype(opr.inp_tensors[0].dtype), [], [1.0]
                 ),
             )
             self._parse_fake_tensor_info(const_1, opr.inp_tensors[0])
@@ -350,16 +348,16 @@ class SubtensorConverter(OperatorBaseConverter):
             op_name + "_step",
         ]
         begin = onnx.helper.make_tensor_value_info(
-            inputs[1], mge2onnx_dtype_mapping[np.int32], starts.shape
+            inputs[1], to_onnx_dtype(np.int32), starts.shape
         )
         end = onnx.helper.make_tensor_value_info(
-            inputs[2], mge2onnx_dtype_mapping[np.int32], ends.shape
+            inputs[2], to_onnx_dtype(np.int32), ends.shape
         )
         axis = onnx.helper.make_tensor_value_info(
-            inputs[3], mge2onnx_dtype_mapping[np.int32], axes.shape
+            inputs[3], to_onnx_dtype(np.int32), axes.shape
         )
         step = onnx.helper.make_tensor_value_info(
-            inputs[4], mge2onnx_dtype_mapping[np.int32], steps.shape
+            inputs[4], to_onnx_dtype(np.int32), steps.shape
         )
         net_sources = [begin, end, axis, step]
         parameters = [
@@ -433,7 +431,7 @@ class MatrixMulConvert(OperatorBaseConverter):
             bias = opr.out_tensors[0].name + "_const_0_onnx"
             dtype = opr.out_tensors[0].dtype
             bias_tensor = onnx.helper.make_tensor_value_info(
-                bias, mge2onnx_dtype_mapping[dtype], [channel]
+                bias, to_onnx_dtype(dtype), [channel]
             )
             bias_param = onnx.numpy_helper.from_array(
                 np.array([0.0] * channel).astype(dtype), bias
@@ -469,9 +467,7 @@ class ReshapeConverter(OperatorBaseConverter):
         outputs = self._get_outputs()
         shape_tensor_name = self._opr.out_tensors[0].name + "_shape_onnx"
         shape_tensor = onnx.helper.make_tensor_value_info(
-            shape_tensor_name,
-            mge2onnx_dtype_mapping[np.int64],
-            (len(self._opr.out_shape),),
+            shape_tensor_name, to_onnx_dtype(np.int64), (len(self._opr.out_shape),),
         )
         shape_param = onnx.numpy_helper.from_array(
             np.array(self._opr.out_shape, dtype=np.int64), shape_tensor_name
@@ -569,7 +565,7 @@ class Conv2DConverter(OperatorBaseConverter):
                 flt = opr.inp_tensors[1].np_data
                 flt_data = flt.reshape(flt_shape)
                 flt_tensor = onnx.helper.make_tensor_value_info(
-                    inputs[1], mge2onnx_dtype_mapping[flt.dtype.type], flt_shape
+                    inputs[1], to_onnx_dtype(flt.dtype.type), flt_shape
                 )
                 flt_param = onnx.numpy_helper.from_array(flt_data, inputs[1])
                 self._net_sources.append(flt_tensor)
@@ -577,9 +573,7 @@ class Conv2DConverter(OperatorBaseConverter):
             else:
                 reshape_inputs = [inputs[1], opr.out_tensors[0].name + "shape_onnx"]
                 shape_tensor = onnx.helper.make_tensor_value_info(
-                    reshape_inputs[1],
-                    mge2onnx_dtype_mapping[np.int64],
-                    (len(flt_shape),),
+                    reshape_inputs[1], to_onnx_dtype(np.int64), (len(flt_shape),),
                 )
                 shape_param = onnx.numpy_helper.from_array(
                     np.array(flt_shape, dtype="int64"), reshape_inputs[1]
@@ -615,7 +609,7 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         # grad_out: (no, co, ho, wo) -> (no, co x ci / group, ho, wo)
         grad_out_tile_in = outputs[0] + "_grad_out_tile_in"
         grad_out_tile_source = onnx.helper.make_tensor_value_info(
-            grad_out_tile_in, mge2onnx_dtype_mapping[np.int64], (4,)
+            grad_out_tile_in, to_onnx_dtype(np.int64), (4,)
         )
         grad_out_tile_param = onnx.numpy_helper.from_array(
             np.array([1, opr.src_shape[1] // opr.group, 1, 1]), grad_out_tile_in
@@ -634,7 +628,7 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         # grad_out: (no, co x ci / group, ho, wo) -> (no x co x ci / group, 1, ho, wo)
         grad_out_reshape_in = outputs[0] + "_grad_out_reshape_in"
         grad_out_reshape_source = onnx.helper.make_tensor_value_info(
-            grad_out_reshape_in, mge2onnx_dtype_mapping[np.int64], (4,)
+            grad_out_reshape_in, to_onnx_dtype(np.int64), (4,)
         )
         grad_out_reshape_param = onnx.numpy_helper.from_array(
             np.array(
@@ -664,7 +658,7 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         # src: (ni, ci, hi, wi) -> (1, ni x ci, hi, wi)
         src_reshape_in = outputs[0] + "_src_reshape_in"
         src_reshape_source = onnx.helper.make_tensor_value_info(
-            src_reshape_in, mge2onnx_dtype_mapping[np.int64], (4,)
+            src_reshape_in, to_onnx_dtype(np.int64), (4,)
         )
         src_reshape_param = onnx.numpy_helper.from_array(
             np.array(
@@ -720,7 +714,7 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         # grad_weight: (1, no x co x ci // group, kh, kw) -> (no, co x ci // group, kh, kw)
         grad_weight_reshape_in = outputs[0] + "_grad_weight_reshape_in"
         grad_weight_reshape_source = onnx.helper.make_tensor_value_info(
-            grad_weight_reshape_in, mge2onnx_dtype_mapping[np.int64], (4,)
+            grad_weight_reshape_in, to_onnx_dtype(np.int64), (4,)
         )
         grad_weight_reshape_param = onnx.numpy_helper.from_array(
             np.array(
@@ -755,7 +749,7 @@ class Conv2DBackwardFilterConverter(OperatorBaseConverter):
         # grad_weight: (1, co x ci // group, kh, kw) -> (ci // group, co, kh, kw)
         grad_weight_reshape2_in = outputs[0] + "_grad_weight_reshape2_in"
         grad_weight_reshape2_source = onnx.helper.make_tensor_value_info(
-            grad_weight_reshape2_in, mge2onnx_dtype_mapping[np.int64], (4,)
+            grad_weight_reshape2_in, to_onnx_dtype(np.int64), (4,)
         )
         grad_weight_reshape2_param = onnx.numpy_helper.from_array(
             np.array(
@@ -844,24 +838,16 @@ class BatchnormConverter(OperatorBaseConverter):
         inputs[4] = self._opr.inp_tensors[0].name + "_var_onnx"
 
         scale = onnx.helper.make_tensor_value_info(
-            inputs[1],
-            mge2onnx_dtype_mapping[self._opr.inp_tensors[1].dtype],
-            scale_.shape,
+            inputs[1], to_onnx_dtype(self._opr.inp_tensors[1].dtype), scale_.shape,
         )
         bias = onnx.helper.make_tensor_value_info(
-            inputs[2],
-            mge2onnx_dtype_mapping[self._opr.inp_tensors[2].dtype],
-            bias_.shape,
+            inputs[2], to_onnx_dtype(self._opr.inp_tensors[2].dtype), bias_.shape,
         )
         mean = onnx.helper.make_tensor_value_info(
-            inputs[3],
-            mge2onnx_dtype_mapping[self._opr.inp_tensors[3].dtype],
-            mean_.shape,
+            inputs[3], to_onnx_dtype(self._opr.inp_tensors[3].dtype), mean_.shape,
         )
         var = onnx.helper.make_tensor_value_info(
-            inputs[4],
-            mge2onnx_dtype_mapping[self._opr.inp_tensors[4].dtype],
-            var_.shape,
+            inputs[4], to_onnx_dtype(self._opr.inp_tensors[4].dtype), var_.shape,
         )
         self._parameters.extend(
             [
@@ -952,9 +938,7 @@ class ReduceConverter(OperatorBaseConverter):
                 self._parse_fake_tensor_info(temp_node, self._opr.inp_tensors[0])
                 shape = inputs[1] + "_shape"
                 shape_tensor = onnx.helper.make_tensor_value_info(
-                    shape,
-                    mge2onnx_dtype_mapping[np.int64],
-                    self._opr.inp_tensors[1].shape,
+                    shape, to_onnx_dtype(np.int64), self._opr.inp_tensors[1].shape,
                 )
                 shape_param = onnx.numpy_helper.from_array(
                     self._opr.inp_tensors[1].np_data.astype(np.int64), shape
@@ -993,10 +977,7 @@ class BroadcastOprConverter(OperatorBaseConverter):
         assert opset_version > 7, "onnx support Expand (broadcast) since opset 8"
         inputs = self._get_inputs()
         typecvt_node = onnx.helper.make_node(
-            "Cast",
-            [inputs[1]],
-            [inputs[1] + "_int64"],
-            to=mge2onnx_dtype_mapping[np.int64],
+            "Cast", [inputs[1]], [inputs[1] + "_int64"], to=to_onnx_dtype(np.int64),
         )
         inputs[1] = inputs[1] + "_int64"
         self._parse_fake_tensor_info(inputs[1], self._opr.inp_tensors[1])
@@ -1012,7 +993,7 @@ class TypeCvtOprConverter(OperatorBaseConverter):
         outputs = self._get_outputs()
         target_dtype = self._opr.out_tensors[0].dtype
         node = onnx.helper.make_node(
-            "Cast", inputs, outputs, to=mge2onnx_dtype_mapping[target_dtype]
+            "Cast", inputs, outputs, to=to_onnx_dtype(target_dtype)
         )
         return [node], self._net_sources, self._net_sources
 
@@ -1128,7 +1109,7 @@ def relu6_add3_dev6(opr, inputs, outputs):
         outputs=[three_name],
         value=onnx.helper.make_tensor(
             name=three_name,
-            data_type=mge2onnx_dtype_mapping[opr.inp_tensors[0].dtype],
+            data_type=to_onnx_dtype(opr.inp_tensors[0].dtype),
             dims=[],
             vals=[3.0],
         ),
@@ -1153,7 +1134,7 @@ def relu6_add3_dev6(opr, inputs, outputs):
         outputs=[relu6_six],
         value=onnx.helper.make_tensor(
             name=six_name,
-            data_type=mge2onnx_dtype_mapping[opr.inp_tensors[0].dtype],
+            data_type=to_onnx_dtype(opr.inp_tensors[0].dtype),
             dims=[],
             vals=[6.0],
         ),
@@ -1243,9 +1224,7 @@ class RepeatConverter(OperatorBaseConverter):
         repeat_shape[opr.axis + 1] *= opr.repeats
         tile_repeats = unsqueeze_out + "_repeats"
         tile_repeats_tensor = onnx.helper.make_tensor_value_info(
-            tile_repeats,
-            mge2onnx_dtype_mapping[np.int64],
-            (opr.inp_tensors[0].ndim + 1,),
+            tile_repeats, to_onnx_dtype(np.int64), (opr.inp_tensors[0].ndim + 1,),
         )
         tile_repeats_param = onnx.numpy_helper.from_array(
             np.array(repeat_shape).astype("int64"), tile_repeats
@@ -1264,7 +1243,7 @@ class RepeatConverter(OperatorBaseConverter):
         shape_tensor_name_after = repeat_name + "_reshape_after"
         shape_tensor_after = onnx.helper.make_tensor_value_info(
             shape_tensor_name_after,
-            mge2onnx_dtype_mapping[np.int64],
+            to_onnx_dtype(np.int64),
             (opr.out_tensors[0].ndim,),
         )
         shape_param_after = onnx.numpy_helper.from_array(
@@ -1301,7 +1280,7 @@ class ResizeConverter(OperatorBaseConverter):
 
         scales = inputs[0] + "_scales"
         scales_tensor = onnx.helper.make_tensor_value_info(
-            scales, mge2onnx_dtype_mapping[np.float32], (4,)
+            scales, to_onnx_dtype(np.float32), (4,)
         )
         scales_param = onnx.numpy_helper.from_array(
             np.array(s, dtype=np.float32), scales

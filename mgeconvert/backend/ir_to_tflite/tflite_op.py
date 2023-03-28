@@ -205,29 +205,22 @@ def get_shape_param(
     )
 
 
-mge2tflite_dtype_mapping = {
-    # pylint: disable=no-member
-    np.float32: TensorType.FLOAT32,
-    np.float16: TensorType.FLOAT16,
-    np.int32: TensorType.INT32,
-    np.int16: TensorType.INT16,
-    np.int8: TensorType.INT8,
-    np.uint8: TensorType.UINT8,
-    dtype("int32"): TensorType.INT32,
-    dtype("int16"): TensorType.INT16,
-    dtype("uint8"): TensorType.UINT8,
-    dtype("int8"): TensorType.INT8,
-    "quint8": TensorType.UINT8,
-    "qint8": TensorType.INT8,
-    "qint32": TensorType.INT32,
-    "qint16": TensorType.INT16,
-    "uint8": TensorType.UINT8,
-    "int8": TensorType.INT8,
-    "int16": TensorType.INT16,
-    "int32": TensorType.INT32,
-    "int64": TensorType.INT64,
-    "qint8_narrow": TensorType.INT8,
-}
+def to_tflite_dtype(dtype: np.dtype):
+    if dtype == np.float32:
+        return TensorType.FLOAT32
+    if dtype == np.float16:
+        return TensorType.FLOAT16
+    if dtype in [np.int64, "int64"]:
+        return TensorType.INT64
+    if dtype in [np.int32, np.dtype("int32"), "qint32", "int32"]:
+        return TensorType.INT32
+    if dtype in [np.int16, np.dtype("int16"), "qint16", "int16"]:
+        return TensorType.INT16
+    if dtype in [np.int8, np.dtype("int8"), "qint8", "int8", "qint8_narrow"]:
+        return TensorType.INT8
+    if dtype in [np.uint8, np.dtype("uint8"), "quint8", "uint8"]:
+        return TensorType.UINT8
+    raise ValueError(f"not support this dtype: {dtype}")
 
 
 mge2tflite_activation_type = {
@@ -629,10 +622,8 @@ def _typecvt(mge_opr, builder):
         target_type = mge_opr.inp_tensors[0].dtype
 
     CastOptions.CastOptionsStart(builder)
-    CastOptions.CastOptionsAddInDataType(builder, mge2tflite_dtype_mapping[target_type])
-    CastOptions.CastOptionsAddOutDataType(
-        builder, mge2tflite_dtype_mapping[target_type]
-    )
+    CastOptions.CastOptionsAddInDataType(builder, to_tflite_dtype(target_type))
+    CastOptions.CastOptionsAddOutDataType(builder, to_tflite_dtype(target_type))
     options = CastOptions.CastOptionsEnd(builder)
     return BuiltinOperator.CAST, BuiltinOptions.CastOptions, options
 

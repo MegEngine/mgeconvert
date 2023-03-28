@@ -22,10 +22,18 @@ from .tflite.CustomOptionsFormat import CustomOptionsFormat
 from .tflite_op import (
     MGE2TFLITE,
     get_shape_param,
-    mge2tflite_dtype_mapping,
     set_quantization,
     set_tensor_format,
+    to_tflite_dtype,
 )
+
+
+def is_quantize(dtype):
+    return (
+        hasattr(dtype, "metadata")
+        and dtype.metadata is not None
+        and "mgb_dtype" in dtype.metadata
+    )
 
 
 class TFLiteConverter:
@@ -112,7 +120,7 @@ class TFLiteConverter:
                 tfl_tensor = self.gen_tensor(
                     tensor.name,
                     result_shape,
-                    mge2tflite_dtype_mapping[dtype],
+                    to_tflite_dtype(dtype),
                     len(self._buffer_list) - 1,
                     scale=scale,
                     zero_point=int(zero_point),
@@ -128,7 +136,7 @@ class TFLiteConverter:
         print("last op: {}".format(last_opr))
         out_tensor = last_opr.out_tensors[0]
         print("dtype: {}".format(out_tensor.dtype))
-        if hasattr(out_tensor.dtype, "metadata"):
+        if is_quantize(out_tensor.dtype):
             scale = out_tensor.dtype.metadata["mgb_dtype"]["scale"]
             zero_point = out_tensor.dtype.metadata["mgb_dtype"].get("zero_point") or 0
             print("scale: {}, zero point: {}".format(scale, zero_point))

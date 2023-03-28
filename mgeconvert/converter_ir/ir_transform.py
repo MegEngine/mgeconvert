@@ -1482,11 +1482,11 @@ def _expand_conv_relu(net: IRGraph):
     for opr in net.all_oprs:
         if not isinstance(opr, (ConvRelu2dOpr, Conv2dOpr)):
             continue
-        
+
         if isinstance(opr, Conv2dOpr):
             if opr.activation != "RELU":
                 continue
-            
+
         conv_op = Conv2dOpr(
             stride=opr.stride,
             padding=opr.padding,

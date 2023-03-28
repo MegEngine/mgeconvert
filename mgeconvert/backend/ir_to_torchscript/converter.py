@@ -10,7 +10,7 @@ import tqdm
 from ...converter_ir.ir_graph import IRGraph
 from ...converter_ir.ir_quantizer import IRQuantizer
 from ...converter_ir.ir_tensor import IRTensor
-from .fx_op import DTYPE_MAPPING, MGE2FX, make_func_node
+from .fx_op import MGE2FX, make_func_node, to_torch_dtype
 
 
 def _detect_unsupported_operators(graph):
@@ -114,7 +114,7 @@ class PytorchConverter:
         module = torch.fx.GraphModule(self.module, self.graph, self.graph_name)
         module.eval()
         inps = [
-            torch.zeros(size=n.shape, dtype=DTYPE_MAPPING[n.dtype])
+            torch.zeros(size=n.shape, dtype=to_torch_dtype(n.dtype))
             for n in self.net.graph_inputs
         ]
         script_module = torch.jit.trace(module, tuple(inps))

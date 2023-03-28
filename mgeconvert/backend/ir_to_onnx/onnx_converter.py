@@ -9,12 +9,7 @@ from tqdm import tqdm
 
 from ...converter_ir.ir_quantizer import IRQuantizer
 from ...frontend.mge_to_ir.mge_utils import get_symvar_value
-from .onnx_op import (
-    MGE2ONNX,
-    _add_input_tensors,
-    mge2onnx_dtype_mapping,
-    set_opset_version,
-)
+from .onnx_op import MGE2ONNX, _add_input_tensors, set_opset_version, to_onnx_dtype
 
 
 class OnnxConverter:
@@ -84,7 +79,7 @@ class OnnxConverter:
         for output in self.net.graph_outputs:
 
             def _get_onnx_dtype(output):
-                return mge2onnx_dtype_mapping[output.dtype]
+                return to_onnx_dtype(output.dtype)
 
             out_tensor = onnx.helper.make_tensor_value_info(
                 output.name, _get_onnx_dtype(output), output.shape
