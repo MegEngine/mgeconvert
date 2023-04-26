@@ -131,9 +131,16 @@ class TM_FrontEnd:
                             else module.act_observer.get_qparams()
                         )
                         out_tensor.set_qparams_from_mge_qparams(qparams)
-                    elif isinstance(m.owner, (FloatQuantStub, FloatDequantStub)):
+                    elif isinstance(m.owner, FloatQuantStub):
                         module = m.owner
                         inp_tensor = self.tensor_resolver.get_ir_tensor(expr.inputs[1])
+                        self.irgraph.get_tensor(
+                            expr.outputs[0]._id, None, origin_tensor=inp_tensor
+                        )
+                    elif isinstance(m.owner, FloatDequantStub):
+                        module = m.owner
+                        inp_tensor = self.tensor_resolver.get_ir_tensor(expr.inputs[1])
+                        inp_tensor.name = expr.outputs[0]._name
                         self.irgraph.get_tensor(
                             expr.outputs[0]._id, None, origin_tensor=inp_tensor
                         )
